@@ -1,0 +1,11 @@
+{
+  "name": "El Sabor de lo Nuestro",
+  "short_name": "El Sabor",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF8ED",
+  "theme_color": "#2B2118"
+}
