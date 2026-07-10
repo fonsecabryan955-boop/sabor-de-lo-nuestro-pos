@@ -1,0 +1,37 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2E7D32"/>
+      <stop offset="100%" stop-color="#1B5E20"/>
+    </linearGradient>
+    <linearGradient id="warmGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#D62828"/>
+      <stop offset="55%" stop-color="#F4661B"/>
+      <stop offset="100%" stop-color="#F7931E"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#bgGrad)"/>
+
+  <!-- Decorative leaves -->
+  <g opacity="0.35">
+    <path d="M60,60 C40,40 40,10 65,-5 C85,15 80,45 60,60 Z" fill="#ffffff" transform="translate(10,40) rotate(20)"/>
+    <path d="M452,452 C432,432 432,402 457,387 C477,407 472,437 452,452 Z" fill="#ffffff" transform="translate(-10,-40) rotate(20)"/>
+  </g>
+
+  <!-- Centered emblem -->
+  <circle cx="256" cy="256" r="150" fill="#FFF8ED"/>
+
+  <text x="256" y="230" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="800" font-size="120" fill="url(#warmGrad)">
+    ES
+  </text>
+  <text x="256" y="330" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="800" font-size="120" fill="url(#warmGrad)">
+    N
+  </text>
+
+  <!-- Small leaf accent under text -->
+  <g transform="translate(256,360)">
+    <path d="M0,0 C-16,-8 -28,-4 -32,8 C-20,16 -8,12 0,0 Z" fill="#2E7D32"/>
+    <path d="M0,0 C16,-8 28,-4 32,8 C20,16 8,12 0,0 Z" fill="#4CAF50"/>
+  </g>
+</svg>
