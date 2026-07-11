@@ -5,7 +5,7 @@ import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Re
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_TQsyLmcW92aapMpchdKaFQ_D-TTWmq8";
 const supabase = createClient(supabaseUrl, supabaseKey);
-const RECORD_ID = "main";
+const RECORD_ID = "main"; // versión con diagnóstico visible
 
 const RESTAURANT_NAME = "El Sabor de lo Nuestro";
 const SHIFT_START = "17:00"; // 5:00 PM
@@ -74,31 +74,44 @@ export default function App() {
   const [showNewDelivery, setShowNewDelivery] = useState(false);
   const [cajaUnlocked, setCajaUnlocked] = useState(false);
   const [receiptFor, setReceiptFor] = useState(null);
+  const [connStatus, setConnStatus] = useState("Conectando…");
+  const [connError, setConnError] = useState(null);
+  const [lastSync, setLastSync] = useState(null);
   const skipNextPoll = useRef(false);
   const initRef = useRef(false);
 
   const persist = useCallback(async (next) => {
     setState(next);
     skipNextPoll.current = true;
-    try {
-      await supabase.from("pos_state").upsert({
-        id: RECORD_ID,
-        value: JSON.stringify(next),
-        updated_at: new Date().toISOString(),
-      });
-    } catch (e) {
-      console.error("No se pudo guardar", e);
+    const { error } = await supabase.from("pos_state").upsert({
+      id: RECORD_ID,
+      value: JSON.stringify(next),
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      setConnStatus("Error al guardar");
+      setConnError(error.message || JSON.stringify(error));
+    } else {
+      setConnStatus("Conectado");
+      setConnError(null);
+      setLastSync(new Date());
     }
   }, []);
 
   useEffect(() => {
     let alive = true;
     async function load() {
-      try {
-        const { data } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).single();
-        if (data && alive) setState(JSON.parse(data.value));
-      } catch (e) {
-        // no existe todavía, se crea en el primer guardado
+      const { data, error } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).maybeSingle();
+      if (error) {
+        setConnStatus("Error al cargar");
+        setConnError(error.message || JSON.stringify(error));
+      } else if (data && alive) {
+        setState(JSON.parse(data.value));
+        setConnStatus("Conectado");
+        setConnError(null);
+        setLastSync(new Date());
+      } else {
+        setConnStatus("Conectado (sin datos aún)");
       }
       if (alive) setLoaded(true);
     }
@@ -108,10 +121,16 @@ export default function App() {
         skipNextPoll.current = false;
         return;
       }
-      try {
-        const { data } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).single();
-        if (data && alive) setState(JSON.parse(data.value));
-      } catch (e) {}
+      const { data, error } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).maybeSingle();
+      if (error) {
+        setConnStatus("Error al sincronizar");
+        setConnError(error.message || JSON.stringify(error));
+      } else if (data && alive) {
+        setState(JSON.parse(data.value));
+        setConnStatus("Conectado");
+        setConnError(null);
+        setLastSync(new Date());
+      }
     }, POLL_MS);
     return () => {
       alive = false;
@@ -126,10 +145,22 @@ export default function App() {
         .from("pos_state")
         .select("id")
         .eq("id", RECORD_ID)
-        .single()
-        .then(({ data }) => {
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (error) {
+            setConnStatus("Error al inicializar");
+            setConnError(error.message || JSON.stringify(error));
+            return;
+          }
           if (!data) {
-            supabase.from("pos_state").insert({ id: RECORD_ID, value: JSON.stringify(state) });
+            supabase.from("pos_state").insert({ id: RECORD_ID, value: JSON.stringify(state) }).then(({ error: insErr }) => {
+              if (insErr) {
+                setConnStatus("Error al crear registro inicial");
+                setConnError(insErr.message || JSON.stringify(insErr));
+              } else {
+                setConnStatus("Conectado");
+              }
+            });
           }
         });
     }
@@ -239,6 +270,12 @@ export default function App() {
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", background: "#FFF8ED", minHeight: "100vh", color: "#2B2118" }}>
+      <div style={{
+        background: connError ? "#C1272D" : "#2E7D32", color: "#fff", fontSize: 12, fontWeight: 700,
+        padding: "6px 14px", textAlign: "center",
+      }}>
+        {connError ? `⚠️ ${connStatus}: ${connError}` : `✅ ${connStatus}${lastSync ? " · última sync " + lastSync.toLocaleTimeString("es-NI") : ""}`}
+      </div>
       <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
           🍔 {RESTAURANT_NAME}
