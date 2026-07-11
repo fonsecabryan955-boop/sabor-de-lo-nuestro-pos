@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet } from "lucide-react";
 
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
-const supabaseKey = "sb_publishable_TQsyLmcW92aapMpchdKaFQ_D-TTWmq8";
+const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
 const RECORD_ID = "main"; // versión con diagnóstico visible
 
