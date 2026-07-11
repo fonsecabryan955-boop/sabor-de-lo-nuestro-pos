@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+mport React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet } from "lucide-react";
 
@@ -719,14 +719,31 @@ const lbl = { display: "block", fontSize: 12, fontWeight: 700, marginTop: 10, ma
 const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 14, boxSizing: "border-box" };
 
 function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
-  const today = todayStr();
-  const todaySales = sales.filter((s) => new Date(s.time).toDateString() === today);
-  const todayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === today);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0, 10);
+  });
+
+  const dayStr = new Date(selectedDate + "T12:00:00").toDateString();
+  const isToday = dayStr === todayStr();
+
+  const todaySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
+  const todayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
   const income = todaySales.reduce((sum, s) => sum + s.total, 0);
   const spent = todayExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const net = income - spent;
   const count = todaySales.length;
-  const lateToday = clockRecords.filter((r) => new Date(r.time).toDateString() === today && r.late).length;
+  const lateToday = clockRecords.filter((r) => new Date(r.time).toDateString() === dayStr && r.late).length;
+
+  const monthKey = selectedDate.slice(0, 7);
+  const monthSales = sales.filter((s) => s.time.slice(0, 7) === monthKey);
+  const monthExpenses = expenses.filter((e) => e.time.slice(0, 7) === monthKey);
+  const monthIncome = monthSales.reduce((sum, s) => sum + s.total, 0);
+  const monthSpent = monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthNet = monthIncome - monthSpent;
+  const [yy, mm] = monthKey.split("-");
+  const monthLabel = new Date(Number(yy), Number(mm) - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
 
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
@@ -739,13 +756,27 @@ function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
 
   return (
     <div>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Reporte del día</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{isToday ? "Reporte de hoy" : "Reporte del día seleccionado"}</h2>
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
+      </div>
+      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 12 }}>
+        Viendo: {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+      </p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={statCard}><div style={statLabel}>Ingresos</div><div style={statValue}>{money(income)}</div></div>
         <div style={statCard}><div style={statLabel}>Gastos</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
         <div style={statCard}><div style={statLabel}>Neto</div><div style={statValue}>{money(net)}</div></div>
         <div style={statCard}><div style={statLabel}>Pedidos cerrados</div><div style={statValue}>{count}</div></div>
         <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
+      </div>
+
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Balance del mes — {monthLabel}</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
+        <div style={statCard}><div style={statLabel}>Gastos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthSpent)}</div></div>
+        <div style={statCard}><div style={statLabel}>Neto del mes</div><div style={statValue}>{money(monthNet)}</div></div>
+        <div style={statCard}><div style={statLabel}>Ventas del mes</div><div style={statValue}>{monthSales.length}</div></div>
       </div>
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Registrar gasto</h3>
