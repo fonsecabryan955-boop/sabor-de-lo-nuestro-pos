@@ -168,7 +168,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales, expenses, employees, clockRecords, promotions, pin } = state;
+  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], pin } = state;
 
   function withTables(fn) {
     persist({ ...state, tables: fn(tables) });
@@ -275,6 +275,13 @@ export default function App() {
       expenses: expenses.filter((e) => new Date(e.time).toDateString() !== dayStr),
     });
   }
+  function clearMonth(monthKey) {
+    persist({
+      ...state,
+      sales: sales.filter((s) => s.time.slice(0, 7) !== monthKey),
+      expenses: expenses.filter((e) => e.time.slice(0, 7) !== monthKey),
+    });
+  }
 
   const nav = [
     { id: "mesas", label: "Mesas", icon: UtensilsCrossed },
@@ -345,7 +352,7 @@ export default function App() {
           <EmpleadosView employees={employees} clockRecords={clockRecords} onAdd={addEmployee} onClockIn={clockIn} />
         )}
 
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} clockRecords={clockRecords} />}
+        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
       </div>
 
       {activeTable && (
@@ -783,7 +790,7 @@ function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
 const lbl = { display: "block", fontSize: 12, fontWeight: 700, marginTop: 10, marginBottom: 4 };
 const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 14, boxSizing: "border-box" };
 
-function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, clockRecords }) {
+function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const tz = d.getTimezoneOffset() * 60000;
@@ -836,7 +843,17 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
         <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
       </div>
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Balance del mes — {monthLabel}</h3>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Balance del mes — {monthLabel}</h3>
+        {(monthSales.length > 0 || monthExpenses.length > 0) && (
+          <button
+            onClick={() => { if (window.confirm(`¿Borrar TODAS las ventas y gastos de ${monthLabel}? Esto no se puede deshacer.`)) onClearMonth(monthKey); }}
+            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+          >
+            Borrar mes completo
+          </button>
+        )}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
         <div style={statCard}><div style={statLabel}>Gastos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthSpent)}</div></div>
@@ -880,7 +897,7 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
         <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Historial de cobros</h3>
-        {todaySales.length > 0 && (
+        {(todaySales.length > 0 || todayExpenses.length > 0) && (
           <button
             onClick={() => { if (window.confirm("¿Borrar todas las ventas y gastos de este día? Esto no se puede deshacer.")) onClearDay(dayStr); }}
             style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
