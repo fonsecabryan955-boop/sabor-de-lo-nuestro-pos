@@ -1,4 +1,4 @@
-mport React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet } from "lucide-react";
 
@@ -827,6 +827,33 @@ const statValue = { fontSize: 22, fontWeight: 800 };
 
 function ReceiptModal({ sale, onClose }) {
   const date = new Date(sale.time);
+  const [contact, setContact] = useState("");
+
+  const receiptText = [
+    RESTAURANT_NAME,
+    date.toLocaleString("es-NI"),
+    sale.ref,
+    "",
+    ...sale.items.map((it) => `${it.qty}x ${it.name} - ${money(it.price * it.qty)}`),
+    "",
+    `Total: ${money(sale.total)}`,
+    `Pago: ${sale.method}`,
+    "",
+    "¡Gracias por su compra!",
+  ].join("\n");
+
+  function sendWhatsapp() {
+    const digits = contact.replace(/[^0-9]/g, "");
+    const url = digits
+      ? `https://wa.me/${digits}?text=${encodeURIComponent(receiptText)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(receiptText)}`;
+    window.open(url, "_blank");
+  }
+  function sendEmail() {
+    const url = `mailto:${contact.includes("@") ? contact : ""}?subject=${encodeURIComponent("Recibo - " + RESTAURANT_NAME)}&body=${encodeURIComponent(receiptText)}`;
+    window.open(url, "_blank");
+  }
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 320, overflow: "hidden" }}>
@@ -848,6 +875,22 @@ function ReceiptModal({ sale, onClose }) {
           </div>
           <div>Pago: {sale.method}</div>
           <div style={{ textAlign: "center", marginTop: 10, fontSize: 11 }}>¡Gracias por su compra!</div>
+        </div>
+        <div style={{ padding: "0 12px 12px" }}>
+          <input
+            placeholder="Número WhatsApp o correo (opcional)"
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            style={{ width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 13, boxSizing: "border-box", marginBottom: 8 }}
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={sendWhatsapp} style={{ flex: 1, padding: 9, borderRadius: 8, border: "none", background: "#25D366", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+              WhatsApp
+            </button>
+            <button onClick={sendEmail} style={{ flex: 1, padding: 9, borderRadius: 8, border: "none", background: "#2B2118", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+              Correo
+            </button>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, padding: 12, borderTop: "1px solid #eee" }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cerrar</button>
