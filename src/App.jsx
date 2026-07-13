@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet } from "lucide-react";
+import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag } from "lucide-react";
 
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
-const RECORD_ID = "main"; // versión con diagnóstico visible
+const RECORD_ID = "main";
+
 const RESTAURANT_NAME = "El Sabor de lo Nuestro";
 const SHIFT_START = "17:00"; // 5:00 PM
 const SHIFT_END = "21:00"; // 9:00 PM
@@ -36,6 +37,7 @@ const MENU = [
   { id: "d1", name: "Soda", price: 40, cat: "Bebidas" },
   { id: "d2", name: "Té de Limón", price: 30, cat: "Bebidas" },
   { id: "d3", name: "Jugo de Naranja", price: 40, cat: "Bebidas" },
+  { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas" },
 ];
 
 const CATS = ["Hamburguesas", "Frappés", "Chicken Mood", "Paninis", "Extras", "Salsas", "Bebidas"];
@@ -57,6 +59,7 @@ function initialState() {
     expenses: [],
     employees: [],
     clockRecords: [],
+    promotions: [],
     pin: DEFAULT_PIN,
   };
 }
@@ -165,7 +168,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales, expenses, employees, clockRecords, pin } = state;
+  const { tables, deliveries, sales, expenses, employees, clockRecords, promotions, pin } = state;
 
   function withTables(fn) {
     persist({ ...state, tables: fn(tables) });
@@ -220,7 +223,7 @@ export default function App() {
     } else {
       const d = deliveries.find((d) => d.id === id);
       if (!d.items.length) return;
-      const sale = { id: Date.now(), kind: "delivery", ref: d.customer, items: d.items, total: orderTotal(d.items), method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, total: orderTotal(d.items), method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
@@ -253,12 +256,19 @@ export default function App() {
       ],
     });
   }
+  function addPromotion(promo) {
+    persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
+  }
+  function deletePromotion(id) {
+    persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
+  }
 
   const nav = [
     { id: "mesas", label: "Mesas", icon: UtensilsCrossed },
     { id: "cocina", label: "Cocina", icon: ChefHat },
     { id: "caja", label: "Caja", icon: Receipt },
     { id: "delivery", label: "Delivery", icon: Bike },
+    { id: "promos", label: "Promos", icon: Tag },
     { id: "empleados", label: "Empleados", icon: UserCheck },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
   ];
@@ -316,6 +326,8 @@ export default function App() {
           <DeliveryView deliveries={deliveries} onNew={() => setShowNewDelivery(true)} onOpen={(id) => setActiveDelivery(id)} />
         )}
 
+        {view === "promos" && <PromoView promotions={promotions} onAdd={addPromotion} onDelete={deletePromotion} />}
+
         {view === "empleados" && (
           <EmpleadosView employees={employees} clockRecords={clockRecords} onAdd={addEmployee} onClockIn={clockIn} />
         )}
@@ -328,6 +340,7 @@ export default function App() {
           title={`Mesa ${activeTable}`}
           items={tables.find((t) => t.id === activeTable).items}
           kitchenStatus={tables.find((t) => t.id === activeTable).kitchenStatus}
+          promotions={promotions}
           onAdd={(item) => addItemToOrder("table", activeTable, item)}
           onQty={(menuId, d) => changeQty("table", activeTable, menuId, d)}
           onNote={(menuId, note) => setNote("table", activeTable, menuId, note)}
@@ -341,6 +354,7 @@ export default function App() {
           title={`Delivery — ${deliveries.find((d) => d.id === activeDelivery).customer}`}
           items={deliveries.find((d) => d.id === activeDelivery).items}
           kitchenStatus={deliveries.find((d) => d.id === activeDelivery).kitchenStatus}
+          promotions={promotions}
           onAdd={(item) => addItemToOrder("delivery", activeDelivery, item)}
           onQty={(menuId, d) => changeQty("delivery", activeDelivery, menuId, d)}
           onNote={(menuId, note) => setNote("delivery", activeDelivery, menuId, note)}
@@ -422,9 +436,11 @@ function MesasView({ tables, onOpen }) {
   );
 }
 
-function OrderModal({ title, items, kitchenStatus, onAdd, onQty, onNote, onSend, onClose }) {
-  const [cat, setCat] = useState(CATS[0]);
+function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onNote, onSend, onClose }) {
+  const allCats = promotions && promotions.length > 0 ? [...CATS, "Promociones"] : CATS;
+  const [cat, setCat] = useState(allCats[0]);
   const total = orderTotal(items);
+  const listForCat = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <div style={{ background: "#FFF8ED", borderRadius: 12, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -434,15 +450,18 @@ function OrderModal({ title, items, kitchenStatus, onAdd, onQty, onNote, onSend,
         </div>
         <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
           <div style={{ width: 150, borderRight: "1px solid #E5D9C3", flexShrink: 0 }}>
-            {CATS.map((c) => (
-              <button key={c} onClick={() => setCat(c)} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 10px", border: "none", background: cat === c ? "#F2C879" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
-                {c}
+            {allCats.map((c) => (
+              <button key={c} onClick={() => setCat(c)} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 10px", border: "none", background: cat === c ? "#F2C879" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: 700, color: c === "Promociones" ? "#C1272D" : "#2B2118" }}>
+                {c === "Promociones" ? "🏷️ Promos" : c}
               </button>
             ))}
           </div>
           <div style={{ flex: 1, padding: 12, overflow: "auto" }}>
-            {MENU.filter((m) => m.cat === cat).map((m) => (
-              <button key={m.id} onClick={() => onAdd(m)} style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", marginBottom: 6, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", fontSize: 14 }}>
+            {cat === "Promociones" && listForCat.length === 0 && (
+              <p style={{ fontSize: 13, color: "#8a7a63" }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
+            )}
+            {listForCat.map((m) => (
+              <button key={m.id} onClick={() => onAdd(m)} style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "10px 12px", marginBottom: 6, borderRadius: 8, border: cat === "Promociones" ? "1px solid #F0997B" : "1px solid #E5D9C3", background: cat === "Promociones" ? "#FFF3EC" : "#fff", cursor: "pointer", fontSize: 14 }}>
                 <span>{m.name}</span>
                 <span style={{ fontWeight: 700 }}>{money(m.price)}</span>
               </button>
@@ -667,6 +686,40 @@ function NewDeliveryModal({ onCreate, onClose }) {
   );
 }
 
+function PromoView({ promotions, onAdd, onDelete }) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  return (
+    <div>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Promociones</h2>
+      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Agrega ofertas o combos temporales — aparecen en una pestaña extra al armar pedidos, sin tocar el menú fijo.</p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
+        <input placeholder="Nombre de la promoción (ej: Combo Familiar)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 260 }} />
+        <input placeholder="Precio" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
+        <button
+          disabled={!name || !price}
+          onClick={() => { onAdd({ name, price: Number(price) }); setName(""); setPrice(""); }}
+          style={{ padding: "0 16px", border: "none", borderRadius: 6, background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name && price ? 1 : 0.5 }}
+        >
+          Agregar promoción
+        </button>
+      </div>
+
+      {promotions.length === 0 && <p style={{ color: "#8a7a63" }}>No hay promociones activas por ahora.</p>}
+      {promotions.map((p) => (
+        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", marginBottom: 8, background: "#fff", border: "1px solid #F0997B", borderRadius: 8 }}>
+          <span style={{ fontWeight: 700 }}>🏷️ {p.name}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontWeight: 700, color: "#C1272D" }}>{money(p.price)}</span>
+            <button onClick={() => onDelete(p.id)} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer" }}><X size={18} /></button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState("");
@@ -801,8 +854,8 @@ function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
         </div>
       )}
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Productos más vendidos hoy</h3>
-      {byItem.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no hay ventas registradas hoy.</p>}
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Productos más vendidos</h3>
+      {byItem.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no hay ventas registradas ese día.</p>}
       {byItem.map(([name, qty]) => (
         <div key={name} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 14 }}>
           <span>{name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
@@ -810,7 +863,7 @@ function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
       ))}
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 20 }}>Historial de cobros</h3>
-      {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros todavía.</p>}
+      {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
       {todaySales.slice().reverse().map((s) => (
         <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
           <span>{s.ref} · {s.method}</span><span style={{ fontWeight: 700 }}>{money(s.total)}</span>
@@ -826,7 +879,7 @@ const statValue = { fontSize: 22, fontWeight: 800 };
 
 function ReceiptModal({ sale, onClose }) {
   const date = new Date(sale.time);
-  const [contact, setContact] = useState("");
+  const [contact, setContact] = useState(sale.phone || "");
 
   const receiptText = [
     RESTAURANT_NAME,
@@ -856,24 +909,45 @@ function ReceiptModal({ sale, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 320, overflow: "hidden" }}>
-        <div id="printable-receipt" style={{ padding: 16, fontFamily: "monospace", fontSize: 13 }}>
-          <div style={{ textAlign: "center", fontWeight: 700, fontSize: 15 }}>{RESTAURANT_NAME}</div>
-          <div style={{ textAlign: "center", fontSize: 11, marginBottom: 8 }}>{date.toLocaleString("es-NI")}</div>
-          <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
-          <div>{sale.ref}</div>
-          <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
+        <div id="printable-receipt" style={{ padding: 18, fontFamily: "monospace", fontSize: 13, background: "#fff" }}>
+          <div style={{ textAlign: "center", fontWeight: 800, fontSize: 17, letterSpacing: 0.5 }}>🍔 {RESTAURANT_NAME}</div>
+          <div style={{ textAlign: "center", fontSize: 10, color: "#666", marginTop: 2 }}>Jinotepe, Carazo, Nicaragua</div>
+          <div style={{ textAlign: "center", fontSize: 11, marginTop: 6, marginBottom: 8, color: "#444" }}>{date.toLocaleString("es-NI", { dateStyle: "long", timeStyle: "short" })}</div>
+          <div style={{ borderTop: "2px dashed #333", margin: "8px 0" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 13 }}>
+            <span>{sale.ref}</span>
+            <span style={{ fontSize: 11, color: "#666" }}>{sale.kind === "delivery" ? "🛵 Delivery" : "🍽️ Mesa"}</span>
+          </div>
+          <div style={{ borderTop: "1px dashed #999", margin: "8px 0" }} />
+          <div style={{ display: "flex", fontSize: 10, color: "#666", fontWeight: 700, marginBottom: 4 }}>
+            <span style={{ flex: 1 }}>PRODUCTO</span>
+            <span style={{ width: 30, textAlign: "center" }}>CANT</span>
+            <span style={{ width: 60, textAlign: "right" }}>SUBTOTAL</span>
+          </div>
           {sale.items.map((it) => (
-            <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between" }}>
-              <span>{it.qty}x {it.name}</span>
-              <span>{money(it.price * it.qty)}</span>
+            <div key={it.menuId} style={{ marginBottom: 4 }}>
+              <div style={{ display: "flex" }}>
+                <span style={{ flex: 1 }}>{it.name}</span>
+                <span style={{ width: 30, textAlign: "center" }}>{it.qty}</span>
+                <span style={{ width: 60, textAlign: "right" }}>{money(it.price * it.qty)}</span>
+              </div>
+              {it.notes && <div style={{ fontSize: 10, color: "#888", fontStyle: "italic" }}>↳ {it.notes}</div>}
             </div>
           ))}
-          <div style={{ borderTop: "1px dashed #999", margin: "6px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}>
-            <span>Total</span><span>{money(sale.total)}</span>
+          <div style={{ borderTop: "1px dashed #999", margin: "8px 0" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#555" }}>
+            <span>Subtotal</span><span>{money(sale.total)}</span>
           </div>
-          <div>Pago: {sale.method}</div>
-          <div style={{ textAlign: "center", marginTop: 10, fontSize: 11 }}>¡Gracias por su compra!</div>
+          <div style={{ borderTop: "2px solid #2B2118", margin: "6px 0" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16 }}>
+            <span>TOTAL</span><span>{money(sale.total)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, background: "#F2C879", padding: "4px 8px", borderRadius: 4 }}>
+            <span>Forma de pago</span><span style={{ fontWeight: 700 }}>{sale.method}</span>
+          </div>
+          <div style={{ borderTop: "1px dashed #999", margin: "10px 0" }} />
+          <div style={{ textAlign: "center", fontSize: 12, fontWeight: 700 }}>¡Gracias por su compra! 🙏</div>
+          <div style={{ textAlign: "center", fontSize: 10, color: "#888", marginTop: 2 }}>Vuelva pronto</div>
         </div>
         <div style={{ padding: "0 12px 12px" }}>
           <input
