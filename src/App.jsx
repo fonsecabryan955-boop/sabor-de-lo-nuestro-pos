@@ -7,7 +7,7 @@ const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
 const RECORD_ID = "main";
 
-const RESTAURANT_NAME = "El Sabor de lo Nuestro";
+const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
 const SHIFT_START = "17:00"; // 5:00 PM
 const SHIFT_END = "21:00"; // 9:00 PM
 const LATE_GRACE_MIN = 10;
@@ -307,7 +307,7 @@ export default function App() {
       </div>
       <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
-          🍔 {RESTAURANT_NAME}
+          🍔🍗 {RESTAURANT_NAME}
         </h1>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {nav.map((n) => {
@@ -956,45 +956,54 @@ function ReceiptModal({ sale, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 320, overflow: "hidden" }}>
-        <div id="printable-receipt" style={{ padding: 18, fontFamily: "monospace", fontSize: 13, background: "#fff" }}>
-          <div style={{ textAlign: "center", fontWeight: 800, fontSize: 17, letterSpacing: 0.5 }}>🍔 {RESTAURANT_NAME}</div>
-          <div style={{ textAlign: "center", fontSize: 10, color: "#666", marginTop: 2 }}>Jinotepe, Carazo, Nicaragua</div>
-          <div style={{ textAlign: "center", fontSize: 11, marginTop: 6, marginBottom: 8, color: "#444" }}>{date.toLocaleString("es-NI", { dateStyle: "long", timeStyle: "short" })}</div>
-          <div style={{ borderTop: "2px dashed #333", margin: "8px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 13 }}>
-            <span>{sale.ref}</span>
-            <span style={{ fontSize: 11, color: "#666" }}>{sale.kind === "delivery" ? "🛵 Delivery" : "🍽️ Mesa"}</span>
+        <div id="printable-receipt" style={{ padding: 0, fontFamily: "'Courier New', monospace", fontSize: 13, background: "#fff" }}>
+          <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", padding: "18px 16px 14px", textAlign: "center" }}>
+            <div style={{ fontSize: 26, marginBottom: 2 }}>🍔🍗</div>
+            <div style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: 0.5, textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>{RESTAURANT_NAME}</div>
+            <div style={{ color: "#FFF3E0", fontSize: 10, marginTop: 3, letterSpacing: 0.5 }}>MASATEPE · MASAYA · NICARAGUA</div>
           </div>
-          <div style={{ borderTop: "1px dashed #999", margin: "8px 0" }} />
-          <div style={{ display: "flex", fontSize: 10, color: "#666", fontWeight: 700, marginBottom: 4 }}>
-            <span style={{ flex: 1 }}>PRODUCTO</span>
-            <span style={{ width: 30, textAlign: "center" }}>CANT</span>
-            <span style={{ width: 60, textAlign: "right" }}>SUBTOTAL</span>
-          </div>
-          {sale.items.map((it) => (
-            <div key={it.menuId} style={{ marginBottom: 4 }}>
-              <div style={{ display: "flex" }}>
-                <span style={{ flex: 1 }}>{it.name}</span>
-                <span style={{ width: 30, textAlign: "center" }}>{it.qty}</span>
-                <span style={{ width: 60, textAlign: "right" }}>{money(it.price * it.qty)}</span>
-              </div>
-              {it.notes && <div style={{ fontSize: 10, color: "#888", fontStyle: "italic" }}>↳ {it.notes}</div>}
+          <div style={{ padding: "14px 16px 0" }}>
+            <div style={{ textAlign: "center", fontSize: 11, color: "#666", marginBottom: 10 }}>{date.toLocaleString("es-NI", { dateStyle: "long", timeStyle: "short" })}</div>
+            <div style={{ borderTop: "2px dashed #E5D9C3", margin: "6px 0 10px" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontWeight: 800, fontSize: 14 }}>{sale.ref}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: sale.kind === "delivery" ? "#2E7D32" : "#C1531F", padding: "3px 8px", borderRadius: 20 }}>
+                {sale.kind === "delivery" ? "🛵 DELIVERY" : "🍽️ MESA"}
+              </span>
             </div>
-          ))}
-          <div style={{ borderTop: "1px dashed #999", margin: "8px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#555" }}>
-            <span>Subtotal</span><span>{money(sale.total)}</span>
+            <div style={{ display: "flex", fontSize: 10, color: "#8a7a63", fontWeight: 800, marginBottom: 6, borderBottom: "1px solid #EEE", paddingBottom: 4 }}>
+              <span style={{ flex: 1 }}>PRODUCTO</span>
+              <span style={{ width: 30, textAlign: "center" }}>CANT</span>
+              <span style={{ width: 65, textAlign: "right" }}>SUBTOTAL</span>
+            </div>
+            {sale.items.map((it) => (
+              <div key={it.menuId} style={{ marginBottom: 6 }}>
+                <div style={{ display: "flex" }}>
+                  <span style={{ flex: 1, fontWeight: 600 }}>{it.name}</span>
+                  <span style={{ width: 30, textAlign: "center" }}>{it.qty}</span>
+                  <span style={{ width: 65, textAlign: "right", fontWeight: 700 }}>{money(it.price * it.qty)}</span>
+                </div>
+                {it.notes && <div style={{ fontSize: 10, color: "#C1531F", fontStyle: "italic" }}>↳ {it.notes}</div>}
+              </div>
+            ))}
+            <div style={{ borderTop: "1px dashed #E5D9C3", margin: "10px 0 8px" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63" }}>
+              <span>Subtotal</span><span>{money(sale.total)}</span>
+            </div>
+            <div style={{ background: "#2B2118", borderRadius: 8, padding: "10px 14px", margin: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>TOTAL</span>
+              <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(sale.total)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, background: "#FFF3E0", padding: "6px 10px", borderRadius: 6, border: "1px solid #F2C879" }}>
+              <span>💳 Forma de pago</span><span style={{ fontWeight: 800 }}>{sale.method}</span>
+            </div>
           </div>
-          <div style={{ borderTop: "2px solid #2B2118", margin: "6px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16 }}>
-            <span>TOTAL</span><span>{money(sale.total)}</span>
+          <div style={{ textAlign: "center", padding: "16px 16px 18px" }}>
+            <div style={{ borderTop: "2px dashed #E5D9C3", marginBottom: 12 }} />
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#C1272D" }}>¡Gracias por su compra! 🙏</div>
+            <div style={{ fontSize: 10, color: "#8a7a63", marginTop: 3 }}>Vuelva pronto — le esperamos con gusto</div>
+            <div style={{ fontSize: 16, marginTop: 8, letterSpacing: 3 }}>🌿 🍔 🌿</div>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, background: "#F2C879", padding: "4px 8px", borderRadius: 4 }}>
-            <span>Forma de pago</span><span style={{ fontWeight: 700 }}>{sale.method}</span>
-          </div>
-          <div style={{ borderTop: "1px dashed #999", margin: "10px 0" }} />
-          <div style={{ textAlign: "center", fontSize: 12, fontWeight: 700 }}>¡Gracias por su compra! 🙏</div>
-          <div style={{ textAlign: "center", fontSize: 10, color: "#888", marginTop: 2 }}>Vuelva pronto</div>
         </div>
         <div style={{ padding: "0 12px 12px" }}>
           <input
