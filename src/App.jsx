@@ -6,7 +6,6 @@ const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
 const RECORD_ID = "main"; // versión con diagnóstico visible
-
 const RESTAURANT_NAME = "El Sabor de lo Nuestro";
 const SHIFT_START = "17:00"; // 5:00 PM
 const SHIFT_END = "21:00"; // 9:00 PM
