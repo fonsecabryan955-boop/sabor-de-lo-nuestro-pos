@@ -262,6 +262,19 @@ export default function App() {
   function deletePromotion(id) {
     persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
   }
+  function deleteSale(id) {
+    persist({ ...state, sales: sales.filter((s) => s.id !== id) });
+  }
+  function deleteExpense(id) {
+    persist({ ...state, expenses: expenses.filter((e) => e.id !== id) });
+  }
+  function clearDay(dayStr) {
+    persist({
+      ...state,
+      sales: sales.filter((s) => new Date(s.time).toDateString() !== dayStr),
+      expenses: expenses.filter((e) => new Date(e.time).toDateString() !== dayStr),
+    });
+  }
 
   const nav = [
     { id: "mesas", label: "Mesas", icon: UtensilsCrossed },
@@ -332,7 +345,7 @@ export default function App() {
           <EmpleadosView employees={employees} clockRecords={clockRecords} onAdd={addEmployee} onClockIn={clockIn} />
         )}
 
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} clockRecords={clockRecords} />}
+        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} clockRecords={clockRecords} />}
       </div>
 
       {activeTable && (
@@ -770,7 +783,7 @@ function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
 const lbl = { display: "block", fontSize: 12, fontWeight: 700, marginTop: 10, marginBottom: 4 };
 const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 14, boxSizing: "border-box" };
 
-function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
+function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, clockRecords }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const tz = d.getTimezoneOffset() * 60000;
@@ -846,9 +859,12 @@ function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
       {todayExpenses.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           {todayExpenses.slice().reverse().map((e) => (
-            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
+            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
               <span>{e.description}</span>
-              <span style={{ fontWeight: 700, color: "#C1272D" }}>-{money(e.amount)}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontWeight: 700, color: "#C1272D" }}>-{money(e.amount)}</span>
+                <button onClick={() => onDeleteExpense(e.id)} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+              </div>
             </div>
           ))}
         </div>
@@ -862,11 +878,25 @@ function ReportesView({ sales, expenses, onAddExpense, clockRecords }) {
         </div>
       ))}
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 20 }}>Historial de cobros</h3>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Historial de cobros</h3>
+        {todaySales.length > 0 && (
+          <button
+            onClick={() => { if (window.confirm("¿Borrar todas las ventas y gastos de este día? Esto no se puede deshacer.")) onClearDay(dayStr); }}
+            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+          >
+            Borrar día completo
+          </button>
+        )}
+      </div>
       {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
       {todaySales.slice().reverse().map((s) => (
-        <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <span>{s.ref} · {s.method}</span><span style={{ fontWeight: 700 }}>{money(s.total)}</span>
+        <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
+          <span>{s.ref} · {s.method}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontWeight: 700 }}>{money(s.total)}</span>
+            <button onClick={() => { if (window.confirm("¿Borrar esta venta?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+          </div>
         </div>
       ))}
     </div>
