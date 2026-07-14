@@ -203,8 +203,9 @@ export default function App() {
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: noteFn(d.items) } : d)));
   }
   function sendToKitchen(kind, id) {
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, kitchenStatus: "pendiente" } : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, kitchenStatus: "pendiente" } : d)));
+    const stamp = (x) => ({ ...x, kitchenStatus: "pendiente", kitchenSentAt: x.kitchenSentAt || new Date().toISOString() });
+    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
+    else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
   function advanceKitchen(kind, id, next) {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, kitchenStatus: next } : t)));
@@ -297,42 +298,48 @@ export default function App() {
     { id: "menutv", label: "Menú TV", icon: Tv },
   ];
 
+  const kiosk = !!new URLSearchParams(window.location.search).get("pantalla");
+
   if (!loaded) {
     return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63" }}>Cargando…</div>;
   }
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", background: "#FFF8ED", minHeight: "100vh", color: "#2B2118" }}>
-      <div style={{
-        background: connError ? "#C1272D" : "#2E7D32", color: "#fff", fontSize: 12, fontWeight: 700,
-        padding: "6px 14px", textAlign: "center",
-      }}>
-        {connError ? `⚠️ ${connStatus}: ${connError}` : `✅ ${connStatus}${lastSync ? " · última sync " + lastSync.toLocaleTimeString("es-NI") : ""}`}
-      </div>
-      <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
-          🍔🍗 {RESTAURANT_NAME}
-        </h1>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {nav.map((n) => {
-            const Icon = n.icon;
-            const active = view === n.id;
-            return (
-              <button
-                key={n.id}
-                onClick={() => setView(n.id)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none",
-                  cursor: "pointer", fontWeight: 700, fontSize: 13,
-                  background: active ? "#E8A33D" : "#3d2f22", color: active ? "#2B2118" : "#F2C879",
-                }}
-              >
-                <Icon size={16} /> {n.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {!kiosk && (
+        <>
+          <div style={{
+            background: connError ? "#C1272D" : "#2E7D32", color: "#fff", fontSize: 12, fontWeight: 700,
+            padding: "6px 14px", textAlign: "center",
+          }}>
+            {connError ? `⚠️ ${connStatus}: ${connError}` : `✅ ${connStatus}${lastSync ? " · última sync " + lastSync.toLocaleTimeString("es-NI") : ""}`}
+          </div>
+          <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+            <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
+              🍔🍗 {RESTAURANT_NAME}
+            </h1>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {nav.map((n) => {
+                const Icon = n.icon;
+                const active = view === n.id;
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => setView(n.id)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none",
+                      cursor: "pointer", fontWeight: 700, fontSize: 13,
+                      background: active ? "#E8A33D" : "#3d2f22", color: active ? "#2B2118" : "#F2C879",
+                    }}
+                  >
+                    <Icon size={16} /> {n.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} />}
@@ -522,57 +529,104 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
 
 const iconBtn = { width: 24, height: 24, borderRadius: 6, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
+function ElapsedBadge({ sentAt }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(iv);
+  }, []);
+  if (!sentAt) return null;
+  const mins = Math.max(0, Math.floor((now - new Date(sentAt).getTime()) / 60000));
+  const urgent = mins >= 10;
+  return (
+    <span style={{
+      fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+      background: urgent ? "#C1272D" : "rgba(255,255,255,0.25)", color: "#fff",
+      animation: urgent ? "pulseBadge 1.2s infinite" : "none",
+    }}>
+      ⏱ {mins} min
+    </span>
+  );
+}
+
 function CocinaView({ tables, deliveries, onAdvance }) {
-  const pendientes = [
-    ...tables.filter((t) => t.kitchenStatus === "pendiente" || t.kitchenStatus === "preparando").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "pendiente" || d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, label: `Delivery: ${d.customer}`, ...d })),
+  const nuevos = [
+    ...tables.filter((t) => t.kitchenStatus === "pendiente").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
+    ...deliveries.filter((d) => d.kitchenStatus === "pendiente").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
+  ];
+  const preparando = [
+    ...tables.filter((t) => t.kitchenStatus === "preparando").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
+    ...deliveries.filter((d) => d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
   ];
   const listos = [
     ...tables.filter((t) => t.kitchenStatus === "listo").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, label: `Delivery: ${d.customer}`, ...d })),
+    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
   ];
+
+  const columns = [
+    { key: "nuevos", title: "🆕 NUEVOS", items: nuevos, bg: "#C1272D", action: "preparando", actionLabel: "Empezar a preparar", nextBg: "#E8A33D" },
+    { key: "preparando", title: "🔥 PREPARANDO", items: preparando, bg: "#E8A33D", action: "listo", actionLabel: "Marcar listo", nextBg: "#639922" },
+    { key: "listos", title: "✅ LISTOS", items: listos, bg: "#639922", action: null, actionLabel: null, nextBg: null },
+  ];
+
   return (
     <div>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Cocina</h2>
-      {pendientes.length === 0 && listos.length === 0 && <p style={{ color: "#8a7a63" }}>No hay pedidos en cocina por ahora.</p>}
-      {pendientes.length > 0 && (
-        <>
-          <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 16 }}>En preparación</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-            {pendientes.map((o) => (
-              <div key={o.kind + o.id} style={{ background: "#fff", border: "2px solid #F0997B", borderRadius: 10, padding: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong>{o.label}</strong>
-                  <Clock size={16} color="#C1531F" />
+      <style>{`
+        @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes cardIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+      `}</style>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>👨‍🍳 Pantalla de Cocina</h2>
+        <span style={{ fontSize: 13, color: "#8a7a63" }}>{new Date().toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+
+      {nuevos.length === 0 && preparando.length === 0 && listos.length === 0 && (
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#8a7a63" }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>🍽️</div>
+          <p>No hay pedidos en cocina por ahora.</p>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
+        {columns.map((col) => (
+          <div key={col.key}>
+            <div style={{ background: col.bg, color: "#fff", fontWeight: 800, fontSize: 14, letterSpacing: 1, padding: "10px 14px", borderRadius: "10px 10px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>{col.title}</span>
+              <span style={{ background: "rgba(255,255,255,0.3)", borderRadius: 20, padding: "2px 10px", fontSize: 13 }}>{col.items.length}</span>
+            </div>
+            <div style={{ background: "#FFF3E8", borderRadius: "0 0 10px 10px", padding: 10, minHeight: 80, display: "flex", flexDirection: "column", gap: 10 }}>
+              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#C9BBA3", textAlign: "center", padding: "16px 0" }}>Vacío</div>}
+              {col.items.map((o) => (
+                <div key={o.kind + o.id} style={{ background: col.bg, borderRadius: 12, padding: 14, color: "#fff", animation: "cardIn 0.3s ease" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong style={{ fontSize: 16 }}>{o.label}</strong>
+                    <ElapsedBadge sentAt={o.kitchenSentAt} />
+                  </div>
+                  <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
+                    {o.items.map((it) => (
+                      <li key={it.menuId}>
+                        <strong>{it.qty}x</strong> {it.name}
+                        {it.notes && <div style={{ fontSize: 12, opacity: 0.85, fontStyle: "italic" }}>↳ {it.notes}</div>}
+                      </li>
+                    ))}
+                  </ul>
+                  {col.action && (
+                    <button
+                      onClick={() => onAdvance(o.kind, o.id, col.action)}
+                      style={{ width: "100%", padding: "10px 0", border: "none", borderRadius: 8, background: "rgba(255,255,255,0.95)", color: col.bg, fontWeight: 800, fontSize: 13, cursor: "pointer" }}
+                    >
+                      {col.actionLabel} →
+                    </button>
+                  )}
+                  {!col.action && (
+                    <div style={{ textAlign: "center", fontSize: 12, fontWeight: 700, opacity: 0.9 }}>Avisar al mesero 🔔</div>
+                  )}
                 </div>
-                <ul style={{ margin: "8px 0", paddingLeft: 18, fontSize: 13 }}>
-                  {o.items.map((it) => (
-                    <li key={it.menuId}>{it.qty}x {it.name} {it.notes && <em style={{ color: "#8a7a63" }}> ({it.notes})</em>}</li>
-                  ))}
-                </ul>
-                {o.kitchenStatus === "pendiente" ? (
-                  <button onClick={() => onAdvance(o.kind, o.id, "preparando")} style={kitchenBtn("#E8A33D")}>Empezar a preparar</button>
-                ) : (
-                  <button onClick={() => onAdvance(o.kind, o.id, "listo")} style={kitchenBtn("#639922")}><CheckCircle2 size={14} /> Marcar listo</button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </>
-      )}
-      {listos.length > 0 && (
-        <>
-          <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 20 }}>Listos para servir</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-            {listos.map((o) => (
-              <div key={o.kind + o.id} style={{ background: "#EAF3DE", border: "2px solid #639922", borderRadius: 10, padding: 14 }}>
-                <strong>{o.label}</strong>
-                <p style={{ margin: "4px 0 0", fontSize: 12, color: "#3B6D11", fontWeight: 700 }}>Listo — avisar al mesero</p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
