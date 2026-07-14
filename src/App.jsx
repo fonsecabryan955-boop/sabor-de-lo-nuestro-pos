@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Package, History, Split } from "lucide-react";
+import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Percent } from "lucide-react";
 
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
@@ -40,23 +40,19 @@ const MENU = [
   { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas" },
 ];
 
+const CAT_ICONS = { "Hamburguesas": "🍔", "Frappés": "🥤", "Chicken Mood": "🍗", "Paninis": "🥪", "Extras": "🍟", "Salsas": "🥫", "Bebidas": "🧃" };
 const CATS = ["Hamburguesas", "Frappés", "Chicken Mood", "Paninis", "Extras", "Salsas", "Bebidas"];
 
 function money(n) {
   return "C$" + (n || 0).toLocaleString("es-NI", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function orderTotal(items) {
-  return items.reduce((sum, it) => sum + it.price * it.qty - (it.discount || 0), 0);
-}
-function itemSubtotal(it) {
-  return it.price * it.qty - (it.discount || 0);
+  return items.reduce((sum, it) => sum + it.price * it.qty, 0);
 }
 function emptyTables() {
   return Array.from({ length: 5 }, (_, i) => ({ id: i + 1, status: "libre", kitchenStatus: null, items: [] }));
 }
 function initialState() {
-  const inv = {};
-  MENU.forEach((m) => (inv[m.id] = 100));
   return {
     tables: emptyTables(),
     deliveries: [],
@@ -66,8 +62,6 @@ function initialState() {
     clockRecords: [],
     promotions: [],
     pin: DEFAULT_PIN,
-    inventory: inv,
-    tableHistory: [],
   };
 }
 function todayStr() {
@@ -89,12 +83,12 @@ export default function App() {
   const [connStatus, setConnStatus] = useState("Conectando…");
   const [connError, setConnError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
-  const [showSplit, setShowSplit] = useState(null);
-  const [showTableHistory, setShowTableHistory] = useState(null);
+  const [readyToast, setReadyToast] = useState(null);
   const skipNextPoll = useRef(false);
   const initRef = useRef(false);
   const audioCtxRef = useRef(null);
   const prevStatusRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   useEffect(() => {
     function unlock() {
@@ -157,10 +151,7 @@ export default function App() {
         setConnStatus("Error al cargar");
         setConnError(error.message || JSON.stringify(error));
       } else if (data && alive) {
-        const parsed = JSON.parse(data.value);
-        if (!parsed.inventory) parsed.inventory = initialState().inventory;
-        if (!parsed.tableHistory) parsed.tableHistory = [];
-        setState(parsed);
+        setState(JSON.parse(data.value));
         setConnStatus("Conectado");
         setConnError(null);
         setLastSync(new Date());
@@ -180,10 +171,7 @@ export default function App() {
         setConnStatus("Error al sincronizar");
         setConnError(error.message || JSON.stringify(error));
       } else if (data && alive) {
-        const parsed = JSON.parse(data.value);
-        if (!parsed.inventory) parsed.inventory = initialState().inventory;
-        if (!parsed.tableHistory) parsed.tableHistory = [];
-        setState(parsed);
+        setState(JSON.parse(data.value));
         setConnStatus("Conectado");
         setConnError(null);
         setLastSync(new Date());
@@ -223,16 +211,20 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], pin, inventory = {}, tableHistory = [] } = state;
+  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], pin } = state;
 
   useEffect(() => {
     const current = {};
-    tables.forEach((t) => { if (t.items.length) current["table" + t.id] = t.kitchenStatus; });
-    deliveries.forEach((d) => { if (d.items.length) current["delivery" + d.id] = d.kitchenStatus; });
+    tables.forEach((t) => { if (t.items.length) current["table" + t.id] = { status: t.kitchenStatus, label: `Mesa ${t.id}` }; });
+    deliveries.forEach((d) => { if (d.items.length) current["delivery" + d.id] = { status: d.kitchenStatus, label: d.customer }; });
     if (prevStatusRef.current) {
       for (const key in current) {
-        if (current[key] === "listo" && prevStatusRef.current[key] !== "listo") {
+        const prev = prevStatusRef.current[key];
+        if (current[key].status === "listo" && (!prev || prev.status !== "listo")) {
           playReadyBeep();
+          setReadyToast(`✅ ${current[key].label} está listo`);
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
           break;
         }
       }
@@ -246,20 +238,12 @@ export default function App() {
   function withDeliveries(fn) {
     persist({ ...state, deliveries: fn(deliveries) });
   }
-  function withInventory(fn) {
-    persist({ ...state, inventory: fn({ ...inventory }) });
-  }
 
   function addItemToOrder(kind, id, menuItem) {
-    const stock = inventory[menuItem.id] ?? 0;
-    if (stock <= 0) {
-      alert("Sin stock para " + menuItem.name);
-      return;
-    }
     const addFn = (items) => {
       const existing = items.find((it) => it.menuId === menuItem.id);
       if (existing) return items.map((it) => (it.menuId === menuItem.id ? { ...it, qty: it.qty + 1 } : it));
-      return [...items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: 1, notes: "", discount: 0 }];
+      return [...items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: 1, notes: "" }];
     };
     if (kind === "table") {
       withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: addFn(t.items), status: "ocupada" } : t)));
@@ -277,73 +261,52 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: noteFn(t.items) } : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: noteFn(d.items) } : d)));
   }
-  function setDiscount(kind, id, menuId, discount) {
-    const disc = Math.max(0, Number(discount) || 0);
-    const discFn = (items) => items.map((it) => (it.menuId === menuId ? { ...it, discount: disc } : it));
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: discFn(t.items) } : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: discFn(d.items) } : d)));
-  }
   function sendToKitchen(kind, id) {
-    const stamp = (x) => ({ ...x, kitchenStatus: "pendiente", kitchenSentAt: new Date().toISOString() });
+    const stamp = (x) => ({ ...x, kitchenStatus: "pendiente", kitchenSentAt: x.kitchenSentAt || new Date().toISOString() });
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
   function advanceKitchen(kind, id, next) {
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, kitchenStatus: next } : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, kitchenStatus: next } : d)));
+    const stamp = (x) => ({ ...x, kitchenStatus: next, kitchenSentAt: new Date().toISOString() });
+    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
+    else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
-
-  function consumeStock(items) {
-    const nextInv = { ...inventory };
-    items.forEach((it) => {
-      if (nextInv[it.menuId] !== undefined) {
-        nextInv[it.menuId] = Math.max(0, (nextInv[it.menuId] || 0) - it.qty);
-      }
-    });
-    return nextInv;
-  }
-
-  function closeTicket(kind, id, method, selectedItems) {
+  function closeTicket(kind, id, method, discount) {
+    const disc = discount && discount.value > 0 ? discount : null;
+    function computeTotal(items) {
+      const sub = orderTotal(items);
+      if (!disc) return { subtotal: sub, discountAmount: 0, total: sub };
+      const discountAmount = disc.type === "percent" ? Math.round(sub * (disc.value / 100)) : Math.min(disc.value, sub);
+      return { subtotal: sub, discountAmount, total: Math.max(0, sub - discountAmount) };
+    }
     if (kind === "table") {
       const t = tables.find((t) => t.id === id);
       if (!t.items.length) return;
-      const itemsToCharge = selectedItems || t.items;
-      const remaining = selectedItems ? t.items.filter((it) => !selectedItems.find((s) => s.menuId === it.menuId)) : [];
-      const total = orderTotal(itemsToCharge);
-      const sale = { id: Date.now(), kind: "mesa", ref: `Mesa ${t.id}`, items: itemsToCharge, total, method, time: new Date().toISOString() };
+      const { subtotal, discountAmount, total } = computeTotal(t.items);
+      const sale = { id: Date.now(), kind: "mesa", ref: `Mesa ${t.id}`, items: t.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
-        tableHistory: [...tableHistory, { ...sale, tableId: t.id }],
-        inventory: consumeStock(itemsToCharge),
-        tables: tables.map((x) => (x.id === id ? { ...x, status: remaining.length ? "ocupada" : "libre", kitchenStatus: remaining.length ? x.kitchenStatus : null, items: remaining } : x)),
+        tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [] } : x)),
       };
       persist(next);
-      if (!remaining.length) {
-        setActiveTable(null);
-      }
+      setActiveTable(null);
       setReceiptFor(sale);
     } else {
       const d = deliveries.find((d) => d.id === id);
       if (!d.items.length) return;
-      const itemsToCharge = selectedItems || d.items;
-      const remaining = selectedItems ? d.items.filter((it) => !selectedItems.find((s) => s.menuId === it.menuId)) : [];
-      const total = orderTotal(itemsToCharge);
-      const sale = { id: Date.now(), kind: "delivery", ref: d.customer, phone: d.phone, items: itemsToCharge, total, method, time: new Date().toISOString() };
+      const { subtotal, discountAmount, total } = computeTotal(d.items);
+      const sale = { id: Date.now(), kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
-        inventory: consumeStock(itemsToCharge),
-        deliveries: deliveries.map((x) => (x.id === id ? { ...x, kitchenStatus: remaining.length ? x.kitchenStatus : "entregado", items: remaining } : x)),
+        deliveries: deliveries.map((x) => (x.id === id ? { ...x, kitchenStatus: "entregado" } : x)),
       };
       persist(next);
-      if (!remaining.length) {
-        setActiveDelivery(null);
-      }
+      setActiveDelivery(null);
       setReceiptFor(sale);
     }
   }
-
   function addExpense(exp) {
     persist({ ...state, expenses: [...expenses, { id: Date.now(), ...exp, time: new Date().toISOString() }] });
   }
@@ -360,11 +323,14 @@ export default function App() {
     const minsLate = late ? nowMinutes - shiftMinutes : 0;
     persist({
       ...state,
-      clockRecords: [...clockRecords, { id: Date.now(), employee: employeeName, time: now.toISOString(), late, minsLate }],
+      clockRecords: [
+        ...clockRecords,
+        { id: Date.now(), employee: employeeName, time: now.toISOString(), late, minsLate },
+      ],
     });
   }
   function addPromotion(promo) {
-    persist({ ...state, promotions: [...promotions, { ...promo, id: Date.now() }] });
+    persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
   }
   function deletePromotion(id) {
     persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
@@ -389,12 +355,6 @@ export default function App() {
       expenses: expenses.filter((e) => e.time.slice(0, 7) !== monthKey),
     });
   }
-  function adjustStock(menuId, qty) {
-    withInventory((inv) => ({ ...inv, [menuId]: Math.max(0, (inv[menuId] || 0) + qty) }));
-  }
-  function setStock(menuId, qty) {
-    withInventory((inv) => ({ ...inv, [menuId]: Math.max(0, Number(qty) || 0) }));
-  }
 
   const nav = [
     { id: "mesas", label: "Mesas", icon: UtensilsCrossed },
@@ -404,18 +364,29 @@ export default function App() {
     { id: "promos", label: "Promos", icon: Tag },
     { id: "empleados", label: "Empleados", icon: UserCheck },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
-    { id: "inventario", label: "Inventario", icon: Package },
     { id: "menutv", label: "Menú TV", icon: Tv },
   ];
 
   const kiosk = !!new URLSearchParams(window.location.search).get("pantalla");
 
   if (!loaded) {
-    return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63", fontFamily: "Arial, sans-serif" }}>Cargando…</div>;
+    return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63" }}>Cargando…</div>;
   }
 
   return (
-    <div style={{ fontFamily: "'Segoe UI', Arial, sans-serif", background: "#FFF8ED", minHeight: "100vh", color: "#2B2118" }}>
+    <div style={{ fontFamily: "Arial, sans-serif", background: "#FFF8ED", minHeight: "100vh", color: "#2B2118" }}>
+      {readyToast && (
+        <div
+          onClick={() => setReadyToast(null)}
+          style={{
+            position: "fixed", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 100,
+            background: "linear-gradient(135deg, #00E676, #00A152)", color: "#fff", fontWeight: 800, fontSize: 14,
+            padding: "12px 22px", borderRadius: 30, boxShadow: "0 6px 20px rgba(0,161,82,0.5)", cursor: "pointer",
+          }}
+        >
+          🔔 {readyToast}
+        </div>
+      )}
       {!kiosk && (
         <>
           <div style={{
@@ -440,8 +411,6 @@ export default function App() {
                       display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none",
                       cursor: "pointer", fontWeight: 700, fontSize: 13,
                       background: active ? "#E8A33D" : "#3d2f22", color: active ? "#2B2118" : "#F2C879",
-                      transition: "all 0.2s",
-                      boxShadow: active ? "0 2px 6px rgba(232,163,61,0.4)" : "none",
                     }}
                   >
                     <Icon size={16} /> {n.label}
@@ -454,13 +423,13 @@ export default function App() {
       )}
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
-        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onHistory={(id) => setShowTableHistory(id)} />}
+        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} />}
 
         {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} />}
 
         {view === "caja" &&
           (cajaUnlocked ? (
-            <CajaView tables={tables} deliveries={deliveries} onCharge={closeTicket} onSplit={(data) => setShowSplit(data)} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} />
+            <CajaView tables={tables} deliveries={deliveries} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} />
           ) : (
             <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />
           ))}
@@ -477,8 +446,6 @@ export default function App() {
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
 
-        {view === "inventario" && <InventoryView inventory={inventory} onAdjust={adjustStock} onSet={setStock} />}
-
         {view === "menutv" && <MenuBoardView promotions={promotions} />}
       </div>
 
@@ -488,11 +455,9 @@ export default function App() {
           items={tables.find((t) => t.id === activeTable).items}
           kitchenStatus={tables.find((t) => t.id === activeTable).kitchenStatus}
           promotions={promotions}
-          inventory={inventory}
           onAdd={(item) => addItemToOrder("table", activeTable, item)}
           onQty={(menuId, d) => changeQty("table", activeTable, menuId, d)}
           onNote={(menuId, note) => setNote("table", activeTable, menuId, note)}
-          onDiscount={(menuId, d) => setDiscount("table", activeTable, menuId, d)}
           onSend={() => sendToKitchen("table", activeTable)}
           onClose={() => setActiveTable(null)}
         />
@@ -504,11 +469,9 @@ export default function App() {
           items={deliveries.find((d) => d.id === activeDelivery).items}
           kitchenStatus={deliveries.find((d) => d.id === activeDelivery).kitchenStatus}
           promotions={promotions}
-          inventory={inventory}
           onAdd={(item) => addItemToOrder("delivery", activeDelivery, item)}
           onQty={(menuId, d) => changeQty("delivery", activeDelivery, menuId, d)}
           onNote={(menuId, note) => setNote("delivery", activeDelivery, menuId, note)}
-          onDiscount={(menuId, d) => setDiscount("delivery", activeDelivery, menuId, d)}
           onSend={() => sendToKitchen("delivery", activeDelivery)}
           onClose={() => setActiveDelivery(null)}
         />
@@ -527,82 +490,17 @@ export default function App() {
       )}
 
       {receiptFor && <ReceiptModal sale={receiptFor} onClose={() => setReceiptFor(null)} />}
-
-      {showSplit && (
-        <SplitModal
-          data={showSplit}
-          onClose={() => setShowSplit(null)}
-          onConfirm={(selectedItems, method) => {
-            closeTicket(showSplit.kind, showSplit.id, method, selectedItems);
-            setShowSplit(null);
-          }}
-        />
-      )}
-
-      {showTableHistory && (
-        <TableHistoryModal
-          tableId={showTableHistory}
-          history={tableHistory.filter((h) => h.tableId === showTableHistory)}
-          onClose={() => setShowTableHistory(null)}
-        />
-      )}
     </div>
   );
 }
 
 function statusStyle(kitchenStatus, hasItems) {
-  if (!hasItems) return { grad: "linear-gradient(135deg, #EFE6D8, #E5D9C3)", text: "#8a7a63", label: "Libre", icon: "🟢" };
-  if (!kitchenStatus) return { grad: "linear-gradient(135deg, #F2C879, #E8A33D)", text: "#2B2118", label: "Armando orden", icon: "📝" };
-  if (kitchenStatus === "pendiente") return { grad: "linear-gradient(135deg, #F0997B, #C1531F)", text: "#fff", label: "En cocina", icon: "🆕" };
-  if (kitchenStatus === "preparando") return { grad: "linear-gradient(135deg, #E8A33D, #C1531F)", text: "#fff", label: "Preparando", icon: "🔥" };
-  if (kitchenStatus === "listo") return { grad: "linear-gradient(135deg, #97C459, #4E7C1F)", text: "#fff", label: "¡Listo!", icon: "✅" };
-  return { grad: "linear-gradient(135deg, #EFE6D8, #E5D9C3)", text: "#8a7a63", label: "Libre", icon: "🟢" };
-}
-
-function MesasView({ tables, onOpen, onHistory }) {
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🍽️ Piso del restaurante</h2>
-        <span style={{ fontSize: 12, color: "#8a7a63" }}>{tables.length} mesas</span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
-        {tables.map((t) => {
-          const st = statusStyle(t.kitchenStatus, t.items.length > 0);
-          const total = orderTotal(t.items);
-          return (
-            <div key={t.id} style={{ position: "relative" }}>
-              <button
-                onClick={() => onOpen(t.id)}
-                style={{
-                  width: "100%", background: st.grad, border: "none", borderRadius: 16, padding: "20px 16px", cursor: "pointer",
-                  textAlign: "left", color: st.text, boxShadow: "0 4px 14px rgba(0,0,0,0.12)", position: "relative", overflow: "hidden",
-                  transition: "transform 0.15s, box-shadow 0.15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 18px rgba(0,0,0,0.16)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 14px rgba(0,0,0,0.12)"; }}
-              >
-                <div style={{ fontSize: 26, position: "absolute", top: 10, right: 12, opacity: 0.85 }}>{st.icon}</div>
-                <div style={{ fontSize: 26, fontWeight: 800 }}>Mesa {t.id}</div>
-                <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.9 }}>{st.label}</div>
-                {t.items.length > 0 && <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>}
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onHistory(t.id); }}
-                style={{
-                  position: "absolute", top: 8, left: 8, background: "rgba(255,255,255,0.35)", border: "none", borderRadius: 6,
-                  padding: "4px 8px", cursor: "pointer", fontSize: 11, fontWeight: 700, color: st.text, display: "flex", alignItems: "center", gap: 4,
-                }}
-                title="Historial de la mesa"
-              >
-                <History size={12} /> Historial
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+  if (!hasItems) return { grad: "linear-gradient(135deg, #26A65B, #158A4A)", text: "#fff", label: "Libre", icon: "🟢", glow: "rgba(38,166,91,0.4)" };
+  if (!kitchenStatus) return { grad: "linear-gradient(135deg, #FFC107, #FF8F00)", text: "#2B2118", label: "Armando orden", icon: "📝", glow: "rgba(255,143,0,0.4)" };
+  if (kitchenStatus === "pendiente") return { grad: "linear-gradient(135deg, #FF5722, #D84315)", text: "#fff", label: "En cocina", icon: "🆕", glow: "rgba(216,67,21,0.45)" };
+  if (kitchenStatus === "preparando") return { grad: "linear-gradient(135deg, #E53935, #B71C1C)", text: "#fff", label: "Preparando", icon: "🔥", glow: "rgba(183,28,28,0.5)" };
+  if (kitchenStatus === "listo") return { grad: "linear-gradient(135deg, #00E676, #00A152)", text: "#fff", label: "¡Listo!", icon: "✅", glow: "rgba(0,161,82,0.55)" };
+  return { grad: "linear-gradient(135deg, #26A65B, #158A4A)", text: "#fff", label: "Libre", icon: "🟢", glow: "rgba(38,166,91,0.4)" };
 }
 
 function PinGate({ pin, onUnlock }) {
@@ -631,76 +529,109 @@ function PinGate({ pin, onUnlock }) {
   );
 }
 
-function OrderModal({ title, items, kitchenStatus, promotions, inventory, onAdd, onQty, onNote, onDiscount, onSend, onClose }) {
+function MesasView({ tables, onOpen }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🍽️ Piso del restaurante</h2>
+        <span style={{ fontSize: 12, color: "#8a7a63" }}>{tables.length} mesas</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
+        {tables.map((t) => {
+          const st = statusStyle(t.kitchenStatus, t.items.length > 0);
+          const total = orderTotal(t.items);
+          return (
+            <button
+              key={t.id}
+              onClick={() => onOpen(t.id)}
+              style={{
+                background: st.grad, border: "none", borderRadius: 16, padding: "20px 14px", cursor: "pointer",
+                textAlign: "left", color: st.text, boxShadow: `0 6px 16px ${st.glow}`, position: "relative", overflow: "hidden",
+              }}
+            >
+              <div style={{ fontSize: 26, position: "absolute", top: 10, right: 12, opacity: 0.85 }}>{st.icon}</div>
+              <div style={{ fontSize: 26, fontWeight: 800 }}>Mesa {t.id}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.9 }}>{st.label}</div>
+              {t.items.length > 0 && <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onNote, onSend, onClose }) {
   const allCats = promotions && promotions.length > 0 ? [...CATS, "Promociones"] : CATS;
   const [cat, setCat] = useState(allCats[0]);
   const total = orderTotal(items);
   const listForCat = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 14, width: "100%", maxWidth: 680, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
-        <div style={{ background: "#2B2118", color: "#FFF8ED", padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#FFF8ED", cursor: "pointer" }}><X size={22} /></button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 680, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>{title}</h3>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
         </div>
         <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
-          <div style={{ width: 160, borderRight: "1px solid #E5D9C3", flexShrink: 0, background: "#FDF6EB" }}>
+          <div style={{ width: 160, borderRight: "1px solid #E5D9C3", flexShrink: 0, background: "#FBF2E4", padding: 6 }}>
             {allCats.map((c) => (
-              <button key={c} onClick={() => setCat(c)} style={{ display: "block", width: "100%", textAlign: "left", padding: "12px 10px", border: "none", background: cat === c ? "#F2C879" : "transparent", cursor: "pointer", fontSize: 13, fontWeight: 700, color: c === "Promociones" ? "#C1272D" : "#2B2118" }}>
-                {c === "Promociones" ? "🏷️ Promos" : c}
+              <button
+                key={c}
+                onClick={() => setCat(c)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "12px 12px", borderRadius: 10, marginBottom: 4,
+                  border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
+                  background: cat === c ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "transparent",
+                  color: cat === c ? "#fff" : (c === "Promociones" ? "#C1272D" : "#5a4c3a"),
+                  boxShadow: cat === c ? "0 3px 8px rgba(193,39,45,0.3)" : "none",
+                }}
+              >
+                <span style={{ fontSize: 16 }}>{c === "Promociones" ? "🏷️" : CAT_ICONS[c]}</span> {c}
               </button>
             ))}
           </div>
-          <div style={{ flex: 1, padding: 12, overflow: "auto" }}>
+          <div style={{ flex: 1, padding: 14, overflow: "auto" }}>
             {cat === "Promociones" && listForCat.length === 0 && (
               <p style={{ fontSize: 13, color: "#8a7a63" }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
             )}
-            {listForCat.map((m) => {
-              const stock = inventory[m.id] ?? 0;
-              const low = stock <= 5 && stock > 0;
-              const out = stock <= 0;
-              return (
-                <button key={m.id} onClick={() => !out && onAdd(m)} disabled={out} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 12px", marginBottom: 6, borderRadius: 8, border: cat === "Promociones" ? "1px solid #F0997B" : "1px solid #E5D9C3", background: out ? "#f5f5f5" : cat === "Promociones" ? "#FFF3EC" : "#fff", cursor: out ? "not-allowed" : "pointer", fontSize: 14, opacity: out ? 0.6 : 1 }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {m.name}
-                    {low && <span style={{ fontSize: 10, background: "#C1272D", color: "#fff", padding: "2px 6px", borderRadius: 10 }}>Bajo</span>}
-                    {out && <span style={{ fontSize: 10, background: "#999", color: "#fff", padding: "2px 6px", borderRadius: 10 }}>Agotado</span>}
-                  </span>
-                  <span style={{ fontWeight: 700 }}>{money(m.price)}</span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+              {listForCat.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => onAdd(m)}
+                  style={{
+                    display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, padding: "14px 14px", borderRadius: 12,
+                    border: "none", cursor: "pointer", fontSize: 14, textAlign: "left",
+                    background: cat === "Promociones" ? "linear-gradient(135deg, #FFF3EC, #FFE4D3)" : "#fff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  <span style={{ fontWeight: 700, color: "#2B2118" }}>{m.name}</span>
+                  <span style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(m.price)}</span>
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
-        <div style={{ borderTop: "1px solid #E5D9C3", padding: 12, maxHeight: 240, overflow: "auto" }}>
+        <div style={{ borderTop: "1px solid #E5D9C3", padding: 14, maxHeight: 200, overflow: "auto", background: "#FBF2E4" }}>
           {items.length === 0 && <p style={{ fontSize: 13, color: "#8a7a63" }}>Sin productos agregados todavía.</p>}
           {items.map((it) => (
-            <div key={it.menuId} style={{ marginBottom: 10, background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #E5D9C3" }}>
+            <div key={it.menuId} style={{ marginBottom: 8, background: "#fff", borderRadius: 10, padding: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 700 }}>{it.name}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{it.name}</span>
                 <button onClick={() => onQty(it.menuId, -1)} style={iconBtn}><Minus size={14} /></button>
                 <span style={{ minWidth: 18, textAlign: "center", fontSize: 13, fontWeight: 700 }}>{it.qty}</span>
                 <button onClick={() => onQty(it.menuId, 1)} style={iconBtn}><Plus size={14} /></button>
-                <span style={{ minWidth: 80, textAlign: "right", fontSize: 13, fontWeight: 700 }}>{money(itemSubtotal(it))}</span>
+                <span style={{ minWidth: 70, textAlign: "right", fontSize: 13, fontWeight: 800, color: "#C1272D" }}>{money(it.price * it.qty)}</span>
               </div>
-              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #E5D9C3", boxSizing: "border-box" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                <span style={{ fontSize: 11, color: "#8a7a63" }}>Descuento:</span>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={it.discount || ""}
-                  onChange={(e) => onDiscount(it.menuId, e.target.value)}
-                  style={{ width: 80, fontSize: 12, padding: "4px 8px", borderRadius: 6, border: "1px solid #E5D9C3" }}
-                />
-                <span style={{ fontSize: 11, color: "#8a7a63" }}>C$</span>
-              </div>
+              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "6px 8px", borderRadius: 6, border: "1px solid #E5D9C3", boxSizing: "border-box" }} />
             </div>
           ))}
         </div>
-        <div style={{ padding: 14, borderTop: "1px solid #E5D9C3", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "#FDF6EB" }}>
-          <div style={{ fontSize: 16, fontWeight: 800 }}>Total: {money(total)}</div>
-          <button onClick={onSend} disabled={!items.length} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", borderRadius: 8, border: "none", cursor: items.length ? "pointer" : "not-allowed", background: "#C1272D", color: "#fff", fontWeight: 700, opacity: items.length ? 1 : 0.5, boxShadow: "0 2px 8px rgba(193,39,45,0.3)" }}>
+        <div style={{ padding: 16, borderTop: "1px solid #E5D9C3", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "#fff" }}>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>Total: {money(total)}</div>
+          <button onClick={onSend} disabled={!items.length} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 10, border: "none", cursor: items.length ? "pointer" : "not-allowed", background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, opacity: items.length ? 1 : 0.5, fontSize: 14 }}>
             <Send size={16} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
           </button>
         </div>
@@ -709,7 +640,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, inventory, onAdd,
   );
 }
 
-const iconBtn = { width: 26, height: 26, borderRadius: 6, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+const iconBtn = { width: 24, height: 24, borderRadius: 6, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
 function ElapsedBadge({ sentAt }) {
   const [now, setNow] = useState(Date.now());
@@ -789,7 +720,6 @@ function CocinaView({ tables, deliveries, onAdvance }) {
                       <li key={it.menuId}>
                         <strong>{it.qty}x</strong> {it.name}
                         {it.notes && <div style={{ fontSize: 12, opacity: 0.85, fontStyle: "italic" }}>↳ {it.notes}</div>}
-                        {(it.discount || 0) > 0 && <div style={{ fontSize: 11, opacity: 0.85 }}>Desc: -{money(it.discount)}</div>}
                       </li>
                     ))}
                   </ul>
@@ -814,18 +744,30 @@ function CocinaView({ tables, deliveries, onAdvance }) {
   );
 }
 
-function kitchenBtn(bg) {
-  return { marginTop: 8, width: "100%", padding: "8px 0", border: "none", borderRadius: 6, background: bg, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 };
-}
-
-function CajaView({ tables, deliveries, onCharge, onSplit, pin, onChangePin }) {
+function CajaView({ tables, deliveries, onCharge, pin, onChangePin }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
   ];
   const [method, setMethod] = useState({});
+  const [discountOpen, setDiscountOpen] = useState({});
+  const [discountType, setDiscountType] = useState({});
+  const [discountValue, setDiscountValue] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
   const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
+
+  function getDiscount(key) {
+    const val = Number(discountValue[key] || 0);
+    if (!val) return null;
+    return { type: discountType[key] || "percent", value: val };
+  }
+  function discountedTotal(items, key) {
+    const sub = orderTotal(items);
+    const disc = getDiscount(key);
+    if (!disc) return sub;
+    const amt = disc.type === "percent" ? Math.round(sub * (disc.value / 100)) : Math.min(disc.value, sub);
+    return Math.max(0, sub - amt);
+  }
 
   return (
     <div>
@@ -834,7 +776,7 @@ function CajaView({ tables, deliveries, onCharge, onSplit, pin, onChangePin }) {
         <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>⚙️ Cambiar PIN</button>
       </div>
       {abiertas.length > 0 && (
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>CUENTAS ABIERTAS: {abiertas.length}</span>
           <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(grandTotal)}</span>
         </div>
@@ -851,18 +793,45 @@ function CajaView({ tables, deliveries, onCharge, onSplit, pin, onChangePin }) {
           const total = orderTotal(o.items);
           const key = o.kind + o.id;
           const m = method[key] || "Efectivo";
+          const finalTotal = discountedTotal(o.items, key);
+          const hasDiscount = finalTotal < total;
           return (
             <div key={key} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
               <strong style={{ fontSize: 16 }}>{o.label}</strong>
               <ul style={{ margin: "10px 0", paddingLeft: 18, fontSize: 13, color: "#5a4c3a" }}>
-                {o.items.map((it) => (
-                  <li key={it.menuId}>
-                    {it.qty}x {it.name} — {money(itemSubtotal(it))}
-                    {(it.discount || 0) > 0 && <span style={{ fontSize: 11, color: "#C1272D" }}> (desc -{money(it.discount)})</span>}
-                  </li>
-                ))}
+                {o.items.map((it) => <li key={it.menuId}>{it.qty}x {it.name} — {money(it.price * it.qty)}</li>)}
               </ul>
-              <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 17, marginBottom: 10, color: "#C1272D" }}>Total: {money(total)}</div>
+
+              <button
+                onClick={() => setDiscountOpen((s) => ({ ...s, [key]: !s[key] }))}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700, marginBottom: 10 }}
+              >
+                <Percent size={13} /> {discountOpen[key] ? "Ocultar descuento" : "Aplicar descuento"}
+              </button>
+
+              {discountOpen[key] && (
+                <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+                  <select value={discountType[key] || "percent"} onChange={(e) => setDiscountType((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 90, padding: 7 }}>
+                    <option value="percent">%</option>
+                    <option value="amount">C$</option>
+                  </select>
+                  <input type="number" placeholder="0" value={discountValue[key] || ""} onChange={(e) => setDiscountValue((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, padding: 7 }} />
+                </div>
+              )}
+
+              {hasDiscount ? (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", textDecoration: "line-through" }}>
+                    <span>Subtotal</span><span>{money(total)}</span>
+                  </div>
+                  <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 17, color: "#C1272D", display: "flex", justifyContent: "space-between" }}>
+                    <span>Total</span><span>{money(finalTotal)}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 17, marginBottom: 10, color: "#C1272D" }}>Total: {money(total)}</div>
+              )}
+
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 {["Efectivo", "Tarjeta"].map((opt) => (
                   <button
@@ -878,131 +847,9 @@ function CajaView({ tables, deliveries, onCharge, onSplit, pin, onChangePin }) {
                   </button>
                 ))}
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => onCharge(o.kind, o.id, m)} style={{ flex: 1, padding: 12, border: "none", borderRadius: 10, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14 }}>
-                  Cobrar y cerrar →
-                </button>
-                {o.items.length > 1 && (
-                  <button onClick={() => onSplit({ kind: o.kind, id: o.id, items: o.items, label: o.label })} style={{ padding: 12, border: "1px solid #E5D9C3", borderRadius: 10, background: "#fff", color: "#2B2118", fontWeight: 700, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
-                    <Split size={14} /> Dividir
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function SplitModal({ data, onClose, onConfirm }) {
-  const [selected, setSelected] = useState([]);
-  const [method, setMethod] = useState("Efectivo");
-  const total = orderTotal(selected);
-
-  function toggleItem(item) {
-    const exists = selected.find((s) => s.menuId === item.menuId);
-    if (exists) {
-      setSelected(selected.filter((s) => s.menuId !== item.menuId));
-    } else {
-      setSelected([...selected, item]);
-    }
-  }
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 14, width: "100%", maxWidth: 440, maxHeight: "85vh", overflow: "auto", padding: 20, boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
-        <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}><Split size={18} /> Dividir cuenta — {data.label}</h3>
-        <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Selecciona los productos que vas a cobrar ahora. El resto quedará abierto.</p>
-        {data.items.map((it) => (
-          <label key={it.menuId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderBottom: "1px solid #E5D9C3", cursor: "pointer", borderRadius: 6 }}>
-            <input type="checkbox" checked={!!selected.find((s) => s.menuId === it.menuId)} onChange={() => toggleItem(it)} />
-            <span style={{ flex: 1, fontSize: 14 }}>{it.qty}x {it.name}</span>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>{money(itemSubtotal(it))}</span>
-          </label>
-        ))}
-        <div style={{ marginTop: 12, display: "flex", gap: 8, marginBottom: 12 }}>
-          {["Efectivo", "Tarjeta"].map((opt) => (
-            <button key={opt} onClick={() => setMethod(opt)} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: method === opt ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: method === opt ? "#fff" : "#5a4c3a", fontWeight: 700, cursor: "pointer" }}>
-              {opt}
-            </button>
-          ))}
-        </div>
-        <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "10px 12px", fontWeight: 800, fontSize: 17, marginBottom: 14, color: "#C1272D", textAlign: "right" }}>
-          A cobrar: {money(total)}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
-          <button disabled={selected.length === 0} onClick={() => onConfirm(selected, method)} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: selected.length ? 1 : 0.5 }}>
-            Confirmar cobro
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TableHistoryModal({ tableId, history, onClose }) {
-  const tableH = history.slice().reverse();
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 14, width: "100%", maxWidth: 480, maxHeight: "85vh", overflow: "auto", padding: 20, boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
-        <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}><History size={18} /> Historial — Mesa {tableId}</h3>
-        {tableH.length === 0 && <p style={{ color: "#8a7a63" }}>Esta mesa aún no tiene historial de ventas.</p>}
-        {tableH.map((h) => (
-          <div key={h.id} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", marginBottom: 6 }}>
-              <span>{new Date(h.time).toLocaleString("es-NI")}</span>
-              <span>{h.method}</span>
-            </div>
-            <div style={{ fontSize: 13, marginBottom: 4 }}>
-              {h.items.map((it) => (
-                <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                  <span>{it.qty}x {it.name}</span>
-                  <span>{money(itemSubtotal(it))}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ textAlign: "right", fontWeight: 800, fontSize: 16, color: "#C1272D" }}>{money(h.total)}</div>
-          </div>
-        ))}
-        <button onClick={onClose} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", marginTop: 8 }}>Cerrar</button>
-      </div>
-    </div>
-  );
-}
-
-function InventoryView({ inventory, onAdjust, onSet }) {
-  const [search, setSearch] = useState("");
-  const items = MENU.map((m) => ({ ...m, stock: inventory[m.id] ?? 0 })).filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>📦 Inventario</h2>
-        <input placeholder="Buscar producto..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-        {items.map((m) => {
-          const low = m.stock <= 5 && m.stock > 0;
-          const out = m.stock <= 0;
-          return (
-            <div key={m.id} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: 14, boxShadow: "0 2px 6px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontWeight: 700, fontSize: 14 }}>{m.name}</span>
-                <span style={{ fontSize: 12, color: "#8a7a63" }}>{m.cat}</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-                <span style={{ fontSize: 24, fontWeight: 800, color: out ? "#999" : low ? "#C1272D" : "#2E7D32" }}>{m.stock}</span>
-                <span style={{ fontSize: 11, color: "#8a7a63" }}>unidades</span>
-                {low && !out && <span style={{ fontSize: 10, background: "#C1272D", color: "#fff", padding: "2px 6px", borderRadius: 10 }}>Bajo stock</span>}
-                {out && <span style={{ fontSize: 10, background: "#999", color: "#fff", padding: "2px 6px", borderRadius: 10 }}>Agotado</span>}
-              </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-                <button onClick={() => onAdjust(m.id, -1)} style={iconBtn}><Minus size={14} /></button>
-                <button onClick={() => onAdjust(m.id, 1)} style={iconBtn}><Plus size={14} /></button>
-                <input type="number" placeholder="Ajustar" onChange={(e) => onSet(m.id, e.target.value)} style={{ ...inp, flex: 1, fontSize: 12, padding: "4px 8px" }} />
-              </div>
+              <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key))} style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14 }}>
+                Cobrar y cerrar →
+              </button>
             </div>
           );
         })}
@@ -1055,7 +902,7 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
         {activos.map((d) => {
           const st = statusStyle(d.kitchenStatus, d.items.length > 0);
           return (
-            <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)", transition: "transform 0.15s" }} onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-2px)"} onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
+            <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <strong style={{ fontSize: 16 }}>{d.customer}</strong>
                 <span style={{ fontSize: 20 }}>{st.icon}</span>
@@ -1076,8 +923,8 @@ function NewDeliveryModal({ onCreate, onClose }) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 14, width: "100%", maxWidth: 380, padding: 24, boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <div style={{ background: "#FFF8ED", borderRadius: 12, width: "100%", maxWidth: 380, padding: 20 }}>
         <h3 style={{ marginTop: 0 }}>Nuevo pedido delivery</h3>
         <label style={lbl}>Nombre del cliente</label>
         <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={inp} />
@@ -1157,7 +1004,7 @@ function MenuBoardView({ promotions }) {
         {CATS.map((cat) => (
           <div key={cat}>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#F2C879", borderBottom: "2px solid #F2C879", paddingBottom: 4, marginBottom: 8, letterSpacing: 0.5 }}>
-              {cat.toUpperCase()}
+              {CAT_ICONS[cat]} {cat.toUpperCase()}
             </div>
             {MENU.filter((m) => m.cat === cat).map((m) => (
               <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 15 }}>
@@ -1341,7 +1188,7 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
       {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
       {todaySales.slice().reverse().map((s) => (
         <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <span>{s.ref} · {s.method}</span>
+          <span>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontWeight: 700 }}>{money(s.total)}</span>
             <button onClick={() => { if (window.confirm("¿Borrar esta venta?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
@@ -1365,8 +1212,9 @@ function ReceiptModal({ sale, onClose }) {
     date.toLocaleString("es-NI"),
     sale.ref,
     "",
-    ...sale.items.map((it) => `${it.qty}x ${it.name} - ${money(itemSubtotal(it))}`),
+    ...sale.items.map((it) => `${it.qty}x ${it.name} - ${money(it.price * it.qty)}`),
     "",
+    ...(sale.discountAmount > 0 ? [`Subtotal: ${money(sale.subtotal)}`, `Descuento (${sale.discountLabel}): -${money(sale.discountAmount)}`] : []),
     `Total: ${money(sale.total)}`,
     `Pago: ${sale.method}`,
     "",
@@ -1386,8 +1234,8 @@ function ReceiptModal({ sale, onClose }) {
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16, backdropFilter: "blur(2px)" }}>
-      <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 320, overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 320, overflow: "hidden" }}>
         <div id="printable-receipt" style={{ padding: 0, fontFamily: "'Courier New', monospace", fontSize: 13, background: "#fff" }}>
           <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", padding: "18px 16px 14px", textAlign: "center" }}>
             <div style={{ fontSize: 26, marginBottom: 2 }}>🍔🍗</div>
@@ -1413,16 +1261,20 @@ function ReceiptModal({ sale, onClose }) {
                 <div style={{ display: "flex" }}>
                   <span style={{ flex: 1, fontWeight: 600 }}>{it.name}</span>
                   <span style={{ width: 30, textAlign: "center" }}>{it.qty}</span>
-                  <span style={{ width: 65, textAlign: "right", fontWeight: 700 }}>{money(itemSubtotal(it))}</span>
+                  <span style={{ width: 65, textAlign: "right", fontWeight: 700 }}>{money(it.price * it.qty)}</span>
                 </div>
                 {it.notes && <div style={{ fontSize: 10, color: "#C1531F", fontStyle: "italic" }}>↳ {it.notes}</div>}
-                {(it.discount || 0) > 0 && <div style={{ fontSize: 10, color: "#C1272D" }}>Desc: -{money(it.discount)}</div>}
               </div>
             ))}
             <div style={{ borderTop: "1px dashed #E5D9C3", margin: "10px 0 8px" }} />
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63" }}>
-              <span>Subtotal</span><span>{money(sale.total)}</span>
+              <span>Subtotal</span><span>{money(sale.subtotal || sale.total)}</span>
             </div>
+            {sale.discountAmount > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#C1272D", fontWeight: 700 }}>
+                <span>🏷️ Descuento ({sale.discountLabel})</span><span>-{money(sale.discountAmount)}</span>
+              </div>
+            )}
             <div style={{ background: "#2B2118", borderRadius: 8, padding: "10px 14px", margin: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>TOTAL</span>
               <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(sale.total)}</span>
