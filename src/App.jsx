@@ -84,6 +84,43 @@ export default function App() {
   const [lastSync, setLastSync] = useState(null);
   const skipNextPoll = useRef(false);
   const initRef = useRef(false);
+  const audioCtxRef = useRef(null);
+  const prevStatusRef = useRef(null);
+
+  useEffect(() => {
+    function unlock() {
+      if (!audioCtxRef.current) {
+        try { audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+      } else if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+    }
+    window.addEventListener("click", unlock);
+    window.addEventListener("touchstart", unlock);
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
+    };
+  }, []);
+
+  function playReadyBeep() {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    [0, 0.28].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 1046.5;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.35, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.24);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.26);
+    });
+  }
 
   const persist = useCallback(async (next) => {
     setState(next);
@@ -172,6 +209,21 @@ export default function App() {
   }, [loaded]);
 
   const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], pin } = state;
+
+  useEffect(() => {
+    const current = {};
+    tables.forEach((t) => { if (t.items.length) current["table" + t.id] = t.kitchenStatus; });
+    deliveries.forEach((d) => { if (d.items.length) current["delivery" + d.id] = d.kitchenStatus; });
+    if (prevStatusRef.current) {
+      for (const key in current) {
+        if (current[key] === "listo" && prevStatusRef.current[key] !== "listo") {
+          playReadyBeep();
+          break;
+        }
+      }
+    }
+    prevStatusRef.current = current;
+  }, [tables, deliveries]);
 
   function withTables(fn) {
     persist({ ...state, tables: fn(tables) });
@@ -413,13 +465,45 @@ export default function App() {
   );
 }
 
-function statusColor(kitchenStatus, hasItems) {
-  if (!hasItems) return { bg: "#EFE6D8", border: "#C9BBA3", label: "Libre" };
-  if (!kitchenStatus) return { bg: "#F2C879", border: "#C99A1E", label: "Armando orden" };
-  if (kitchenStatus === "pendiente") return { bg: "#F0997B", border: "#C1531F", label: "En cocina" };
-  if (kitchenStatus === "preparando") return { bg: "#F0997B", border: "#C1531F", label: "Preparando" };
-  if (kitchenStatus === "listo") return { bg: "#97C459", border: "#4E7C1F", label: "Listo p/ servir" };
-  return { bg: "#EFE6D8", border: "#C9BBA3", label: "Libre" };
+function statusStyle(kitchenStatus, hasItems) {
+  if (!hasItems) return { grad: "linear-gradient(135deg, #EFE6D8, #E5D9C3)", text: "#8a7a63", label: "Libre", icon: "🟢" };
+  if (!kitchenStatus) return { grad: "linear-gradient(135deg, #F2C879, #E8A33D)", text: "#2B2118", label: "Armando orden", icon: "📝" };
+  if (kitchenStatus === "pendiente") return { grad: "linear-gradient(135deg, #F0997B, #C1531F)", text: "#fff", label: "En cocina", icon: "🆕" };
+  if (kitchenStatus === "preparando") return { grad: "linear-gradient(135deg, #E8A33D, #C1531F)", text: "#fff", label: "Preparando", icon: "🔥" };
+  if (kitchenStatus === "listo") return { grad: "linear-gradient(135deg, #97C459, #4E7C1F)", text: "#fff", label: "¡Listo!", icon: "✅" };
+  return { grad: "linear-gradient(135deg, #EFE6D8, #E5D9C3)", text: "#8a7a63", label: "Libre", icon: "🟢" };
+}
+
+function MesasView({ tables, onOpen }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🍽️ Piso del restaurante</h2>
+        <span style={{ fontSize: 12, color: "#8a7a63" }}>{tables.length} mesas</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
+        {tables.map((t) => {
+          const st = statusStyle(t.kitchenStatus, t.items.length > 0);
+          const total = orderTotal(t.items);
+          return (
+            <button
+              key={t.id}
+              onClick={() => onOpen(t.id)}
+              style={{
+                background: st.grad, border: "none", borderRadius: 16, padding: "20px 14px", cursor: "pointer",
+                textAlign: "left", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)", position: "relative", overflow: "hidden",
+              }}
+            >
+              <div style={{ fontSize: 26, position: "absolute", top: 10, right: 12, opacity: 0.85 }}>{st.icon}</div>
+              <div style={{ fontSize: 26, fontWeight: 800 }}>Mesa {t.id}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.9 }}>{st.label}</div>
+              {t.items.length > 0 && <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function PinGate({ pin, onUnlock }) {
@@ -444,27 +528,6 @@ function PinGate({ pin, onUnlock }) {
       >
         Entrar
       </button>
-    </div>
-  );
-}
-
-function MesasView({ tables, onOpen }) {
-  return (
-    <div>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Piso — 5 mesas</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-        {tables.map((t) => {
-          const sc = statusColor(t.kitchenStatus, t.items.length > 0);
-          const total = orderTotal(t.items);
-          return (
-            <button key={t.id} onClick={() => onOpen(t.id)} style={{ background: sc.bg, border: `2px solid ${sc.border}`, borderRadius: 12, padding: "18px 12px", cursor: "pointer", textAlign: "left", color: "#2B2118" }}>
-              <div style={{ fontSize: 22, fontWeight: 800 }}>Mesa {t.id}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{sc.label}</div>
-              {t.items.length > 0 && <div style={{ fontSize: 13, marginTop: 8, fontWeight: 700 }}>{money(total)}</div>}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -638,48 +701,60 @@ function kitchenBtn(bg) {
 function CajaView({ tables, deliveries, onCharge, pin, onChangePin }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `Delivery: ${d.customer}`, ...d })),
+    ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
   ];
   const [method, setMethod] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
+  const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Caja</h2>
-        <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>Cambiar PIN</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>💵 Caja</h2>
+        <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>⚙️ Cambiar PIN</button>
       </div>
+      {abiertas.length > 0 && (
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>CUENTAS ABIERTAS: {abiertas.length}</span>
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(grandTotal)}</span>
+        </div>
+      )}
       {showPinSettings && <ChangePin current={pin} onChange={(p) => { onChangePin(p); setShowPinSettings(false); }} />}
-      {abiertas.length === 0 && <p style={{ color: "#8a7a63" }}>No hay cuentas abiertas.</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+      {abiertas.length === 0 && (
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>💵</div>
+          <p>No hay cuentas abiertas.</p>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 14 }}>
         {abiertas.map((o) => {
           const total = orderTotal(o.items);
           const key = o.kind + o.id;
           const m = method[key] || "Efectivo";
           return (
-            <div key={key} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: 14 }}>
-              <strong>{o.label}</strong>
-              <ul style={{ margin: "8px 0", paddingLeft: 18, fontSize: 13 }}>
+            <div key={key} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
+              <strong style={{ fontSize: 16 }}>{o.label}</strong>
+              <ul style={{ margin: "10px 0", paddingLeft: 18, fontSize: 13, color: "#5a4c3a" }}>
                 {o.items.map((it) => <li key={it.menuId}>{it.qty}x {it.name} — {money(it.price * it.qty)}</li>)}
               </ul>
-              <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 8 }}>Total: {money(total)}</div>
-              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 17, marginBottom: 10, color: "#C1272D" }}>Total: {money(total)}</div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 {["Efectivo", "Tarjeta"].map((opt) => (
                   <button
                     key={opt}
                     onClick={() => setMethod((s) => ({ ...s, [key]: opt }))}
                     style={{
-                      flex: 1, padding: 10, borderRadius: 8, cursor: "pointer", fontWeight: 700, fontSize: 13,
-                      border: m === opt ? "2px solid #C1272D" : "1px solid #E5D9C3",
-                      background: m === opt ? "#FCEBEB" : "#fff", color: m === opt ? "#791F1F" : "#2B2118",
+                      flex: 1, padding: 10, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13,
+                      border: "none",
+                      background: m === opt ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: m === opt ? "#fff" : "#5a4c3a",
                     }}
                   >
                     <Wallet size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{opt}
                   </button>
                 ))}
               </div>
-              <button onClick={() => onCharge(o.kind, o.id, m)} style={{ width: "100%", padding: 10, border: "none", borderRadius: 8, background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
-                Cobrar y cerrar
+              <button onClick={() => onCharge(o.kind, o.id, m)} style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14 }}>
+                Cobrar y cerrar →
               </button>
             </div>
           );
@@ -717,22 +792,30 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
   const activos = deliveries.filter((d) => d.kitchenStatus !== "entregado");
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Delivery</h2>
-        <button onClick={onNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🛵 Delivery</h2>
+        <button onClick={onNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 8px rgba(193,39,45,0.3)" }}>
           <Plus size={16} /> Nuevo pedido
         </button>
       </div>
-      {activos.length === 0 && <p style={{ color: "#8a7a63" }}>No hay pedidos de delivery activos.</p>}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+      {activos.length === 0 && (
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>🛵</div>
+          <p>No hay pedidos de delivery activos.</p>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
         {activos.map((d) => {
-          const sc = statusColor(d.kitchenStatus, d.items.length > 0);
+          const st = statusStyle(d.kitchenStatus, d.items.length > 0);
           return (
-            <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: sc.bg, border: `2px solid ${sc.border}`, borderRadius: 10, padding: 14, cursor: "pointer" }}>
-              <strong>{d.customer}</strong>
-              <p style={{ margin: "4px 0", fontSize: 12 }}>{d.phone}</p>
-              <p style={{ margin: "4px 0", fontSize: 12 }}>{d.address}</p>
-              <div style={{ fontSize: 12, fontWeight: 700, marginTop: 6 }}>{sc.label}</div>
+            <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <strong style={{ fontSize: 16 }}>{d.customer}</strong>
+                <span style={{ fontSize: 20 }}>{st.icon}</span>
+              </div>
+              <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>
+              <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>
+              <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
             </button>
           );
         })}
