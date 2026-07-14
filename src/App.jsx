@@ -84,6 +84,7 @@ export default function App() {
   const [connError, setConnError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
   const [readyToast, setReadyToast] = useState(null);
+  const [audioReady, setAudioReady] = useState(false);
   const skipNextPoll = useRef(false);
   const initRef = useRef(false);
   const audioCtxRef = useRef(null);
