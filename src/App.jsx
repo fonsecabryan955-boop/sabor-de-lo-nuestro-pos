@@ -92,11 +92,21 @@ export default function App() {
 
   useEffect(() => {
     function unlock() {
-      if (!audioCtxRef.current) {
-        try { audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
-      } else if (audioCtxRef.current.state === "suspended") {
-        audioCtxRef.current.resume();
+      let ctx = audioCtxRef.current;
+      if (!ctx) {
+        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); audioCtxRef.current = ctx; } catch (e) { return; }
       }
+      if (ctx.state === "suspended") ctx.resume();
+      try {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.value = 0.0001;
+        osc.frequency.value = 440;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.05);
+      } catch (e) {}
     }
     window.addEventListener("click", unlock);
     window.addEventListener("touchstart", unlock);
@@ -287,7 +297,7 @@ export default function App() {
       const next = {
         ...state,
         sales: [...sales, sale],
-        tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [] } : x)),
+        tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null } : x)),
       };
       persist(next);
       setActiveTable(null);
