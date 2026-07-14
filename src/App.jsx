@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag } from "lucide-react";
+import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv } from "lucide-react";
 
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
@@ -70,7 +70,10 @@ function todayStr() {
 export default function App() {
   const [state, setState] = useState(initialState());
   const [loaded, setLoaded] = useState(false);
-  const [view, setView] = useState("mesas");
+  const [view, setView] = useState(() => {
+    const p = new URLSearchParams(window.location.search).get("pantalla");
+    return p === "cocina" || p === "menutv" ? p : "mesas";
+  });
   const [activeTable, setActiveTable] = useState(null);
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [showNewDelivery, setShowNewDelivery] = useState(false);
@@ -291,6 +294,7 @@ export default function App() {
     { id: "promos", label: "Promos", icon: Tag },
     { id: "empleados", label: "Empleados", icon: UserCheck },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
+    { id: "menutv", label: "Menú TV", icon: Tv },
   ];
 
   if (!loaded) {
@@ -353,6 +357,8 @@ export default function App() {
         )}
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
+
+        {view === "menutv" && <MenuBoardView promotions={promotions} />}
       </div>
 
       {activeTable && (
@@ -740,7 +746,47 @@ function PromoView({ promotions, onAdd, onDelete }) {
   );
 }
 
-function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
+function MenuBoardView({ promotions }) {
+  return (
+    <div style={{ background: "#2B2118", borderRadius: 16, padding: "28px 24px", color: "#FFF8ED" }}>
+      <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={{ fontSize: 40 }}>🍔🍗</div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: "#F2C879" }}>{RESTAURANT_NAME}</div>
+        <div style={{ fontSize: 13, color: "#C9BBA3", letterSpacing: 1 }}>MASATEPE · MASAYA · NICARAGUA</div>
+      </div>
+
+      {promotions && promotions.length > 0 && (
+        <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 12, padding: "14px 18px", marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 8, letterSpacing: 1 }}>🏷️ PROMOCIONES DE HOY</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+            {promotions.map((p) => (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "8px 12px" }}>
+                <span style={{ fontWeight: 700, color: "#fff" }}>{p.name}</span>
+                <span style={{ fontWeight: 800, color: "#fff" }}>{money(p.price)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+        {CATS.map((cat) => (
+          <div key={cat}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#F2C879", borderBottom: "2px solid #F2C879", paddingBottom: 4, marginBottom: 8, letterSpacing: 0.5 }}>
+              {cat.toUpperCase()}
+            </div>
+            {MENU.filter((m) => m.cat === cat).map((m) => (
+              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 15 }}>
+                <span>{m.name}</span>
+                <span style={{ fontWeight: 700, color: "#F2C879" }}>{money(m.price)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
   const [name, setName] = useState("");
   const [selected, setSelected] = useState("");
   const today = todayStr();
