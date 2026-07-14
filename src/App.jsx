@@ -8,8 +8,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const RECORD_ID = "main";
 
 const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
-const SHIFT_START = "17:00"; // 5:00 PM
-const SHIFT_END = "21:00"; // 9:00 PM
+const SHIFT_START = "17:00";
+const SHIFT_END = "21:00";
 const LATE_GRACE_MIN = 10;
 const DEFAULT_PIN = "1234";
 const POLL_MS = 4000;
@@ -787,6 +787,8 @@ function MenuBoardView({ promotions }) {
     </div>
   );
 }
+
+function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState("");
   const today = todayStr();
@@ -900,7 +902,7 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
           </button>
         )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20, marginTop: 8 }}>
         <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
         <div style={statCard}><div style={statLabel}>Gastos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthSpent)}</div></div>
         <div style={statCard}><div style={statLabel}>Neto del mes</div><div style={statValue}>{money(monthNet)}</div></div>
