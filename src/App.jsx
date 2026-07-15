@@ -107,6 +107,7 @@ export default function App() {
         osc.frequency.value = 440;
         osc.start();
         osc.stop(ctx.currentTime + 0.05);
+        setAudioReady(true);
       } catch (e) {}
     }
     window.addEventListener("click", unlock);
@@ -133,6 +134,25 @@ export default function App() {
       gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.24);
       osc.start(now + offset);
       osc.stop(now + offset + 0.26);
+    });
+  }
+
+  function playNewOrderBeep() {
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    [0, 0.15, 0.3].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "square";
+      osc.frequency.value = 660;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.13);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.15);
     });
   }
 
@@ -229,15 +249,27 @@ export default function App() {
     tables.forEach((t) => { if (t.items.length) current["table" + t.id] = { status: t.kitchenStatus, label: `Mesa ${t.id}` }; });
     deliveries.forEach((d) => { if (d.items.length) current["delivery" + d.id] = { status: d.kitchenStatus, label: d.customer }; });
     if (prevStatusRef.current) {
+      let readyFound = null;
+      let newOrderFound = null;
       for (const key in current) {
         const prev = prevStatusRef.current[key];
         if (current[key].status === "listo" && (!prev || prev.status !== "listo")) {
-          playReadyBeep();
-          setReadyToast(`✅ ${current[key].label} está listo`);
-          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-          toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
-          break;
+          readyFound = current[key].label;
         }
+        if (current[key].status === "pendiente" && (!prev || prev.status !== "pendiente")) {
+          newOrderFound = current[key].label;
+        }
+      }
+      if (newOrderFound) {
+        playNewOrderBeep();
+        setReadyToast(`🆕 Nuevo pedido: ${newOrderFound}`);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
+      } else if (readyFound) {
+        playReadyBeep();
+        setReadyToast(`✅ ${readyFound} está listo`);
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
       }
     }
     prevStatusRef.current = current;
@@ -410,7 +442,7 @@ export default function App() {
             <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
               🍔🍗 {RESTAURANT_NAME}
             </h1>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
               {nav.map((n) => {
                 const Icon = n.icon;
                 const active = view === n.id;
@@ -428,6 +460,17 @@ export default function App() {
                   </button>
                 );
               })}
+              <button
+                onClick={() => { playReadyBeep(); }}
+                title="Probar sonido"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: "none",
+                  cursor: "pointer", fontWeight: 700, fontSize: 13,
+                  background: audioReady ? "#2E7D32" : "#8a7a63", color: "#fff",
+                }}
+              >
+                {audioReady ? "🔊" : "🔇"} Probar sonido
+              </button>
             </div>
           </div>
         </>
