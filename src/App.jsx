@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Percent, Users } from "lucide-react";
+import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Percent, Users, Archive } from "lucide-react";
 
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
@@ -61,6 +61,8 @@ function initialState() {
     employees: [],
     clockRecords: [],
     promotions: [],
+    salesLog: [],
+    expensesLog: [],
     pin: DEFAULT_PIN,
   };
 }
@@ -242,7 +244,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], pin } = state;
+  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], pin } = state;
 
   useEffect(() => {
     const current = {};
@@ -330,6 +332,7 @@ export default function App() {
       const next = {
         ...state,
         sales: [...sales, sale],
+        salesLog: [...salesLog, sale],
         tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null } : x)),
       };
       persist(next);
@@ -343,6 +346,7 @@ export default function App() {
       const next = {
         ...state,
         sales: [...sales, sale],
+        salesLog: [...salesLog, sale],
         deliveries: deliveries.map((x) => (x.id === id ? { ...x, kitchenStatus: "entregado" } : x)),
       };
       persist(next);
@@ -351,7 +355,8 @@ export default function App() {
     }
   }
   function addExpense(exp) {
-    persist({ ...state, expenses: [...expenses, { id: Date.now(), ...exp, time: new Date().toISOString() }] });
+    const record = { id: Date.now(), ...exp, time: new Date().toISOString() };
+    persist({ ...state, expenses: [...expenses, record], expensesLog: [...expensesLog, record] });
   }
   function addEmployee(name) {
     if (!name.trim()) return;
@@ -405,8 +410,10 @@ export default function App() {
     { id: "caja", label: "Caja", icon: Receipt },
     { id: "delivery", label: "Delivery", icon: Bike },
     { id: "promos", label: "Promos", icon: Tag },
+    { id: "clientes", label: "Clientes", icon: Users },
     { id: "empleados", label: "Empleados", icon: UserCheck },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
+    { id: "historial", label: "Historial", icon: Archive },
     { id: "menutv", label: "Menú TV", icon: Tv },
   ];
 
@@ -499,6 +506,8 @@ export default function App() {
         )}
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
+
+        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} />}
 
         {view === "menutv" && <MenuBoardView promotions={promotions} />}
       </div>
@@ -719,15 +728,15 @@ function ElapsedBadge({ sentAt }) {
 function CocinaView({ tables, deliveries, onAdvance }) {
   const nuevos = [
     ...tables.filter((t) => t.kitchenStatus === "pendiente").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "pendiente").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
+    ...deliveries.filter((d) => d.kitchenStatus === "pendiente").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
   ];
   const preparando = [
     ...tables.filter((t) => t.kitchenStatus === "preparando").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
+    ...deliveries.filter((d) => d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
   ];
   const listos = [
     ...tables.filter((t) => t.kitchenStatus === "listo").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
+    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
   ];
 
   const columns = [
@@ -938,10 +947,38 @@ function ChangePin({ current, onChange }) {
 
 function DeliveryView({ deliveries, onNew, onOpen }) {
   const activos = deliveries.filter((d) => d.kitchenStatus !== "entregado");
+  const delivery = activos.filter((d) => d.type !== "pickup");
+  const pickup = activos.filter((d) => d.type === "pickup");
+
+  function Section({ title, icon, list }) {
+    return (
+      <div style={{ marginBottom: 24 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#8a7a63", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>{icon} {title} ({list.length})</h3>
+        {list.length === 0 && <p style={{ color: "#C9BBA3", fontSize: 13 }}>Sin pedidos activos.</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+          {list.map((d) => {
+            const st = statusStyle(d.kitchenStatus, d.items.length > 0);
+            return (
+              <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <strong style={{ fontSize: 16 }}>{d.customer}</strong>
+                  <span style={{ fontSize: 20 }}>{st.icon}</span>
+                </div>
+                {d.address && <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>}
+                <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🛵 Delivery</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🛵 Delivery &amp; Para llevar</h2>
         <button onClick={onNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 8px rgba(193,39,45,0.3)" }}>
           <Plus size={16} /> Nuevo pedido
         </button>
@@ -949,46 +986,46 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
       {activos.length === 0 && (
         <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>🛵</div>
-          <p>No hay pedidos de delivery activos.</p>
+          <p>No hay pedidos activos.</p>
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
-        {activos.map((d) => {
-          const st = statusStyle(d.kitchenStatus, d.items.length > 0);
-          return (
-            <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <strong style={{ fontSize: 16 }}>{d.customer}</strong>
-                <span style={{ fontSize: 20 }}>{st.icon}</span>
-              </div>
-              <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>
-              <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>
-              <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
-            </button>
-          );
-        })}
-      </div>
+      {activos.length > 0 && (
+        <>
+          <Section title="Delivery" icon="🛵" list={delivery} />
+          <Section title="Para llevar" icon="🥡" list={pickup} />
+        </>
+      )}
     </div>
   );
 }
 
 function NewDeliveryModal({ onCreate, onClose }) {
+  const [type, setType] = useState("delivery");
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const valid = type === "delivery" ? customer && phone && address : customer && phone;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <div style={{ background: "#FFF8ED", borderRadius: 12, width: "100%", maxWidth: 380, padding: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Nuevo pedido delivery</h3>
+        <h3 style={{ marginTop: 0 }}>Nuevo pedido</h3>
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "delivery" ? "#fff" : "#5a4c3a" }}>🛵 Delivery</button>
+          <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "pickup" ? "#fff" : "#5a4c3a" }}>🥡 Para llevar</button>
+        </div>
         <label style={lbl}>Nombre del cliente</label>
         <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={inp} />
         <label style={lbl}>Teléfono</label>
         <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inp} />
-        <label style={lbl}>Dirección</label>
-        <input value={address} onChange={(e) => setAddress(e.target.value)} style={inp} />
+        {type === "delivery" && (
+          <>
+            <label style={lbl}>Dirección</label>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} style={inp} />
+          </>
+        )}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
-          <button disabled={!customer || !phone || !address} onClick={() => onCreate({ customer, phone, address })} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: customer && phone && address ? 1 : 0.5 }}>
+          <button disabled={!valid} onClick={() => onCreate({ type, customer, phone, address: type === "delivery" ? address : "" })} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: valid ? 1 : 0.5 }}>
             Crear
           </button>
         </div>
@@ -1069,6 +1106,73 @@ function MenuBoardView({ promotions }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function HistorialView({ salesLog, expensesLog }) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const inRange = (isoTime) => {
+    const t = isoTime.slice(0, 10);
+    if (from && t < from) return false;
+    if (to && t > to) return false;
+    return true;
+  };
+
+  const filteredSales = salesLog.filter((s) => inRange(s.time)).slice().reverse();
+  const filteredExpenses = expensesLog.filter((e) => inRange(e.time)).slice().reverse();
+  const totalIncome = filteredSales.reduce((sum, s) => sum + s.total, 0);
+  const totalSpent = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🗄️ Historial permanente</h2>
+      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
+        Este registro nunca se borra, aunque uses los botones de "Borrar" en Reportes — queda como respaldo completo de todo lo vendido y gastado.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63" }}>Desde</label>
+        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+        <label style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63" }}>Hasta</label>
+        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+        {(from || to) && (
+          <button onClick={() => { setFrom(""); setTo(""); }} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#8a7a63" }}>Limpiar filtro</button>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
+        <div style={statCard}><div style={statLabel}>Ingresos totales</div><div style={statValue}>{money(totalIncome)}</div></div>
+        <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(totalSpent)}</div></div>
+        <div style={statCard}><div style={statLabel}>Neto</div><div style={statValue}>{money(totalIncome - totalSpent)}</div></div>
+        <div style={statCard}><div style={statLabel}>Ventas registradas</div><div style={statValue}>{filteredSales.length}</div></div>
+      </div>
+
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Ventas</h3>
+      {filteredSales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin ventas en este rango.</p>}
+      {filteredSales.map((s) => (
+        <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
+            <strong>{money(s.total)}</strong>
+          </div>
+          <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(s.time).toLocaleString("es-NI")}</div>
+        </div>
+      ))}
+
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 20 }}>Gastos</h3>
+      {filteredExpenses.length === 0 && <p style={{ color: "#8a7a63" }}>Sin gastos en este rango.</p>}
+      {filteredExpenses.map((e) => (
+        <div key={e.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span>{e.description}</span>
+            <strong style={{ color: "#C1272D" }}>-{money(e.amount)}</strong>
+          </div>
+          <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(e.time).toLocaleString("es-NI")}</div>
+        </div>
+      ))}
     </div>
   );
 }
