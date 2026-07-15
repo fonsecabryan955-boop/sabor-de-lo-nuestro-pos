@@ -999,12 +999,20 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
   );
 }
 
-function NewDeliveryModal({ onCreate, onClose }) {
+function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
   const [type, setType] = useState("delivery");
   const [customer, setCustomer] = useState("");
-  const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
-  const valid = type === "delivery" ? customer && phone && address : customer && phone;
+  const valid = type === "delivery" ? customer && address : true;
+
+  function handleCreate() {
+    if (type === "pickup") {
+      onCreate({ type: "pickup", customer: `Para llevar #${pickupCount + 1}`, phone: "", address: "" });
+    } else {
+      onCreate({ type: "delivery", customer, phone: "", address });
+    }
+  }
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <div style={{ background: "#FFF8ED", borderRadius: 12, width: "100%", maxWidth: 380, padding: 20 }}>
@@ -1013,19 +1021,19 @@ function NewDeliveryModal({ onCreate, onClose }) {
           <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "delivery" ? "#fff" : "#5a4c3a" }}>🛵 Delivery</button>
           <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "pickup" ? "#fff" : "#5a4c3a" }}>🥡 Para llevar</button>
         </div>
-        <label style={lbl}>Nombre del cliente</label>
-        <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={inp} />
-        <label style={lbl}>Teléfono</label>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inp} />
-        {type === "delivery" && (
+        {type === "delivery" ? (
           <>
+            <label style={lbl}>Nombre del cliente</label>
+            <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={inp} />
             <label style={lbl}>Dirección</label>
             <input value={address} onChange={(e) => setAddress(e.target.value)} style={inp} />
           </>
+        ) : (
+          <p style={{ fontSize: 13, color: "#8a7a63", margin: "10px 0" }}>No se necesita ningún dato — solo confirma para crear el pedido.</p>
         )}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
-          <button disabled={!valid} onClick={() => onCreate({ type, customer, phone, address: type === "delivery" ? address : "" })} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: valid ? 1 : 0.5 }}>
+          <button disabled={!valid} onClick={handleCreate} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: valid ? 1 : 0.5 }}>
             Crear
           </button>
         </div>
