@@ -65,6 +65,7 @@ function initialState() {
     expensesLog: [],
     payments: [],
     cashSessions: [],
+    salesGoal: 0,
     pin: DEFAULT_PIN,
   };
 }
@@ -248,7 +249,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], pin } = state;
+  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], salesGoal = 0, pin } = state;
 
   useEffect(() => {
     const current = {};
@@ -399,6 +400,9 @@ export default function App() {
       cashSessions: cashSessions.map((s) => (s.id === sessionId ? { ...s, closedAt: new Date().toISOString(), countedCash: Number(countedCash), expectedCash, difference: Number(countedCash) - expectedCash, notes: notes || "" } : s)),
     });
   }
+  function setSalesGoal(amount) {
+    persist({ ...state, salesGoal: Number(amount) || 0 });
+  }
   function deletePromotion(id) {
     persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
   }
@@ -527,7 +531,7 @@ export default function App() {
 
         {view === "caja" &&
           (cajaUnlocked ? (
-            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} />
+            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
           ) : (
             <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />
           ))}
@@ -1073,7 +1077,52 @@ function SessionHistory({ sessions, sales, expenses }) {
   );
 }
 
-function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin }) {
+function GoalBar({ sales, salesGoal, onSetGoal }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(salesGoal || "");
+  const today = todayStr();
+  const todayTotal = sales.filter((s) => new Date(s.time).toDateString() === today).reduce((sum, s) => sum + s.total, 0);
+  const pct = salesGoal > 0 ? Math.min(100, Math.round((todayTotal / salesGoal) * 100)) : 0;
+  const reached = salesGoal > 0 && todayTotal >= salesGoal;
+
+  if (!salesGoal || editing) {
+    return (
+      <div style={{ background: "#fff", border: "2px dashed #E8A33D", borderRadius: 14, padding: 16, marginBottom: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 20 }}>🎯</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#5a4c3a" }}>Meta de ventas de hoy:</span>
+        <input type="number" placeholder="Ej: 5000" value={val} onChange={(e) => setVal(e.target.value)} style={{ ...inp, maxWidth: 130 }} />
+        <button
+          disabled={!val}
+          onClick={() => { onSetGoal(val); setEditing(false); }}
+          style={{ padding: "8px 16px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: val ? 1 : 0.5 }}
+        >
+          Guardar meta
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: reached ? "linear-gradient(135deg, #00C853, #009624)" : "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 14, padding: 16, marginBottom: 18, color: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
+        <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 0.5 }}>{reached ? "🎉 ¡META ALCANZADA!" : "🎯 META DE VENTAS DE HOY"}</span>
+        <button onClick={() => { setVal(salesGoal); setEditing(true); }} style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", color: "#fff" }}>✏️ Cambiar</button>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <span style={{ fontWeight: 800, fontSize: 22 }}>{money(todayTotal)}</span>
+        <span style={{ fontSize: 13, opacity: 0.85 }}>de {money(salesGoal)} ({pct}%)</span>
+      </div>
+      <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 20, height: 14, overflow: "hidden" }}>
+        <div style={{ background: reached ? "#fff" : "linear-gradient(90deg, #E8A33D, #F2C879)", height: "100%", width: `${pct}%`, borderRadius: 20, transition: "width 0.5s ease" }} />
+      </div>
+      {!reached && salesGoal > todayTotal && (
+        <div style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Faltan {money(salesGoal - todayTotal)} para la meta</div>
+      )}
+    </div>
+  );
+}
+
+function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin, salesGoal, onSetGoal }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
