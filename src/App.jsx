@@ -877,8 +877,14 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
 
   if (!active) {
     return (
-      <div style={{ background: "#fff", border: "2px dashed #C1272D", borderRadius: 14, padding: 18, marginBottom: 20 }}>
-        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>🔓 Abrir caja</div>
+      <div style={{ background: "linear-gradient(160deg, #fff, #FFF8ED)", border: "2px dashed #C1272D", borderRadius: 16, padding: 22, marginBottom: 22, boxShadow: "0 6px 18px rgba(193,39,45,0.08)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #C1272D, #E8A33D)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔓</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>Abrir caja</div>
+            <div style={{ fontSize: 11, color: "#8a7a63" }}>Necesario para empezar a cobrar en este turno</div>
+          </div>
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select value={openedBy} onChange={(e) => setOpenedBy(e.target.value)} style={{ ...inp, maxWidth: 200 }}>
             <option value="">¿Quién abre la caja?</option>
@@ -888,14 +894,14 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           <button
             disabled={!openedBy || !openingAmount}
             onClick={() => { onOpenSession(openedBy, openingAmount); setOpenedBy(""); setOpeningAmount(""); }}
-            style={{ padding: "0 18px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: openedBy && openingAmount ? 1 : 0.5 }}
+            style={{ padding: "0 20px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: openedBy && openingAmount ? 1 : 0.5, boxShadow: "0 3px 10px rgba(193,39,45,0.3)" }}
           >
-            Abrir caja
+            🔓 Abrir caja
           </button>
         </div>
         {closedSessions.length > 0 && (
-          <button onClick={() => setShowHistory((s) => !s)} style={{ marginTop: 12, fontSize: 12, background: "none", border: "none", color: "#8a7a63", cursor: "pointer", textDecoration: "underline" }}>
-            {showHistory ? "Ocultar" : "Ver"} historial de cortes anteriores ({closedSessions.length})
+          <button onClick={() => setShowHistory((s) => !s)} style={{ marginTop: 14, fontSize: 12, background: "none", border: "none", color: "#8a7a63", cursor: "pointer", textDecoration: "underline", fontWeight: 700 }}>
+            📜 {showHistory ? "Ocultar" : "Ver"} historial de cortes anteriores ({closedSessions.length})
           </button>
         )}
         {showHistory && <SessionHistory sessions={closedSessions} />}
@@ -911,72 +917,87 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   const diff = counted !== "" ? Number(counted) - expectedCash : null;
 
   return (
-    <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 14, padding: 18, marginBottom: 20, color: "#fff" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
-        <div>
-          <div style={{ fontWeight: 800, fontSize: 15, color: "#F2C879" }}>🔐 Caja abierta — {active.openedBy}</div>
-          <div style={{ fontSize: 11, color: "#C9BBA3" }}>Desde: {new Date(active.openedAt).toLocaleString("es-NI")}</div>
+    <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 22, marginBottom: 22, color: "#fff", boxShadow: "0 10px 24px rgba(0,0,0,0.25)", border: "1px solid rgba(242,200,121,0.2)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(242,200,121,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔐</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#F2C879" }}>Caja abierta — {active.openedBy}</div>
+            <div style={{ fontSize: 11, color: "#C9BBA3" }}>Desde: {new Date(active.openedAt).toLocaleString("es-NI")}</div>
+          </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 11, color: "#C9BBA3" }}>Fondo inicial</div>
-          <div style={{ fontWeight: 800 }}>{money(active.openingAmount)}</div>
+        <div style={{ textAlign: "right", background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: "8px 14px" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3", letterSpacing: 0.5 }}>FONDO INICIAL</div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>{money(active.openingAmount)}</div>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, margin: "12px 0" }}>
-        <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>Ventas efectivo</div>
-          <div style={{ fontWeight: 800 }}>{money(cashSales)}</div>
+        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #26A65B" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💵 Ventas efectivo</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cashSales)}</div>
         </div>
-        <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>Ventas tarjeta</div>
-          <div style={{ fontWeight: 800 }}>{money(cardSales)}</div>
+        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #1565C0" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💳 Ventas tarjeta</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cardSales)}</div>
         </div>
-        <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>Gastos del turno</div>
-          <div style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(sessionExpenses)}</div>
+        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #FF5252" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>📤 Gastos del turno</div>
+          <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionExpenses)}</div>
         </div>
-        <div style={{ background: "#F2C879", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10, color: "#2B2118" }}>Efectivo debería haber</div>
-          <div style={{ fontWeight: 800, color: "#2B2118" }}>{money(expectedCash)}</div>
+        <div style={{ background: "#F2C879", borderRadius: 10, padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#2B2118", fontWeight: 700 }}>💰 EFECTIVO ESPERADO</div>
+          <div style={{ fontWeight: 800, fontSize: 17, color: "#2B2118" }}>{money(expectedCash)}</div>
         </div>
       </div>
-      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 4 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general (efectivo + tarjeta): <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong></div>
+      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong></div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <input placeholder="Efectivo contado físicamente" type="number" value={counted} onChange={(e) => setCounted(e.target.value)} style={{ ...inp, maxWidth: 200, color: "#2B2118" }} />
-        <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 180, color: "#2B2118" }} />
-      </div>
-
-      {counted !== "" && (
-        <div style={{ marginTop: 10, fontWeight: 800, fontSize: 14, color: diff === 0 ? "#00E676" : diff > 0 ? "#F2C879" : "#FF5252" }}>
-          {diff === 0 ? "✅ Cuadra exacto" : diff > 0 ? `📈 Sobran ${money(diff)}` : `📉 Faltan ${money(Math.abs(diff))}`}
+      <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.08)" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 10, letterSpacing: 0.5 }}>🧮 CONTEO FÍSICO PARA CERRAR</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input placeholder="Efectivo contado" type="number" value={counted} onChange={(e) => setCounted(e.target.value)} style={{ ...inp, maxWidth: 190, color: "#2B2118", fontWeight: 700 }} />
+          <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 180, color: "#2B2118" }} />
         </div>
-      )}
 
-      <button
-        disabled={counted === ""}
-        onClick={() => { if (window.confirm("¿Cerrar la caja con estos datos?")) onCloseSession(active.id, counted, expectedCash, notes); }}
-        style={{ marginTop: 14, width: "100%", padding: 12, border: "none", borderRadius: 10, background: counted !== "" ? "#C1272D" : "#5a4c3a", color: "#fff", fontWeight: 800, cursor: counted !== "" ? "pointer" : "not-allowed", fontSize: 14 }}
-      >
-        🔒 Cerrar caja
-      </button>
+        {counted !== "" && (
+          <div style={{
+            marginTop: 12, padding: "10px 14px", borderRadius: 10, fontWeight: 800, fontSize: 14, textAlign: "center",
+            background: diff === 0 ? "rgba(0,230,118,0.15)" : diff > 0 ? "rgba(242,200,121,0.15)" : "rgba(255,82,82,0.15)",
+            color: diff === 0 ? "#00E676" : diff > 0 ? "#F2C879" : "#FF5252",
+            border: `1px solid ${diff === 0 ? "#00E676" : diff > 0 ? "#F2C879" : "#FF5252"}44`,
+          }}>
+            {diff === 0 ? "✅ Cuadra exacto" : diff > 0 ? `📈 Sobran ${money(diff)}` : `📉 Faltan ${money(Math.abs(diff))}`}
+          </div>
+        )}
+
+        <button
+          disabled={counted === ""}
+          onClick={() => { if (window.confirm("¿Cerrar la caja con estos datos?")) onCloseSession(active.id, counted, expectedCash, notes); }}
+          style={{ marginTop: 14, width: "100%", padding: 13, border: "none", borderRadius: 10, background: counted !== "" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "rgba(255,255,255,0.1)", color: "#fff", fontWeight: 800, cursor: counted !== "" ? "pointer" : "not-allowed", fontSize: 14, letterSpacing: 0.3 }}
+        >
+          🔒 Cerrar caja
+        </button>
+      </div>
     </div>
   );
 }
 
 function SessionHistory({ sessions }) {
   return (
-    <div style={{ marginTop: 10 }}>
+    <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: "6px 14px", border: "1px solid #F0E8D8" }}>
       {sessions.map((s) => (
-        <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #F0E8D8", fontSize: 12 }}>
+        <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span><strong>{s.openedBy}</strong> · {new Date(s.openedAt).toLocaleDateString("es-NI")}</span>
-            <span style={{ fontWeight: 700, color: s.difference === 0 ? "#2E7D32" : s.difference > 0 ? "#C99A1E" : "#C1272D" }}>
+            <span style={{
+              fontWeight: 800, padding: "2px 10px", borderRadius: 20,
+              background: s.difference === 0 ? "#E8F5E9" : s.difference > 0 ? "#FFF8E1" : "#FCE8E8",
+              color: s.difference === 0 ? "#2E7D32" : s.difference > 0 ? "#C99A1E" : "#C1272D",
+            }}>
               {s.difference === 0 ? "Cuadró" : s.difference > 0 ? `+${money(s.difference)}` : `-${money(Math.abs(s.difference))}`}
             </span>
           </div>
-          <div style={{ fontSize: 11, color: "#8a7a63" }}>Fondo: {money(s.openingAmount)} · Esperado: {money(s.expectedCash)} · Contado: {money(s.countedCash)}{s.notes ? ` · ${s.notes}` : ""}</div>
+          <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 3 }}>Fondo: {money(s.openingAmount)} · Esperado: {money(s.expectedCash)} · Contado: {money(s.countedCash)}{s.notes ? ` · ${s.notes}` : ""}</div>
         </div>
       ))}
     </div>
@@ -1027,68 +1048,82 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
           <p>No hay cuentas abiertas.</p>
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {abiertas.map((o) => {
           const total = orderTotal(o.items);
           const key = o.kind + o.id;
           const m = method[key] || "Efectivo";
           const finalTotal = discountedTotal(o.items, key);
           const hasDiscount = finalTotal < total;
+          const typeIcon = o.kind === "table" ? "🍽️" : (o.type === "pickup" ? "🥡" : "🛵");
           return (
-            <div key={key} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
-              <strong style={{ fontSize: 16 }}>{o.label}</strong>
-              <ul style={{ margin: "10px 0", paddingLeft: 18, fontSize: 13, color: "#5a4c3a" }}>
-                {o.items.map((it) => <li key={it.menuId}>{it.qty}x {it.name} — {money(it.price * it.qty)}</li>)}
-              </ul>
-
-              <button
-                onClick={() => setDiscountOpen((s) => ({ ...s, [key]: !s[key] }))}
-                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700, marginBottom: 10 }}
-              >
-                <Percent size={13} /> {discountOpen[key] ? "Ocultar descuento" : "Aplicar descuento"}
-              </button>
-
-              {discountOpen[key] && (
-                <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
-                  <select value={discountType[key] || "percent"} onChange={(e) => setDiscountType((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 90, padding: 7 }}>
-                    <option value="percent">%</option>
-                    <option value="amount">C$</option>
-                  </select>
-                  <input type="number" placeholder="0" value={discountValue[key] || ""} onChange={(e) => setDiscountValue((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, padding: 7 }} />
-                </div>
-              )}
-
-              {hasDiscount ? (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", textDecoration: "line-through" }}>
-                    <span>Subtotal</span><span>{money(total)}</span>
-                  </div>
-                  <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 17, color: "#C1272D", display: "flex", justifyContent: "space-between" }}>
-                    <span>Total</span><span>{money(finalTotal)}</span>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "#FFF3E8", borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 17, marginBottom: 10, color: "#C1272D" }}>Total: {money(total)}</div>
-              )}
-
-              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                {["Efectivo", "Tarjeta"].map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setMethod((s) => ({ ...s, [key]: opt }))}
-                    style={{
-                      flex: 1, padding: 10, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13,
-                      border: "none",
-                      background: m === opt ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: m === opt ? "#fff" : "#5a4c3a",
-                    }}
-                  >
-                    <Wallet size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{opt}
-                  </button>
-                ))}
+            <div key={key} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 18px rgba(43,33,24,0.1)", border: "1px solid #F0E8D8" }}>
+              <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{typeIcon} {o.label}</span>
+                <span style={{ color: "#F2C879", fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
               </div>
-              <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key))} style={{ width: "100%", padding: 12, border: "none", borderRadius: 10, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14 }}>
-                Cobrar y cerrar →
-              </button>
+              <div style={{ padding: 18 }}>
+                <div style={{ fontFamily: "'Courier New', monospace" }}>
+                  {o.items.map((it) => (
+                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#5a4c3a" }}>
+                      <span>{it.qty}x {it.name}</span>
+                      <span>{money(it.price * it.qty)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ borderTop: "1px dashed #E5D9C3", margin: "10px 0" }} />
+
+                <button
+                  onClick={() => setDiscountOpen((s) => ({ ...s, [key]: !s[key] }))}
+                  style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700, marginBottom: 10 }}
+                >
+                  <Percent size={13} /> {discountOpen[key] ? "Ocultar descuento" : "Aplicar descuento"}
+                </button>
+
+                {discountOpen[key] && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+                    <select value={discountType[key] || "percent"} onChange={(e) => setDiscountType((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 90, padding: 7 }}>
+                      <option value="percent">%</option>
+                      <option value="amount">C$</option>
+                    </select>
+                    <input type="number" placeholder="0" value={discountValue[key] || ""} onChange={(e) => setDiscountValue((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, padding: 7 }} />
+                  </div>
+                )}
+
+                {hasDiscount ? (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", textDecoration: "line-through" }}>
+                      <span>Subtotal</span><span>{money(total)}</span>
+                    </div>
+                    <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(finalTotal)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(total)}</span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                  {["Efectivo", "Tarjeta"].map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setMethod((s) => ({ ...s, [key]: opt }))}
+                      style={{
+                        flex: 1, padding: 11, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13,
+                        border: m === opt ? "none" : "1px solid #E5D9C3",
+                        background: m === opt ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#fff", color: m === opt ? "#fff" : "#5a4c3a",
+                      }}
+                    >
+                      <Wallet size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{opt}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key))} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
+                  ✓ Cobrar y cerrar
+                </button>
+              </div>
             </div>
           );
         })}
