@@ -124,6 +124,7 @@ export default function App() {
   function playReadyBeep() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
     const now = ctx.currentTime;
     [0, 0.28].forEach((offset) => {
       const osc = ctx.createOscillator();
@@ -143,6 +144,7 @@ export default function App() {
   function playNewOrderBeep() {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
     const now = ctx.currentTime;
     [0, 0.15, 0.3].forEach((offset) => {
       const osc = ctx.createOscillator();
@@ -359,9 +361,9 @@ export default function App() {
     const record = { id: Date.now(), ...exp, time: new Date().toISOString() };
     persist({ ...state, expenses: [...expenses, record], expensesLog: [...expensesLog, record] });
   }
-  function addEmployee(name) {
+  function addEmployee(name, dailyWage) {
     if (!name.trim()) return;
-    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim() }] });
+    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim(), dailyWage: Number(dailyWage) || 0 }] });
   }
   function clockIn(employeeName) {
     const now = new Date();
@@ -444,6 +446,24 @@ export default function App() {
           🔔 {readyToast}
         </div>
       )}
+      <button
+        onClick={() => {
+          if (!audioCtxRef.current) {
+            try { audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)(); setAudioReady(true); } catch (e) {}
+          } else if (audioCtxRef.current.state === "suspended") {
+            audioCtxRef.current.resume();
+          }
+          playReadyBeep();
+        }}
+        title="Tocar para activar/probar el sonido"
+        style={{
+          position: "fixed", bottom: 16, right: 16, zIndex: 100, width: 52, height: 52, borderRadius: "50%",
+          border: "none", cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center",
+          background: audioReady ? "#2E7D32" : "#C1272D", color: "#fff", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+        }}
+      >
+        {audioReady ? "🔊" : "🔇"}
+      </button>
       {!kiosk && (
         <>
           <div style={{
@@ -735,6 +755,12 @@ function ElapsedBadge({ sentAt }) {
 }
 
 function CocinaView({ tables, deliveries, onAdvance }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const iv = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(iv);
+  }, []);
+
   const nuevos = [
     ...tables.filter((t) => t.kitchenStatus === "pendiente").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.kitchenStatus === "pendiente").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
@@ -749,62 +775,75 @@ function CocinaView({ tables, deliveries, onAdvance }) {
   ];
 
   const columns = [
-    { key: "nuevos", title: "🆕 NUEVOS", items: nuevos, bg: "#C1272D", action: "preparando", actionLabel: "Empezar a preparar", nextBg: "#E8A33D" },
-    { key: "preparando", title: "🔥 PREPARANDO", items: preparando, bg: "#E8A33D", action: "listo", actionLabel: "Marcar listo", nextBg: "#639922" },
-    { key: "listos", title: "✅ LISTOS", items: listos, bg: "#639922", action: null, actionLabel: null, nextBg: null },
+    { key: "nuevos", title: "NUEVOS", emoji: "🆕", items: nuevos, accent: "#FF5252", action: "preparando", actionLabel: "Empezar a preparar" },
+    { key: "preparando", title: "PREPARANDO", emoji: "🔥", items: preparando, accent: "#FFB300", action: "listo", actionLabel: "Marcar listo" },
+    { key: "listos", title: "LISTOS", emoji: "✅", items: listos, accent: "#00E676", action: null, actionLabel: null },
   ];
 
   return (
-    <div>
+    <div style={{ background: "radial-gradient(circle at top, #2d2418, #16110c)", borderRadius: 20, padding: "22px 20px", margin: "-4px", boxShadow: "0 10px 30px rgba(0,0,0,0.35)" }}>
       <style>{`
         @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes cardIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes cardIn { from { transform: scale(0.94) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        @keyframes glowPulse { 0%,100% { box-shadow: 0 0 0px rgba(255,255,255,0); } 50% { box-shadow: 0 0 18px rgba(255,255,255,0.15); } }
       `}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>👨‍🍳 Pantalla de Cocina</h2>
-        <span style={{ fontSize: 13, color: "#8a7a63" }}>{new Date().toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: "#F2C879", letterSpacing: 0.5 }}>👨‍🍳 PANTALLA DE COCINA</h2>
+          <div style={{ fontSize: 11, color: "#9a8a6f", letterSpacing: 1 }}>{RESTAURANT_NAME.toUpperCase()}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", fontFamily: "'Courier New', monospace" }}>{now.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</div>
+          <div style={{ fontSize: 11, color: "#9a8a6f" }}>{now.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}</div>
+        </div>
       </div>
 
       {nuevos.length === 0 && preparando.length === 0 && listos.length === 0 && (
-        <div style={{ textAlign: "center", padding: "60px 20px", color: "#8a7a63" }}>
-          <div style={{ fontSize: 40, marginBottom: 8 }}>🍽️</div>
-          <p>No hay pedidos en cocina por ahora.</p>
+        <div style={{ textAlign: "center", padding: "70px 20px", color: "#7a6c56" }}>
+          <div style={{ fontSize: 48, marginBottom: 10 }}>🍽️</div>
+          <p style={{ fontSize: 15 }}>Todo tranquilo — no hay pedidos en cocina.</p>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 18, alignItems: "start" }}>
         {columns.map((col) => (
-          <div key={col.key}>
-            <div style={{ background: col.bg, color: "#fff", fontWeight: 800, fontSize: 14, letterSpacing: 1, padding: "10px 14px", borderRadius: "10px 10px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>{col.title}</span>
-              <span style={{ background: "rgba(255,255,255,0.3)", borderRadius: 20, padding: "2px 10px", fontSize: 13 }}>{col.items.length}</span>
+          <div key={col.key} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, border: `1px solid ${col.accent}33`, overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `2px solid ${col.accent}` }}>
+              <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: 1.5, color: col.accent }}>{col.emoji} {col.title}</span>
+              <span style={{ background: col.accent, color: "#1a1410", borderRadius: 20, padding: "2px 12px", fontSize: 13, fontWeight: 800 }}>{col.items.length}</span>
             </div>
-            <div style={{ background: "#FFF3E8", borderRadius: "0 0 10px 10px", padding: 10, minHeight: 80, display: "flex", flexDirection: "column", gap: 10 }}>
-              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#C9BBA3", textAlign: "center", padding: "16px 0" }}>Vacío</div>}
+            <div style={{ padding: 12, minHeight: 100, display: "flex", flexDirection: "column", gap: 12 }}>
+              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#5a4c3a", textAlign: "center", padding: "20px 0" }}>— vacío —</div>}
               {col.items.map((o) => (
-                <div key={o.kind + o.id} style={{ background: col.bg, borderRadius: 12, padding: 14, color: "#fff", animation: "cardIn 0.3s ease" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <strong style={{ fontSize: 16 }}>{o.label}</strong>
+                <div
+                  key={o.kind + o.id}
+                  style={{
+                    background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 14, padding: 16, color: "#F5ECD9",
+                    animation: "cardIn 0.3s ease", border: `1px solid ${col.accent}55`, borderLeft: `4px solid ${col.accent}`,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <strong style={{ fontSize: 17, letterSpacing: 0.3 }}>{o.label}</strong>
                     <ElapsedBadge sentAt={o.kitchenSentAt} />
                   </div>
-                  <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 14, lineHeight: 1.5 }}>
+                  <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 14, lineHeight: 1.6, color: "#E4D8C0" }}>
                     {o.items.map((it) => (
                       <li key={it.menuId}>
-                        <strong>{it.qty}x</strong> {it.name}
-                        {it.notes && <div style={{ fontSize: 12, opacity: 0.85, fontStyle: "italic" }}>↳ {it.notes}</div>}
+                        <strong style={{ color: "#F2C879" }}>{it.qty}x</strong> {it.name}
+                        {it.notes && <div style={{ fontSize: 12, color: "#C1531F", fontStyle: "italic" }}>↳ {it.notes}</div>}
                       </li>
                     ))}
                   </ul>
                   {col.action && (
                     <button
                       onClick={() => onAdvance(o.kind, o.id, col.action)}
-                      style={{ width: "100%", padding: "10px 0", border: "none", borderRadius: 8, background: "rgba(255,255,255,0.95)", color: col.bg, fontWeight: 800, fontSize: 13, cursor: "pointer" }}
+                      style={{ width: "100%", padding: "11px 0", border: "none", borderRadius: 10, background: col.accent, color: "#1a1410", fontWeight: 800, fontSize: 13, cursor: "pointer", letterSpacing: 0.3 }}
                     >
                       {col.actionLabel} →
                     </button>
                   )}
                   {!col.action && (
-                    <div style={{ textAlign: "center", fontSize: 12, fontWeight: 700, opacity: 0.9 }}>Avisar al mesero 🔔</div>
+                    <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: col.accent, letterSpacing: 0.5 }}>🔔 AVISAR AL MESERO</div>
                   )}
                 </div>
               ))}
@@ -1275,9 +1314,9 @@ function initials(name) {
 
 function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment }) {
   const [name, setName] = useState("");
+  const [wage, setWage] = useState("");
   const [selected, setSelected] = useState("");
   const [expanded, setExpanded] = useState(null);
-  const [payAmount, setPayAmount] = useState({});
   const [payNote, setPayNote] = useState({});
   const today = todayStr();
   const monthKey = new Date().toISOString().slice(0, 7);
@@ -1285,19 +1324,38 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
 
   const monthPayroll = payments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((sum, p) => sum + p.amount, 0);
 
+  function employeeStats(emp) {
+    const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().sort((a, b) => new Date(a.time) - new Date(b.time));
+    const lastPayment = empPayments[empPayments.length - 1];
+    const cutoff = lastPayment ? new Date(lastPayment.time) : null;
+    const empClockAll = clockRecords.filter((r) => r.employee === emp.name);
+    const pendingDays = cutoff ? empClockAll.filter((r) => new Date(r.time) > cutoff).length : empClockAll.length;
+    const owed = pendingDays * (emp.dailyWage || 0);
+    return { empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed, totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount: empClockAll.filter((r) => r.late).length, totalDays: empClockAll.length };
+  }
+
+  const totalOwedAll = employees.reduce((sum, emp) => sum + employeeStats(emp).owed, 0);
+
   return (
     <div>
-      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal y Nómina</h2>
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
 
-      <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 20px", margin: "14px 0 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>💰 NÓMINA PAGADA ESTE MES</span>
-        <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(monthPayroll)}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, margin: "14px 0 20px" }}>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 18px" }}>
+          <div style={{ color: "#F2C879", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>💰 PAGADO ESTE MES</div>
+          <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(monthPayroll)}</div>
+        </div>
+        <div style={{ background: totalOwedAll > 0 ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "linear-gradient(135deg, #26A65B, #158A4A)", borderRadius: 12, padding: "14px 18px" }}>
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>⏳ PENDIENTE DE PAGAR</div>
+          <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(totalOwedAll)}</div>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <input placeholder="Nombre del nuevo empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
-        <button onClick={() => { onAdd(name); setName(""); }} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer" }}>+ Agregar empleado</button>
+        <input placeholder="Nombre del nuevo empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
+        <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...inp, maxWidth: 140 }} />
+        <button onClick={() => { onAdd(name, wage); setName(""); setWage(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>+ Agregar empleado</button>
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
@@ -1318,14 +1376,11 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
       {employees.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no has agregado empleados.</p>}
       <div style={{ display: "grid", gap: 10 }}>
         {employees.map((emp) => {
-          const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().reverse();
-          const empTotalPaid = empPayments.reduce((sum, p) => sum + p.amount, 0);
-          const empLate = clockRecords.filter((r) => r.employee === emp.name && r.late).length;
-          const empClock = clockRecords.filter((r) => r.employee === emp.name).length;
+          const st = employeeStats(emp);
           const isOpen = expanded === emp.id;
           const key = emp.id;
           return (
-            <div key={emp.id} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
+            <div key={emp.id} style={{ background: "#fff", border: st.owed > 0 ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
               <button
                 onClick={() => setExpanded(isOpen ? null : emp.id)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
@@ -1335,29 +1390,45 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</div>
-                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{empClock} entradas · {empLate} tardanzas</div>
+                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{money(emp.dailyWage)}/día · {st.totalDays} entradas · {st.lateCount} tardanzas</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 800, color: "#2E7D32", fontSize: 15 }}>{money(empTotalPaid)}</div>
-                  <div style={{ fontSize: 10, color: "#8a7a63" }}>pagado total</div>
+                  {st.owed > 0 ? (
+                    <>
+                      <div style={{ fontWeight: 800, color: "#C1272D", fontSize: 16 }}>{money(st.owed)}</div>
+                      <div style={{ fontSize: 10, color: "#C1531F", fontWeight: 700 }}>se le debe · {st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontWeight: 800, color: "#2E7D32", fontSize: 15 }}>Al día ✅</div>
+                      <div style={{ fontSize: 10, color: "#8a7a63" }}>{money(st.totalPaid)} pagado total</div>
+                    </>
+                  )}
                 </div>
               </button>
               {isOpen && (
                 <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
+                  {st.owed > 0 && (
+                    <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                      <div style={{ fontSize: 12 }}>
+                        <strong>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
+                        {st.lastPayment && <div style={{ color: "#8a7a63" }}>Último pago: {new Date(st.lastPayment.time).toLocaleDateString("es-NI")}</div>}
+                      </div>
+                      <button
+                        onClick={() => onAddPayment(emp.name, st.owed, payNote[key] || "Pago de días trabajados")}
+                        style={{ padding: "10px 18px", border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13 }}
+                      >
+                        💵 Pagar {money(st.owed)}
+                      </button>
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                    <input placeholder="Monto" type="number" value={payAmount[key] || ""} onChange={(e) => setPayAmount((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 110 }} />
-                    <input placeholder="Nota (ej: quincena)" value={payNote[key] || ""} onChange={(e) => setPayNote((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 180 }} />
-                    <button
-                      disabled={!payAmount[key]}
-                      onClick={() => { onAddPayment(emp.name, payAmount[key], payNote[key]); setPayAmount((s) => ({ ...s, [key]: "" })); setPayNote((s) => ({ ...s, [key]: "" })); }}
-                      style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payAmount[key] ? 1 : 0.5 }}
-                    >
-                      💵 Registrar pago
-                    </button>
+                    <input placeholder="Nota (ej: adelanto, bono)" value={payNote[key] || ""} onChange={(e) => setPayNote((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 180 }} />
+                    <PayCustomButton onPay={(amt) => onAddPayment(emp.name, amt, payNote[key] || "")} />
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
-                  {empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
-                  {empPayments.map((p) => (
+                  {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
+                  {st.empPayments.map((p) => (
                     <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
@@ -1387,6 +1458,22 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
         </div>
       ))}
     </div>
+  );
+}
+
+function PayCustomButton({ onPay }) {
+  const [amt, setAmt] = useState("");
+  return (
+    <>
+      <input placeholder="Monto libre" type="number" value={amt} onChange={(e) => setAmt(e.target.value)} style={{ ...inp, maxWidth: 110 }} />
+      <button
+        disabled={!amt}
+        onClick={() => { onPay(Number(amt)); setAmt(""); }}
+        style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#F2C879", fontWeight: 700, cursor: "pointer", opacity: amt ? 1 : 0.5 }}
+      >
+        Registrar
+      </button>
+    </>
   );
 }
 
