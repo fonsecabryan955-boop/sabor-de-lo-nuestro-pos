@@ -63,6 +63,7 @@ function initialState() {
     promotions: [],
     salesLog: [],
     expensesLog: [],
+    payments: [],
     pin: DEFAULT_PIN,
   };
 }
@@ -244,7 +245,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], pin } = state;
+  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], pin } = state;
 
   useEffect(() => {
     const current = {};
@@ -380,6 +381,12 @@ export default function App() {
   function addPromotion(promo) {
     persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
   }
+  function addPayment(employeeName, amount, note) {
+    persist({ ...state, payments: [...payments, { id: Date.now(), employeeName, amount: Number(amount), note: note || "", time: new Date().toISOString() }] });
+  }
+  function deletePayment(id) {
+    persist({ ...state, payments: payments.filter((p) => p.id !== id) });
+  }
   function deletePromotion(id) {
     persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
   }
@@ -501,8 +508,10 @@ export default function App() {
 
         {view === "promos" && <PromoView promotions={promotions} onAdd={addPromotion} onDelete={deletePromotion} />}
 
+        {view === "clientes" && <ClientesView salesLog={salesLog} />}
+
         {view === "empleados" && (
-          <EmpleadosView employees={employees} clockRecords={clockRecords} onAdd={addEmployee} onClockIn={clockIn} />
+          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} />
         )}
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
@@ -1042,6 +1051,75 @@ function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
   );
 }
 
+function ClientesView({ salesLog }) {
+  const [expanded, setExpanded] = useState(null);
+
+  const customers = useMemo(() => {
+    const map = {};
+    salesLog.filter((s) => s.kind === "delivery" && s.ref).forEach((s) => {
+      const key = s.ref;
+      if (!map[key]) map[key] = { name: s.ref, orders: [], total: 0 };
+      map[key].orders.push(s);
+      map[key].total += s.total;
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [salesLog]);
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Historial de Clientes</h2>
+      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
+        Agrupa automáticamente los pedidos de Delivery y Para llevar por nombre de cliente, con lo que ha comprado cada vez.
+      </p>
+
+      {customers.length === 0 && (
+        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
+          <p>Aún no hay pedidos de delivery o para llevar registrados.</p>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gap: 10 }}>
+        {customers.map((c) => {
+          const isOpen = expanded === c.name;
+          return (
+            <div key={c.name} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
+              <button
+                onClick={() => setExpanded(isOpen ? null : c.name)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
+              >
+                <div style={{ width: 40, height: 40, borderRadius: "50%", background: avatarColor(c.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                  {initials(c.name)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{c.orders.length} pedido{c.orders.length !== 1 ? "s" : ""}</div>
+                </div>
+                <div style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(c.total)}</div>
+              </button>
+              {isOpen && (
+                <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
+                  {c.orders.slice().reverse().map((o) => (
+                    <div key={o.id} style={{ padding: "10px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700 }}>{new Date(o.time).toLocaleDateString("es-NI", { day: "numeric", month: "short", year: "numeric" })}</span>
+                        <span style={{ fontWeight: 800 }}>{money(o.total)}</span>
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 16, color: "#8a7a63" }}>
+                        {o.items.map((it) => <li key={it.menuId}>{it.qty}x {it.name}</li>)}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PromoView({ promotions, onAdd, onDelete }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -1185,23 +1263,44 @@ function HistorialView({ salesLog, expensesLog }) {
   );
 }
 
-function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
+const AVATAR_COLORS = ["#C1272D", "#2E7D32", "#E8A33D", "#1565C0", "#6A1B9A", "#00838F"];
+function avatarColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+function initials(name) {
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
+
+function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment }) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState("");
+  const [expanded, setExpanded] = useState(null);
+  const [payAmount, setPayAmount] = useState({});
+  const [payNote, setPayNote] = useState({});
   const today = todayStr();
+  const monthKey = new Date().toISOString().slice(0, 7);
   const todayRecords = clockRecords.filter((r) => new Date(r.time).toDateString() === today).slice().reverse();
+
+  const monthPayroll = payments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((sum, p) => sum + p.amount, 0);
 
   return (
     <div>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Empleados</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal</h2>
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
+
+      <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 20px", margin: "14px 0 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>💰 NÓMINA PAGADA ESTE MES</span>
+        <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(monthPayroll)}</span>
+      </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         <input placeholder="Nombre del nuevo empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
-        <button onClick={() => { onAdd(name); setName(""); }} style={{ padding: "0 16px", border: "none", borderRadius: 6, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Agregar empleado</button>
+        <button onClick={() => { onAdd(name); setName(""); }} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer" }}>+ Agregar empleado</button>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
         <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ ...inp, maxWidth: 220 }}>
           <option value="">Selecciona un empleado</option>
           {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
@@ -1209,13 +1308,72 @@ function EmpleadosView({ employees, clockRecords, onAdd, onClockIn }) {
         <button
           disabled={!selected}
           onClick={() => onClockIn(selected)}
-          style={{ padding: "10px 16px", border: "none", borderRadius: 6, background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: selected ? 1 : 0.5 }}
+          style={{ padding: "10px 16px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: selected ? 1 : 0.5 }}
         >
           Marcar entrada
         </button>
       </div>
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Entradas de hoy</h3>
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginBottom: 10 }}>Equipo</h3>
+      {employees.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no has agregado empleados.</p>}
+      <div style={{ display: "grid", gap: 10 }}>
+        {employees.map((emp) => {
+          const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().reverse();
+          const empTotalPaid = empPayments.reduce((sum, p) => sum + p.amount, 0);
+          const empLate = clockRecords.filter((r) => r.employee === emp.name && r.late).length;
+          const empClock = clockRecords.filter((r) => r.employee === emp.name).length;
+          const isOpen = expanded === emp.id;
+          const key = emp.id;
+          return (
+            <div key={emp.id} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
+              <button
+                onClick={() => setExpanded(isOpen ? null : emp.id)}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: "50%", background: avatarColor(emp.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, flexShrink: 0 }}>
+                  {initials(emp.name)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</div>
+                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{empClock} entradas · {empLate} tardanzas</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 800, color: "#2E7D32", fontSize: 15 }}>{money(empTotalPaid)}</div>
+                  <div style={{ fontSize: 10, color: "#8a7a63" }}>pagado total</div>
+                </div>
+              </button>
+              {isOpen && (
+                <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
+                  <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, flexWrap: "wrap" }}>
+                    <input placeholder="Monto" type="number" value={payAmount[key] || ""} onChange={(e) => setPayAmount((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 110 }} />
+                    <input placeholder="Nota (ej: quincena)" value={payNote[key] || ""} onChange={(e) => setPayNote((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 180 }} />
+                    <button
+                      disabled={!payAmount[key]}
+                      onClick={() => { onAddPayment(emp.name, payAmount[key], payNote[key]); setPayAmount((s) => ({ ...s, [key]: "" })); setPayNote((s) => ({ ...s, [key]: "" })); }}
+                      style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: payAmount[key] ? 1 : 0.5 }}
+                    >
+                      💵 Registrar pago
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
+                  {empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
+                  {empPayments.map((p) => (
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
+                        <div style={{ fontSize: 10, color: "#C9BBA3" }}>{new Date(p.time).toLocaleString("es-NI")}</div>
+                      </div>
+                      <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 24 }}>Entradas de hoy</h3>
       {todayRecords.length === 0 && <p style={{ color: "#8a7a63" }}>Nadie ha marcado entrada todavía hoy.</p>}
       {todayRecords.map((r) => (
         <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 14 }}>
