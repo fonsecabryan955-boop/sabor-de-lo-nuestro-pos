@@ -5,7 +5,7 @@ import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Re
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
-const RECORD_ID = "main";
+const RECORD_ID = "main"; // Caja completa: apertura/cierre, descuentos, folios
 
 const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
 const SHIFT_START = "17:00";
@@ -904,7 +904,7 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
             📜 {showHistory ? "Ocultar" : "Ver"} historial de cortes anteriores ({closedSessions.length})
           </button>
         )}
-        {showHistory && <SessionHistory sessions={closedSessions} />}
+        {showHistory && <SessionHistory sessions={closedSessions} sales={sales} expenses={expenses} />}
       </div>
     );
   }
@@ -982,20 +982,89 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   );
 }
 
-function SessionHistory({ sessions }) {
+function printSessionReport(session, sales, expenses) {
+  const start = new Date(session.openedAt);
+  const end = session.closedAt ? new Date(session.closedAt) : new Date();
+  const sessionSales = sales.filter((s) => new Date(s.time) >= start && new Date(s.time) <= end);
+  const sessionExpenses = expenses.filter((e) => new Date(e.time) >= start && new Date(e.time) <= end);
+  const cash = sessionSales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
+  const card = sessionSales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const expensesTotal = sessionExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+  const rows = sessionSales.map((s) => `
+    <tr>
+      <td>#${String(s.folio || s.id).padStart(5, "0")}</td>
+      <td>${s.ref}</td>
+      <td>${s.method}</td>
+      <td style="text-align:right">${money(s.total)}</td>
+    </tr>`).join("");
+
+  const expenseRows = sessionExpenses.map((e) => `
+    <tr><td colspan="3">${e.description}</td><td style="text-align:right">-${money(e.amount)}</td></tr>`).join("");
+
+  const html = `
+    <html><head><title>Corte de Caja</title><style>
+      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 16px; color: #2B2118; }
+      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
+      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 14px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      td, th { padding: 4px 2px; border-bottom: 1px dashed #ccc; text-align: left; }
+      .totals td { border: none; font-weight: bold; }
+      .big { font-size: 15px; }
+      hr { border: none; border-top: 2px dashed #333; margin: 10px 0; }
+      @page { margin: 10mm; }
+    </style></head><body>
+      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
+      <div class="sub">CORTE DE CAJA · MASATEPE, MASAYA</div>
+      <div>Abierta por: <strong>${session.openedBy}</strong></div>
+      <div>Desde: ${start.toLocaleString("es-NI")}</div>
+      <div>Hasta: ${end.toLocaleString("es-NI")}</div>
+      <hr/>
+      <table>
+        <tr><th>Ticket</th><th>Ref</th><th>Pago</th><th style="text-align:right">Total</th></tr>
+        ${rows || '<tr><td colspan="4">Sin ventas registradas</td></tr>'}
+      </table>
+      <hr/>
+      <table class="totals">
+        <tr><td>Fondo inicial</td><td colspan="2"></td><td style="text-align:right">${money(session.openingAmount)}</td></tr>
+        <tr><td>Ventas efectivo</td><td colspan="2"></td><td style="text-align:right">${money(cash)}</td></tr>
+        <tr><td>Ventas tarjeta</td><td colspan="2"></td><td style="text-align:right">${money(card)}</td></tr>
+        <tr><td>Gastos</td><td colspan="2"></td><td style="text-align:right">-${money(expensesTotal)}</td></tr>
+        <tr class="big"><td>EFECTIVO ESPERADO</td><td colspan="2"></td><td style="text-align:right">${money(session.expectedCash != null ? session.expectedCash : session.openingAmount + cash - expensesTotal)}</td></tr>
+        ${session.countedCash != null ? `<tr class="big"><td>EFECTIVO CONTADO</td><td colspan="2"></td><td style="text-align:right">${money(session.countedCash)}</td></tr>
+        <tr class="big"><td>DIFERENCIA</td><td colspan="2"></td><td style="text-align:right">${session.difference >= 0 ? "+" : ""}${money(session.difference)}</td></tr>` : ""}
+      </table>
+      ${sessionExpenses.length ? `<hr/><div style="font-weight:bold;margin-bottom:4px;">Gastos del turno</div><table>${expenseRows}</table>` : ""}
+      <hr/>
+      <div style="text-align:center;margin-top:10px;">${sessionSales.length} ventas registradas · Generado ${new Date().toLocaleString("es-NI")}</div>
+    </body></html>`;
+
+  const w = window.open("", "_blank", "width=380,height=650");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+function SessionHistory({ sessions, sales, expenses }) {
   return (
     <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: "6px 14px", border: "1px solid #F0E8D8" }}>
       {sessions.map((s) => (
         <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span><strong>{s.openedBy}</strong> · {new Date(s.openedAt).toLocaleDateString("es-NI")}</span>
-            <span style={{
-              fontWeight: 800, padding: "2px 10px", borderRadius: 20,
-              background: s.difference === 0 ? "#E8F5E9" : s.difference > 0 ? "#FFF8E1" : "#FCE8E8",
-              color: s.difference === 0 ? "#2E7D32" : s.difference > 0 ? "#C99A1E" : "#C1272D",
-            }}>
-              {s.difference === 0 ? "Cuadró" : s.difference > 0 ? `+${money(s.difference)}` : `-${money(Math.abs(s.difference))}`}
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                fontWeight: 800, padding: "2px 10px", borderRadius: 20,
+                background: s.difference === 0 ? "#E8F5E9" : s.difference > 0 ? "#FFF8E1" : "#FCE8E8",
+                color: s.difference === 0 ? "#2E7D32" : s.difference > 0 ? "#C99A1E" : "#C1272D",
+              }}>
+                {s.difference === 0 ? "Cuadró" : s.difference > 0 ? `+${money(s.difference)}` : `-${money(Math.abs(s.difference))}`}
+              </span>
+              <button onClick={() => printSessionReport(s, sales, expenses)} title="Imprimir corte" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: "#8a7a63" }}>
+                <Printer size={13} />
+              </button>
+            </div>
           </div>
           <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 3 }}>Fondo: {money(s.openingAmount)} · Esperado: {money(s.expectedCash)} · Contado: {money(s.countedCash)}{s.notes ? ` · ${s.notes}` : ""}</div>
         </div>
