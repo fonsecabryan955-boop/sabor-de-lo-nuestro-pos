@@ -332,7 +332,7 @@ export default function App() {
       const t = tables.find((t) => t.id === id);
       if (!t.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(t.items);
-      const sale = { id: Date.now(), kind: "mesa", ref: `Mesa ${t.id}`, items: t.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}`, items: t.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
@@ -346,7 +346,7 @@ export default function App() {
       const d = deliveries.find((d) => d.id === id);
       if (!d.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(d.items);
-      const sale = { id: Date.now(), kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
@@ -904,6 +904,8 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   }
 
   const cashSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
+  const cardSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const sessionSalesCount = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt)).length;
   const sessionExpenses = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).reduce((sum, e) => sum + Number(e.amount), 0);
   const expectedCash = active.openingAmount + cashSales - sessionExpenses;
   const diff = counted !== "" ? Number(counted) - expectedCash : null;
@@ -927,14 +929,19 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           <div style={{ fontWeight: 800 }}>{money(cashSales)}</div>
         </div>
         <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>Ventas tarjeta</div>
+          <div style={{ fontWeight: 800 }}>{money(cardSales)}</div>
+        </div>
+        <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
           <div style={{ fontSize: 10, color: "#C9BBA3" }}>Gastos del turno</div>
           <div style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(sessionExpenses)}</div>
         </div>
         <div style={{ background: "#F2C879", borderRadius: 8, padding: 10 }}>
-          <div style={{ fontSize: 10, color: "#2B2118" }}>Debería haber</div>
+          <div style={{ fontSize: 10, color: "#2B2118" }}>Efectivo debería haber</div>
           <div style={{ fontWeight: 800, color: "#2B2118" }}>{money(expectedCash)}</div>
         </div>
       </div>
+      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 4 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general (efectivo + tarjeta): <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong></div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input placeholder="Efectivo contado físicamente" type="number" value={counted} onChange={(e) => setCounted(e.target.value)} style={{ ...inp, maxWidth: 200, color: "#2B2118" }} />
@@ -1773,6 +1780,7 @@ function ReceiptModal({ sale, onClose }) {
             <div style={{ fontSize: 26, marginBottom: 2 }}>🍔🍗</div>
             <div style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: 0.5, textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>{RESTAURANT_NAME}</div>
             <div style={{ color: "#FFF3E0", fontSize: 10, marginTop: 3, letterSpacing: 0.5 }}>MASATEPE · MASAYA · NICARAGUA</div>
+            {sale.folio && <div style={{ color: "#fff", fontSize: 11, marginTop: 6, fontWeight: 800, background: "rgba(0,0,0,0.2)", display: "inline-block", padding: "2px 12px", borderRadius: 20 }}>TICKET #{String(sale.folio).padStart(5, "0")}</div>}
           </div>
           <div style={{ padding: "14px 16px 0" }}>
             <div style={{ textAlign: "center", fontSize: 11, color: "#666", marginBottom: 10 }}>{date.toLocaleString("es-NI", { dateStyle: "long", timeStyle: "short" })}</div>
