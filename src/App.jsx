@@ -64,6 +64,7 @@ function initialState() {
     salesLog: [],
     expensesLog: [],
     payments: [],
+    cashSessions: [],
     pin: DEFAULT_PIN,
   };
 }
@@ -247,7 +248,7 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], pin } = state;
+  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], pin } = state;
 
   useEffect(() => {
     const current = {};
@@ -389,6 +390,15 @@ export default function App() {
   function deletePayment(id) {
     persist({ ...state, payments: payments.filter((p) => p.id !== id) });
   }
+  function openCashSession(openedBy, openingAmount) {
+    persist({ ...state, cashSessions: [...cashSessions, { id: Date.now(), openedBy, openingAmount: Number(openingAmount) || 0, openedAt: new Date().toISOString(), closedAt: null }] });
+  }
+  function closeCashSession(sessionId, countedCash, expectedCash, notes) {
+    persist({
+      ...state,
+      cashSessions: cashSessions.map((s) => (s.id === sessionId ? { ...s, closedAt: new Date().toISOString(), countedCash: Number(countedCash), expectedCash, difference: Number(countedCash) - expectedCash, notes: notes || "" } : s)),
+    });
+  }
   function deletePromotion(id) {
     persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
   }
@@ -517,7 +527,7 @@ export default function App() {
 
         {view === "caja" &&
           (cajaUnlocked ? (
-            <CajaView tables={tables} deliveries={deliveries} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} />
+            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} />
           ) : (
             <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />
           ))}
@@ -855,7 +865,118 @@ function CocinaView({ tables, deliveries, onAdvance }) {
   );
 }
 
-function CajaView({ tables, deliveries, onCharge, pin, onChangePin }) {
+function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, onCloseSession }) {
+  const active = cashSessions.find((s) => !s.closedAt);
+  const [openedBy, setOpenedBy] = useState("");
+  const [openingAmount, setOpeningAmount] = useState("");
+  const [counted, setCounted] = useState("");
+  const [notes, setNotes] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+
+  const closedSessions = cashSessions.filter((s) => s.closedAt).slice().reverse();
+
+  if (!active) {
+    return (
+      <div style={{ background: "#fff", border: "2px dashed #C1272D", borderRadius: 14, padding: 18, marginBottom: 20 }}>
+        <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 10 }}>🔓 Abrir caja</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select value={openedBy} onChange={(e) => setOpenedBy(e.target.value)} style={{ ...inp, maxWidth: 200 }}>
+            <option value="">¿Quién abre la caja?</option>
+            {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
+          </select>
+          <input placeholder="Fondo inicial (C$)" type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+          <button
+            disabled={!openedBy || !openingAmount}
+            onClick={() => { onOpenSession(openedBy, openingAmount); setOpenedBy(""); setOpeningAmount(""); }}
+            style={{ padding: "0 18px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: openedBy && openingAmount ? 1 : 0.5 }}
+          >
+            Abrir caja
+          </button>
+        </div>
+        {closedSessions.length > 0 && (
+          <button onClick={() => setShowHistory((s) => !s)} style={{ marginTop: 12, fontSize: 12, background: "none", border: "none", color: "#8a7a63", cursor: "pointer", textDecoration: "underline" }}>
+            {showHistory ? "Ocultar" : "Ver"} historial de cortes anteriores ({closedSessions.length})
+          </button>
+        )}
+        {showHistory && <SessionHistory sessions={closedSessions} />}
+      </div>
+    );
+  }
+
+  const cashSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
+  const sessionExpenses = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).reduce((sum, e) => sum + Number(e.amount), 0);
+  const expectedCash = active.openingAmount + cashSales - sessionExpenses;
+  const diff = counted !== "" ? Number(counted) - expectedCash : null;
+
+  return (
+    <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 14, padding: 18, marginBottom: 20, color: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 15, color: "#F2C879" }}>🔐 Caja abierta — {active.openedBy}</div>
+          <div style={{ fontSize: 11, color: "#C9BBA3" }}>Desde: {new Date(active.openedAt).toLocaleString("es-NI")}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: "#C9BBA3" }}>Fondo inicial</div>
+          <div style={{ fontWeight: 800 }}>{money(active.openingAmount)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, margin: "12px 0" }}>
+        <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>Ventas efectivo</div>
+          <div style={{ fontWeight: 800 }}>{money(cashSales)}</div>
+        </div>
+        <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: 10 }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>Gastos del turno</div>
+          <div style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(sessionExpenses)}</div>
+        </div>
+        <div style={{ background: "#F2C879", borderRadius: 8, padding: 10 }}>
+          <div style={{ fontSize: 10, color: "#2B2118" }}>Debería haber</div>
+          <div style={{ fontWeight: 800, color: "#2B2118" }}>{money(expectedCash)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <input placeholder="Efectivo contado físicamente" type="number" value={counted} onChange={(e) => setCounted(e.target.value)} style={{ ...inp, maxWidth: 200, color: "#2B2118" }} />
+        <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 180, color: "#2B2118" }} />
+      </div>
+
+      {counted !== "" && (
+        <div style={{ marginTop: 10, fontWeight: 800, fontSize: 14, color: diff === 0 ? "#00E676" : diff > 0 ? "#F2C879" : "#FF5252" }}>
+          {diff === 0 ? "✅ Cuadra exacto" : diff > 0 ? `📈 Sobran ${money(diff)}` : `📉 Faltan ${money(Math.abs(diff))}`}
+        </div>
+      )}
+
+      <button
+        disabled={counted === ""}
+        onClick={() => { if (window.confirm("¿Cerrar la caja con estos datos?")) onCloseSession(active.id, counted, expectedCash, notes); }}
+        style={{ marginTop: 14, width: "100%", padding: 12, border: "none", borderRadius: 10, background: counted !== "" ? "#C1272D" : "#5a4c3a", color: "#fff", fontWeight: 800, cursor: counted !== "" ? "pointer" : "not-allowed", fontSize: 14 }}
+      >
+        🔒 Cerrar caja
+      </button>
+    </div>
+  );
+}
+
+function SessionHistory({ sessions }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      {sessions.map((s) => (
+        <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #F0E8D8", fontSize: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span><strong>{s.openedBy}</strong> · {new Date(s.openedAt).toLocaleDateString("es-NI")}</span>
+            <span style={{ fontWeight: 700, color: s.difference === 0 ? "#2E7D32" : s.difference > 0 ? "#C99A1E" : "#C1272D" }}>
+              {s.difference === 0 ? "Cuadró" : s.difference > 0 ? `+${money(s.difference)}` : `-${money(Math.abs(s.difference))}`}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: "#8a7a63" }}>Fondo: {money(s.openingAmount)} · Esperado: {money(s.expectedCash)} · Contado: {money(s.countedCash)}{s.notes ? ` · ${s.notes}` : ""}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
