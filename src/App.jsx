@@ -25,8 +25,7 @@ const MENU = [
   { id: "c1", name: "Dedos de Pollo (6u)", price: 200, cat: "Chicken Mood" },
   { id: "c2", name: "Alitas x6", price: 230, cat: "Chicken Mood" },
   { id: "c3", name: "Alitas x12", price: 450, cat: "Chicken Mood" },
-  { id: "c4", name: "Alitas Fritas (6u)", price: 220, cat: "Chicken Mood" },
-  { id: "c5", name: "Alitas Fritas (12u)", price: 430, cat: "Chicken Mood" },
+  { id: "c4", name: "Alitas Fritas", price: 220, price12: 430, cat: "Chicken Mood" },
   { id: "p1", name: "Panini de Pollo", price: 235, cat: "Paninis" },
   { id: "p2", name: "Panini de Jamón", price: 190, cat: "Paninis" },
   { id: "e1", name: "Papas Francesas", price: 50, cat: "Extras" },
@@ -677,13 +676,38 @@ const WING_SAUCES = [
 ];
 
 function WingOptionsModal({ item, onConfirm, onClose }) {
+  const needsQty = !!item.price12;
+  const [qty, setQty] = useState(6);
   const [sauce, setSauce] = useState(WING_SAUCES[0]);
   const [pres, setPres] = useState("Bañadas");
+  const finalPrice = needsQty && qty === 12 ? item.price12 : item.price;
+  const finalName = needsQty ? `${item.name} x${qty}` : item.name;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
       <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 360, padding: 20 }}>
         <h3 style={{ marginTop: 0, marginBottom: 4 }}>🍗 {item.name}</h3>
-        <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Elige la salsa y cómo las quieren</p>
+        <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Elige {needsQty ? "cantidad, salsa y presentación" : "la salsa y cómo las quieren"}</p>
+
+        {needsQty && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Cantidad</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+              {[6, 12].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setQty(q)}
+                  style={{
+                    flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13,
+                    background: qty === q ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
+                    color: qty === q ? "#fff" : "#5a4c3a",
+                  }}
+                >
+                  {q} pzas · {money(q === 12 ? item.price12 : item.price)}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Salsa</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
@@ -722,7 +746,7 @@ function WingOptionsModal({ item, onConfirm, onClose }) {
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
           <button
-            onClick={() => onConfirm({ id: `${item.id}-${sauce.id}-${pres === "Bañadas" ? "banadas" : "aparte"}`, name: `${item.name} · ${sauce.label} (${pres})`, price: item.price })}
+            onClick={() => onConfirm({ id: `${item.id}-${qty}-${sauce.id}-${pres === "Bañadas" ? "banadas" : "aparte"}`, name: `${finalName} · ${sauce.label} (${pres})`, price: finalPrice })}
             style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}
           >
             Agregar
@@ -1713,6 +1737,83 @@ function printPayStub(employeeName, payment) {
   w.print();
 }
 
+function printPayrollSummary(employees, payments, clockRecords) {
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const rows = employees.map((emp) => {
+    const empPayments = payments.filter((p) => p.employeeName === emp.name);
+    const monthPaid = empPayments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((s, p) => s + p.amount, 0);
+    const empClock = clockRecords.filter((r) => r.employee === emp.name);
+    const lateCount = empClock.filter((r) => r.late).length;
+    const punctuality = empClock.length > 0 ? Math.round(((empClock.length - lateCount) / empClock.length) * 100) : 100;
+    return `<tr>
+      <td>${emp.name}</td>
+      <td>${emp.role || "Personal"}</td>
+      <td style="text-align:right">${money(emp.dailyWage)}</td>
+      <td style="text-align:center">${empClock.length}</td>
+      <td style="text-align:center">${punctuality}%</td>
+      <td style="text-align:right">${money(monthPaid)}</td>
+    </tr>`;
+  }).join("");
+  const totalMonth = employees.reduce((sum, emp) => sum + payments.filter((p) => p.employeeName === emp.name && p.time.slice(0, 7) === monthKey).reduce((s, p) => s + p.amount, 0), 0);
+
+  const html = `
+    <html><head><title>Reporte de Nómina</title><style>
+      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 18px; color: #2B2118; }
+      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
+      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      td, th { padding: 6px 4px; border-bottom: 1px solid #ddd; text-align: left; }
+      th { font-size: 10px; text-transform: uppercase; color: #555; }
+      .total td { border: none; font-weight: bold; font-size: 14px; padding-top: 12px; }
+      hr { border: none; border-top: 2px dashed #333; margin: 12px 0; }
+      @page { margin: 12mm; }
+    </style></head><body>
+      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
+      <div class="sub">REPORTE DE NÓMINA · ${new Date().toLocaleDateString("es-NI", { month: "long", year: "numeric" }).toUpperCase()}</div>
+      <hr/>
+      <table>
+        <tr><th>Empleado</th><th>Puesto</th><th style="text-align:right">Pago/día</th><th style="text-align:center">Entradas</th><th style="text-align:center">Puntualidad</th><th style="text-align:right">Pagado (mes)</th></tr>
+        ${rows}
+        <tr class="total"><td colspan="5">TOTAL NÓMINA DEL MES</td><td style="text-align:right">${money(totalMonth)}</td></tr>
+      </table>
+      <hr/>
+      <div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">Generado ${new Date().toLocaleString("es-NI")}</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=420,height=650");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
+function AttendanceMini({ employeeName, clockRecords }) {
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dayStr = d.toDateString();
+    const rec = clockRecords.find((r) => r.employee === employeeName && new Date(r.time).toDateString() === dayStr);
+    days.push({ date: d, status: rec ? (rec.late ? "late" : "ontime") : "none" });
+  }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>📅 Asistencia (últimos 14 días)</div>
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {days.map((d, i) => (
+          <div
+            key={i}
+            title={`${d.date.toLocaleDateString("es-NI")}: ${d.status === "ontime" ? "A tiempo" : d.status === "late" ? "Tarde" : "No marcó"}`}
+            style={{
+              width: 18, height: 18, borderRadius: 4,
+              background: d.status === "ontime" ? "#26A65B" : d.status === "late" ? "#E53935" : "#E5D9C3",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment }) {
   const [name, setName] = useState("");
   const [wage, setWage] = useState("");
@@ -1743,7 +1844,14 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal y Nómina</h2>
-      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <p style={{ fontSize: 12, color: "#8a7a63", margin: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
+        {employees.length > 0 && (
+          <button onClick={() => printPayrollSummary(employees, payments, clockRecords)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>
+            <Printer size={13} /> Imprimir nómina del mes
+          </button>
+        )}
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, margin: "14px 0 20px" }}>
         <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 18px" }}>
@@ -1832,6 +1940,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
               </button>
               {isOpen && (
                 <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
+                  <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
                   {st.owed > 0 && (
                     <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                       <div style={{ fontSize: 12 }}>
@@ -1907,6 +2016,47 @@ function PayCustomButton({ onPay }) {
 const lbl = { display: "block", fontSize: 12, fontWeight: 700, marginTop: 10, marginBottom: 4 };
 const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 14, boxSizing: "border-box" };
 
+function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insumos, payroll, realProfit) {
+  const daySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
+  const dayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
+  const rows = daySales.map((s) => `<tr><td>#${String(s.folio || s.id).padStart(5, "0")}</td><td>${s.ref}</td><td>${s.method}</td><td style="text-align:right">${money(s.total)}</td></tr>`).join("");
+  const expRows = dayExpenses.map((e) => `<tr><td colspan="3">${(e.category || "Otro") === "Insumos" ? "🍗" : "🧾"} ${e.description}</td><td style="text-align:right">-${money(e.amount)}</td></tr>`).join("");
+  const html = `
+    <html><head><title>Reporte del Día</title><style>
+      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 18px; color: #2B2118; }
+      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
+      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      td, th { padding: 4px 2px; border-bottom: 1px dashed #ccc; text-align: left; }
+      .totals td { border: none; font-weight: bold; }
+      .big { font-size: 16px; background: #F2C879; padding: 10px; border-radius: 8px; text-align: center; margin: 12px 0; }
+      hr { border: none; border-top: 2px dashed #333; margin: 10px 0; }
+      @page { margin: 10mm; }
+    </style></head><body>
+      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
+      <div class="sub">REPORTE DIARIO · ${dateLabel.toUpperCase()}</div>
+      <hr/>
+      <table><tr><th>Ticket</th><th>Ref</th><th>Pago</th><th style="text-align:right">Total</th></tr>
+      ${rows || '<tr><td colspan="4">Sin ventas</td></tr>'}</table>
+      <hr/>
+      <table class="totals">
+        <tr><td>Ingresos</td><td colspan="2"></td><td style="text-align:right">${money(income)}</td></tr>
+        <tr><td>Insumos</td><td colspan="2"></td><td style="text-align:right">-${money(insumos)}</td></tr>
+        <tr><td>Otros gastos</td><td colspan="2"></td><td style="text-align:right">-${money(spent - insumos)}</td></tr>
+        <tr><td>Nómina pagada</td><td colspan="2"></td><td style="text-align:right">-${money(payroll)}</td></tr>
+      </table>
+      <div class="big">GANANCIA NETA REAL: ${money(realProfit)}</div>
+      ${dayExpenses.length ? `<hr/><div style="font-weight:bold;">Gastos del día</div><table>${expRows}</table>` : ""}
+      <hr/>
+      <div style="text-align:center;font-size:10px;color:#888;">Generado ${new Date().toLocaleString("es-NI")}</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=400,height=650");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
 function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
@@ -1954,16 +2104,48 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
     todaySales.forEach((s) => s.items.forEach((it) => { map[it.name] = (map[it.name] || 0) + it.qty; }));
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [todaySales]);
+  const maxItemQty = byItem.length > 0 ? byItem[0][1] : 1;
+
+  const last7Days = useMemo(() => {
+    const arr = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ds = d.toDateString();
+      const total = sales.filter((s) => new Date(s.time).toDateString() === ds).reduce((sum, s) => sum + s.total, 0);
+      arr.push({ label: d.toLocaleDateString("es-NI", { weekday: "short" }), total });
+    }
+    return arr;
+  }, [sales]);
+  const max7 = Math.max(1, ...last7Days.map((d) => d.total));
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
         <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{isToday ? "Reporte de hoy" : "Reporte del día seleccionado"}</h2>
-        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
+          <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63" }}>
+            <Printer size={15} />
+          </button>
+        </div>
       </div>
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 12 }}>
         Viendo: {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
       </p>
+
+      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 18 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 10 }}>📈 Tendencia de ventas — últimos 7 días</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
+          {last7Days.map((d, i) => (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div style={{ fontSize: 9, color: "#8a7a63" }}>{d.total > 0 ? money(d.total).replace("C$", "") : ""}</div>
+              <div style={{ width: "100%", height: Math.max(4, (d.total / max7) * 60), background: "linear-gradient(180deg, #E8A33D, #C1272D)", borderRadius: 4 }} />
+              <div style={{ fontSize: 10, color: "#8a7a63", textTransform: "capitalize" }}>{d.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#fff" }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL (hoy)</div>
@@ -2054,8 +2236,13 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Productos más vendidos</h3>
       {byItem.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no hay ventas registradas ese día.</p>}
       {byItem.map(([name, qty]) => (
-        <div key={name} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 14 }}>
-          <span>{name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
+        <div key={name} style={{ marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
+            <span>{name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
+          </div>
+          <div style={{ background: "#F0E8D8", borderRadius: 6, height: 8, overflow: "hidden" }}>
+            <div style={{ width: `${(qty / maxItemQty) * 100}%`, height: "100%", background: "linear-gradient(90deg, #E8A33D, #C1272D)", borderRadius: 6 }} />
+          </div>
         </div>
       ))}
 
