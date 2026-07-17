@@ -25,6 +25,8 @@ const MENU = [
   { id: "c1", name: "Dedos de Pollo (6u)", price: 200, cat: "Chicken Mood" },
   { id: "c2", name: "Alitas x6", price: 230, cat: "Chicken Mood" },
   { id: "c3", name: "Alitas x12", price: 450, cat: "Chicken Mood" },
+  { id: "c4", name: "Alitas Fritas (6u)", price: 220, cat: "Chicken Mood" },
+  { id: "c5", name: "Alitas Fritas (12u)", price: 430, cat: "Chicken Mood" },
   { id: "p1", name: "Panini de Pollo", price: 235, cat: "Paninis" },
   { id: "p2", name: "Panini de Jamón", price: 190, cat: "Paninis" },
   { id: "e1", name: "Papas Francesas", price: 50, cat: "Extras" },
@@ -363,9 +365,9 @@ export default function App() {
     const record = { id: Date.now(), ...exp, time: new Date().toISOString() };
     persist({ ...state, expenses: [...expenses, record], expensesLog: [...expensesLog, record] });
   }
-  function addEmployee(name, dailyWage) {
+  function addEmployee(name, dailyWage, role) {
     if (!name.trim()) return;
-    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim(), dailyWage: Number(dailyWage) || 0 }] });
+    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim(), dailyWage: Number(dailyWage) || 0, role: role || "Personal" }] });
   }
   function clockIn(employeeName) {
     const now = new Date();
@@ -548,7 +550,7 @@ export default function App() {
           <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} />
         )}
 
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
+        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
 
         {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} />}
 
@@ -667,12 +669,86 @@ function MesasView({ tables, onOpen }) {
   );
 }
 
+const WING_SAUCES = [
+  { id: "bbq", label: "BBQ" },
+  { id: "buffalo", label: "Buffalo" },
+  { id: "ranch", label: "Ranch" },
+  { id: "casa", label: "Salsa de la Casa" },
+];
+
+function WingOptionsModal({ item, onConfirm, onClose }) {
+  const [sauce, setSauce] = useState(WING_SAUCES[0]);
+  const [pres, setPres] = useState("Bañadas");
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
+      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 360, padding: 20 }}>
+        <h3 style={{ marginTop: 0, marginBottom: 4 }}>🍗 {item.name}</h3>
+        <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Elige la salsa y cómo las quieren</p>
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Salsa</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+          {WING_SAUCES.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSauce(s)}
+              style={{
+                padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13,
+                background: sauce.id === s.id ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
+                color: sauce.id === s.id ? "#fff" : "#5a4c3a",
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Presentación</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          {["Bañadas", "Salsa aparte"].map((p) => (
+            <button
+              key={p}
+              onClick={() => setPres(p)}
+              style={{
+                flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13,
+                background: pres === p ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
+                color: pres === p ? "#fff" : "#5a4c3a",
+              }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
+          <button
+            onClick={() => onConfirm({ id: `${item.id}-${sauce.id}-${pres === "Bañadas" ? "banadas" : "aparte"}`, name: `${item.name} · ${sauce.label} (${pres})`, price: item.price })}
+            style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}
+          >
+            Agregar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onNote, onSend, onClose }) {
   const allCats = promotions && promotions.length > 0 ? [...CATS, "Promociones"] : CATS;
   const [cat, setCat] = useState(allCats[0]);
+  const [wingItem, setWingItem] = useState(null);
   const total = orderTotal(items);
   const listForCat = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
+
+  function handleItemClick(m) {
+    if (m.cat === "Chicken Mood" && m.name.toLowerCase().includes("alita")) {
+      setWingItem(m);
+    } else {
+      onAdd(m);
+    }
+  }
   return (
+    <>
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 680, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
         <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -705,7 +781,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
               {listForCat.map((m) => (
                 <button
                   key={m.id}
-                  onClick={() => onAdd(m)}
+                  onClick={() => handleItemClick(m)}
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, padding: "14px 14px", borderRadius: 12,
                     border: "none", cursor: "pointer", fontSize: 14, textAlign: "left",
@@ -743,11 +819,18 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
         </div>
       </div>
     </div>
+    {wingItem && (
+      <WingOptionsModal
+        item={wingItem}
+        onConfirm={(customItem) => { onAdd(customItem); setWingItem(null); }}
+        onClose={() => setWingItem(null)}
+      />
+    )}
+    </>
   );
 }
 
 const iconBtn = { width: 24, height: 24, borderRadius: 6, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
-
 function ElapsedBadge({ sentAt }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -1598,9 +1681,42 @@ function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
 
+const ROLES = ["Cocinero/a", "Mesero/a", "Cajero/a", "Repartidor/a", "Personal"];
+const ROLE_ICONS = { "Cocinero/a": "👨‍🍳", "Mesero/a": "🧑‍🍽️", "Cajero/a": "💵", "Repartidor/a": "🛵", "Personal": "👤" };
+
+function printPayStub(employeeName, payment) {
+  const html = `
+    <html><head><title>Recibo de Pago</title><style>
+      body { font-family: 'Courier New', monospace; font-size: 13px; padding: 20px; color: #2B2118; }
+      h1 { font-size: 15px; text-align: center; margin-bottom: 2px; }
+      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
+      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ccc; }
+      .big { font-size: 20px; font-weight: bold; text-align: center; margin: 14px 0; background: #F2C879; padding: 10px; border-radius: 8px; }
+      hr { border: none; border-top: 2px dashed #333; margin: 12px 0; }
+      @page { margin: 12mm; }
+    </style></head><body>
+      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
+      <div class="sub">RECIBO DE PAGO · MASATEPE, MASAYA</div>
+      <hr/>
+      <div class="row"><span>Empleado</span><strong>${employeeName}</strong></div>
+      <div class="row"><span>Fecha de pago</span><span>${new Date(payment.time).toLocaleString("es-NI")}</span></div>
+      <div class="row"><span>Concepto</span><span>${payment.note || "Pago de días trabajados"}</span></div>
+      <div class="big">${money(payment.amount)}</div>
+      <hr/>
+      <div style="text-align:center;font-size:11px;margin-top:20px;">Firma del empleado: _____________________</div>
+      <div style="text-align:center;font-size:10px;color:#888;margin-top:20px;">Generado ${new Date().toLocaleString("es-NI")}</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=360,height=560");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
 function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment }) {
   const [name, setName] = useState("");
   const [wage, setWage] = useState("");
+  const [role, setRole] = useState(ROLES[0]);
   const [selected, setSelected] = useState("");
   const [expanded, setExpanded] = useState(null);
   const [payNote, setPayNote] = useState({});
@@ -1617,7 +1733,9 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
     const empClockAll = clockRecords.filter((r) => r.employee === emp.name);
     const pendingDays = cutoff ? empClockAll.filter((r) => new Date(r.time) > cutoff).length : empClockAll.length;
     const owed = pendingDays * (emp.dailyWage || 0);
-    return { empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed, totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount: empClockAll.filter((r) => r.late).length, totalDays: empClockAll.length };
+    const lateCount = empClockAll.filter((r) => r.late).length;
+    const punctuality = empClockAll.length > 0 ? Math.round(((empClockAll.length - lateCount) / empClockAll.length) * 100) : 100;
+    return { empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed, totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount, totalDays: empClockAll.length, punctuality };
   }
 
   const totalOwedAll = employees.reduce((sum, emp) => sum + employeeStats(emp).owed, 0);
@@ -1636,12 +1754,26 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
           <div style={{ color: "#fff", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>⏳ PENDIENTE DE PAGAR</div>
           <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(totalOwedAll)}</div>
         </div>
+        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 18px" }}>
+          <div style={{ color: "#8a7a63", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>👥 EQUIPO ACTIVO</div>
+          <div style={{ color: "#2B2118", fontWeight: 800, fontSize: 22 }}>{employees.length}</div>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        <input placeholder="Nombre del nuevo empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
-        <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...inp, maxWidth: 140 }} />
-        <button onClick={() => { onAdd(name, wage); setName(""); setWage(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>+ Agregar empleado</button>
+      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 24 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>➕ Agregar nuevo empleado</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+          {ROLES.map((r) => (
+            <button key={r} onClick={() => setRole(r)} style={{ padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: role === r ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: role === r ? "#fff" : "#5a4c3a" }}>
+              {ROLE_ICONS[r]} {r}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input placeholder="Nombre del empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
+          <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...inp, maxWidth: 140 }} />
+          <button onClick={() => { onAdd(name, wage, role); setName(""); setWage(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>Agregar</button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
@@ -1675,8 +1807,14 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                   {initials(emp.name)}
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</div>
-                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{money(emp.dailyWage)}/día · {st.totalDays} entradas · {st.lateCount} tardanzas</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "#F3ECE0", color: "#5a4c3a", padding: "2px 8px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 2 }}>
+                    {money(emp.dailyWage)}/día · {st.totalDays} entradas ·
+                    <span style={{ color: st.punctuality >= 90 ? "#2E7D32" : st.punctuality >= 70 ? "#C99A1E" : "#C1272D", fontWeight: 700 }}> {st.punctuality}% puntual</span>
+                  </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   {st.owed > 0 ? (
@@ -1720,7 +1858,10 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                         <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
                         <div style={{ fontSize: 10, color: "#C9BBA3" }}>{new Date(p.time).toLocaleString("es-NI")}</div>
                       </div>
-                      <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <button onClick={() => printPayStub(emp.name, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
+                        <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1766,7 +1907,7 @@ function PayCustomButton({ onPay }) {
 const lbl = { display: "block", fontSize: 12, fontWeight: 700, marginTop: 10, marginBottom: 4 };
 const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 14, boxSizing: "border-box" };
 
-function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
+function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const tz = d.getTimezoneOffset() * 60000;
@@ -1778,23 +1919,35 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
 
   const todaySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
   const todayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
+  const todayPayments = (payments || []).filter((p) => new Date(p.time).toDateString() === dayStr);
   const income = todaySales.reduce((sum, s) => sum + s.total, 0);
   const spent = todayExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const insumos = todayExpenses.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
+  const otrosGastos = spent - insumos;
+  const payroll = todayPayments.reduce((sum, p) => sum + p.amount, 0);
   const net = income - spent;
+  const realProfit = income - spent - payroll;
+  const foodCostPct = income > 0 ? Math.round((insumos / income) * 100) : 0;
   const count = todaySales.length;
   const lateToday = clockRecords.filter((r) => new Date(r.time).toDateString() === dayStr && r.late).length;
 
   const monthKey = selectedDate.slice(0, 7);
   const monthSales = sales.filter((s) => s.time.slice(0, 7) === monthKey);
   const monthExpenses = expenses.filter((e) => e.time.slice(0, 7) === monthKey);
+  const monthPayments = (payments || []).filter((p) => p.time.slice(0, 7) === monthKey);
   const monthIncome = monthSales.reduce((sum, s) => sum + s.total, 0);
   const monthSpent = monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthInsumos = monthExpenses.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthPayroll = monthPayments.reduce((sum, p) => sum + p.amount, 0);
   const monthNet = monthIncome - monthSpent;
+  const monthRealProfit = monthIncome - monthSpent - monthPayroll;
+  const monthFoodCostPct = monthIncome > 0 ? Math.round((monthInsumos / monthIncome) * 100) : 0;
   const [yy, mm] = monthKey.split("-");
   const monthLabel = new Date(Number(yy), Number(mm) - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
 
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Insumos");
 
   const byItem = useMemo(() => {
     const map = {};
@@ -1811,10 +1964,26 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 12 }}>
         Viendo: {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
       </p>
+
+      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#fff" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL (hoy)</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
+          <div><div style={{ color: "#C9BBA3" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(income)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(insumos)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(otrosGastos)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(payroll)}</div></div>
+        </div>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>= Te queda realmente</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: realProfit >= 0 ? "#00E676" : "#FF5252" }}>{money(realProfit)}</span>
+        </div>
+        {income > 0 && <div style={{ fontSize: 11, color: "#C9BBA3", marginTop: 8 }}>🍗 Costo de insumos: {foodCostPct}% de las ventas {foodCostPct > 35 ? "⚠️ (alto, ideal 30-35%)" : "✅"}</div>}
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={statCard}><div style={statLabel}>Ingresos</div><div style={statValue}>{money(income)}</div></div>
-        <div style={statCard}><div style={statLabel}>Gastos</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Neto</div><div style={statValue}>{money(net)}</div></div>
+        <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
+        <div style={statCard}><div style={statLabel}>Neto (sin nómina)</div><div style={statValue}>{money(net)}</div></div>
         <div style={statCard}><div style={statLabel}>Pedidos cerrados</div><div style={statValue}>{count}</div></div>
         <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
       </div>
@@ -1830,20 +1999,39 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
           </button>
         )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20, marginTop: 8 }}>
+      <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, margin: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontSize: 12, color: "#5a4c3a" }}>💎 Ganancia neta real del mes (ventas − insumos − otros gastos − nómina){monthIncome > 0 ? ` · costo insumos: ${monthFoodCostPct}%` : ""}</div>
+        <div style={{ fontWeight: 800, fontSize: 20, color: monthRealProfit >= 0 ? "#2E7D32" : "#C1272D" }}>{money(monthRealProfit)}</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
-        <div style={statCard}><div style={statLabel}>Gastos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthSpent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Neto del mes</div><div style={statValue}>{money(monthNet)}</div></div>
+        <div style={statCard}><div style={statLabel}>Insumos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthInsumos)}</div></div>
+        <div style={statCard}><div style={statLabel}>Nómina del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthPayroll)}</div></div>
         <div style={statCard}><div style={statLabel}>Ventas del mes</div><div style={statValue}>{monthSales.length}</div></div>
       </div>
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Registrar gasto</h3>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        {["Insumos", "Otro"].map((c) => (
+          <button
+            key={c}
+            onClick={() => setCategory(c)}
+            style={{
+              padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
+              background: category === c ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
+              color: category === c ? "#fff" : "#5a4c3a",
+            }}
+          >
+            {c === "Insumos" ? "🍗 Insumos" : "🧾 Otro gasto"}
+          </button>
+        ))}
+      </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        <input placeholder="Descripción (ej: gas, hielo)" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
+        <input placeholder="Descripción (ej: pollo, gas)" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
         <input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
         <button
           disabled={!desc || !amount}
-          onClick={() => { onAddExpense({ description: desc, amount: Number(amount) }); setDesc(""); setAmount(""); }}
+          onClick={() => { onAddExpense({ description: desc, amount: Number(amount), category }); setDesc(""); setAmount(""); }}
           style={{ padding: "0 16px", border: "none", borderRadius: 6, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: desc && amount ? 1 : 0.5 }}
         >
           Agregar gasto
@@ -1853,7 +2041,7 @@ function ReportesView({ sales, expenses, onAddExpense, onDeleteSale, onDeleteExp
         <div style={{ marginBottom: 20 }}>
           {todayExpenses.slice().reverse().map((e) => (
             <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-              <span>{e.description}</span>
+              <span>{(e.category || "Otro") === "Insumos" ? "🍗" : "🧾"} {e.description}</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontWeight: 700, color: "#C1272D" }}>-{money(e.amount)}</span>
                 <button onClick={() => onDeleteExpense(e.id)} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
