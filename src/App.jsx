@@ -1153,6 +1153,11 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>💵 Caja</h2>
         <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>⚙️ Cambiar PIN</button>
       </div>
+
+      <GoalBar sales={sales} salesGoal={salesGoal} onSetGoal={onSetGoal} />
+
+      <CorteCaja sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={onOpenSession} onCloseSession={onCloseSession} />
+
       {abiertas.length > 0 && (
         <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>CUENTAS ABIERTAS: {abiertas.length}</span>
