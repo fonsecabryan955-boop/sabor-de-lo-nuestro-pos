@@ -364,9 +364,12 @@ export default function App() {
     const record = { id: Date.now(), ...exp, time: new Date().toISOString() };
     persist({ ...state, expenses: [...expenses, record], expensesLog: [...expensesLog, record] });
   }
-  function addEmployee(name, dailyWage, role) {
+  function addEmployee(name, dailyWage, role, phone) {
     if (!name.trim()) return;
-    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim(), dailyWage: Number(dailyWage) || 0, role: role || "Personal" }] });
+    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim(), dailyWage: Number(dailyWage) || 0, role: role || "Personal", phone: phone || "", hireDate: new Date().toISOString(), active: true }] });
+  }
+  function toggleEmployeeActive(id) {
+    persist({ ...state, employees: employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)) });
   }
   function clockIn(employeeName) {
     const now = new Date();
@@ -546,7 +549,7 @@ export default function App() {
         {view === "clientes" && <ClientesView salesLog={salesLog} />}
 
         {view === "empleados" && (
-          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} />
+          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} onToggleActive={toggleEmployeeActive} />
         )}
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
@@ -1708,7 +1711,7 @@ function initials(name) {
 const ROLES = ["Cocinero/a", "Mesero/a", "Cajero/a", "Repartidor/a", "Personal"];
 const ROLE_ICONS = { "Cocinero/a": "👨‍🍳", "Mesero/a": "🧑‍🍽️", "Cajero/a": "💵", "Repartidor/a": "🛵", "Personal": "👤" };
 
-function printPayStub(employeeName, payment) {
+function printPayStub(employee, payment) {
   const html = `
     <html><head><title>Recibo de Pago</title><style>
       body { font-family: 'Courier New', monospace; font-size: 13px; padding: 20px; color: #2B2118; }
@@ -1722,7 +1725,9 @@ function printPayStub(employeeName, payment) {
       <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
       <div class="sub">RECIBO DE PAGO · MASATEPE, MASAYA</div>
       <hr/>
-      <div class="row"><span>Empleado</span><strong>${employeeName}</strong></div>
+      <div class="row"><span>Empleado</span><strong>${employee.name}</strong></div>
+      <div class="row"><span>Puesto</span><span>${employee.role || "Personal"}</span></div>
+      <div class="row"><span>Pago por día</span><span>${money(employee.dailyWage)}</span></div>
       <div class="row"><span>Fecha de pago</span><span>${new Date(payment.time).toLocaleString("es-NI")}</span></div>
       <div class="row"><span>Concepto</span><span>${payment.note || "Pago de días trabajados"}</span></div>
       <div class="big">${money(payment.amount)}</div>
@@ -1814,10 +1819,23 @@ function AttendanceMini({ employeeName, clockRecords }) {
   );
 }
 
-function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment }) {
+function seniorityLabel(hireDate) {
+  if (!hireDate) return null;
+  const days = Math.floor((Date.now() - new Date(hireDate).getTime()) / 86400000);
+  if (days < 30) return `${days} día${days !== 1 ? "s" : ""}`;
+  if (days < 365) return `${Math.floor(days / 30)} mes${Math.floor(days / 30) !== 1 ? "es" : ""}`;
+  const years = Math.floor(days / 365);
+  const months = Math.floor((days % 365) / 30);
+  return `${years} año${years !== 1 ? "s" : ""}${months ? ` ${months} mes${months !== 1 ? "es" : ""}` : ""}`;
+}
+
+function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment, onToggleActive }) {
   const [name, setName] = useState("");
   const [wage, setWage] = useState("");
   const [role, setRole] = useState(ROLES[0]);
+  const [phone, setPhone] = useState("");
+  const [search, setSearch] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState("");
   const [expanded, setExpanded] = useState(null);
   const [payNote, setPayNote] = useState({});
@@ -1839,7 +1857,10 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
     return { empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed, totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount, totalDays: empClockAll.length, punctuality };
   }
 
-  const totalOwedAll = employees.reduce((sum, emp) => sum + employeeStats(emp).owed, 0);
+  const activeEmployees = employees.filter((e) => e.active !== false);
+  const inactiveEmployees = employees.filter((e) => e.active === false);
+  const totalOwedAll = activeEmployees.reduce((sum, emp) => sum + employeeStats(emp).owed, 0);
+  const visibleEmployees = (showInactive ? employees : activeEmployees).filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div>
@@ -1878,10 +1899,20 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input placeholder="Nombre del empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
+          <input placeholder="Nombre del empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 180 }} />
+          <input placeholder="Teléfono (opcional)" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
           <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...inp, maxWidth: 140 }} />
-          <button onClick={() => { onAdd(name, wage, role); setName(""); setWage(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>Agregar</button>
+          <button onClick={() => { onAdd(name, wage, role, phone); setName(""); setWage(""); setPhone(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>Agregar</button>
         </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+        <input placeholder="🔍 Buscar empleado..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+        {inactiveEmployees.length > 0 && (
+          <button onClick={() => setShowInactive((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 12px", cursor: "pointer", color: "#8a7a63", fontWeight: 700 }}>
+            {showInactive ? "Ocultar" : "Ver"} inactivos ({inactiveEmployees.length})
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
@@ -1899,14 +1930,15 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
       </div>
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginBottom: 10 }}>Equipo</h3>
-      {employees.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no has agregado empleados.</p>}
+      {visibleEmployees.length === 0 && <p style={{ color: "#8a7a63" }}>No se encontraron empleados.</p>}
       <div style={{ display: "grid", gap: 10 }}>
-        {employees.map((emp) => {
+        {visibleEmployees.map((emp) => {
           const st = employeeStats(emp);
           const isOpen = expanded === emp.id;
           const key = emp.id;
+          const isInactive = emp.active === false;
           return (
-            <div key={emp.id} style={{ background: "#fff", border: st.owed > 0 ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
+            <div key={emp.id} style={{ background: isInactive ? "#F5F0E8" : "#fff", border: st.owed > 0 && !isInactive ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)", opacity: isInactive ? 0.7 : 1 }}>
               <button
                 onClick={() => setExpanded(isOpen ? null : emp.id)}
                 style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
@@ -1918,11 +1950,14 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</span>
                     <span style={{ fontSize: 10, fontWeight: 700, background: "#F3ECE0", color: "#5a4c3a", padding: "2px 8px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
+                    {isInactive && <span style={{ fontSize: 10, fontWeight: 700, background: "#FCE8E8", color: "#C1272D", padding: "2px 8px", borderRadius: 20 }}>Inactivo</span>}
                   </div>
                   <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 2 }}>
                     {money(emp.dailyWage)}/día · {st.totalDays} entradas ·
                     <span style={{ color: st.punctuality >= 90 ? "#2E7D32" : st.punctuality >= 70 ? "#C99A1E" : "#C1272D", fontWeight: 700 }}> {st.punctuality}% puntual</span>
+                    {emp.hireDate && <span> · Antigüedad: {seniorityLabel(emp.hireDate)}</span>}
                   </div>
+                  {emp.phone && <div style={{ fontSize: 11, color: "#8a7a63" }}>📞 {emp.phone}</div>}
                 </div>
                 <div style={{ textAlign: "right" }}>
                   {st.owed > 0 ? (
@@ -1941,6 +1976,12 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
               {isOpen && (
                 <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
                   <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
+                  <button
+                    onClick={() => onToggleActive(emp.id)}
+                    style={{ marginTop: 10, fontSize: 12, background: "none", border: `1px solid ${isInactive ? "#2E7D32" : "#C1272D"}`, color: isInactive ? "#2E7D32" : "#C1272D", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
+                  >
+                    {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
+                  </button>
                   {st.owed > 0 && (
                     <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
                       <div style={{ fontSize: 12 }}>
@@ -2095,6 +2136,14 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
   const [yy, mm] = monthKey.split("-");
   const monthLabel = new Date(Number(yy), Number(mm) - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
 
+  const prevMonthDate = new Date(Number(yy), Number(mm) - 2, 1);
+  const prevMonthKey = prevMonthDate.toISOString().slice(0, 7);
+  const prevMonthIncome = sales.filter((s) => s.time.slice(0, 7) === prevMonthKey).reduce((sum, s) => sum + s.total, 0);
+  const monthChangePct = prevMonthIncome > 0 ? Math.round(((monthIncome - prevMonthIncome) / prevMonthIncome) * 100) : null;
+
+  const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
+  const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Insumos");
@@ -2170,6 +2219,30 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
         <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
       </div>
 
+      {income > 0 && (
+        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 10 }}>💳 Método de pago (hoy)</div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                <span>💵 Efectivo</span><span style={{ fontWeight: 700 }}>{money(cashToday)}</span>
+              </div>
+              <div style={{ background: "#F0E8D8", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                <div style={{ width: `${income > 0 ? (cashToday / income) * 100 : 0}%`, height: "100%", background: "#26A65B", borderRadius: 6 }} />
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                <span>💳 Tarjeta</span><span style={{ fontWeight: 700 }}>{money(cardToday)}</span>
+              </div>
+              <div style={{ background: "#F0E8D8", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                <div style={{ width: `${income > 0 ? (cardToday / income) * 100 : 0}%`, height: "100%", background: "#1565C0", borderRadius: 6 }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Balance del mes — {monthLabel}</h3>
         {(monthSales.length > 0 || monthExpenses.length > 0) && (
@@ -2181,6 +2254,11 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
           </button>
         )}
       </div>
+      {monthChangePct !== null && (
+        <div style={{ fontSize: 12, margin: "6px 0 10px", color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D", fontWeight: 700 }}>
+          {monthChangePct >= 0 ? "📈" : "📉"} {monthChangePct >= 0 ? "+" : ""}{monthChangePct}% vs. mes anterior ({money(prevMonthIncome)})
+        </div>
+      )}
       <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, margin: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 12, color: "#5a4c3a" }}>💎 Ganancia neta real del mes (ventas − insumos − otros gastos − nómina){monthIncome > 0 ? ` · costo insumos: ${monthFoodCostPct}%` : ""}</div>
         <div style={{ fontWeight: 800, fontSize: 20, color: monthRealProfit >= 0 ? "#2E7D32" : "#C1272D" }}>{money(monthRealProfit)}</div>
