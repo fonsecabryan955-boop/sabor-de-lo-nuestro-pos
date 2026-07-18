@@ -297,7 +297,7 @@ export default function App() {
       return [...items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: 1, notes: "" }];
     };
     if (kind === "table") {
-      withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: addFn(t.items), status: "ocupada" } : t)));
+      withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: addFn(t.items), status: "ocupada", occupiedAt: t.occupiedAt || new Date().toISOString() } : t)));
     } else {
       withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: addFn(d.items) } : d)));
     }
@@ -322,8 +322,9 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
-  function closeTicket(kind, id, method, discount) {
+  function closeTicket(kind, id, method, discount, tip) {
     const disc = discount && discount.value > 0 ? discount : null;
+    const tipAmount = Number(tip) || 0;
     function computeTotal(items) {
       const sub = orderTotal(items);
       if (!disc) return { subtotal: sub, discountAmount: 0, total: sub };
@@ -334,12 +335,12 @@ export default function App() {
       const t = tables.find((t) => t.id === id);
       if (!t.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(t.items);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}`, items: t.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}`, items: t.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
         salesLog: [...salesLog, sale],
-        tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null } : x)),
+        tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null, occupiedAt: null } : x)),
       };
       persist(next);
       setActiveTable(null);
@@ -348,7 +349,7 @@ export default function App() {
       const d = deliveries.find((d) => d.id === id);
       if (!d.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(d.items);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
@@ -639,6 +640,17 @@ function PinGate({ pin, onUnlock }) {
   );
 }
 
+function TableElapsed({ occupiedAt }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(iv);
+  }, []);
+  if (!occupiedAt) return null;
+  const mins = Math.max(0, Math.floor((now - new Date(occupiedAt).getTime()) / 60000));
+  return <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>⏱ {mins} min ocupada</span>;
+}
+
 function MesasView({ tables, onOpen }) {
   return (
     <div>
@@ -650,6 +662,7 @@ function MesasView({ tables, onOpen }) {
         {tables.map((t) => {
           const st = statusStyle(t.kitchenStatus, t.items.length > 0);
           const total = orderTotal(t.items);
+          const itemCount = t.items.reduce((s, it) => s + it.qty, 0);
           return (
             <button
               key={t.id}
@@ -662,7 +675,13 @@ function MesasView({ tables, onOpen }) {
               <div style={{ fontSize: 26, position: "absolute", top: 10, right: 12, opacity: 0.85 }}>{st.icon}</div>
               <div style={{ fontSize: 26, fontWeight: 800 }}>Mesa {t.id}</div>
               <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.9 }}>{st.label}</div>
-              {t.items.length > 0 && <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>}
+              {t.items.length > 0 && (
+                <>
+                  <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>
+                  <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{itemCount} ítem{itemCount !== 1 ? "s" : ""}</div>
+                  <div style={{ marginTop: 4 }}><TableElapsed occupiedAt={t.occupiedAt} /></div>
+                </>
+              )}
             </button>
           );
         })}
@@ -763,9 +782,12 @@ function WingOptionsModal({ item, onConfirm, onClose }) {
 function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onNote, onSend, onClose }) {
   const allCats = promotions && promotions.length > 0 ? [...CATS, "Promociones"] : CATS;
   const [cat, setCat] = useState(allCats[0]);
+  const [search, setSearch] = useState("");
   const [wingItem, setWingItem] = useState(null);
   const total = orderTotal(items);
-  const listForCat = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
+  const baseList = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
+  const listForCat = search ? baseList.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : baseList;
+  const cartQtyFor = (menuId) => items.filter((it) => it.menuId === menuId || it.menuId.startsWith(menuId + "-")).reduce((s, it) => s + it.qty, 0);
 
   function handleItemClick(m) {
     if (m.cat === "Chicken Mood" && m.name.toLowerCase().includes("alita")) {
@@ -801,25 +823,42 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
             ))}
           </div>
           <div style={{ flex: 1, padding: 14, overflow: "auto" }}>
-            {cat === "Promociones" && listForCat.length === 0 && (
+            <input
+              placeholder="🔍 Buscar producto..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #E5D9C3", fontSize: 13, boxSizing: "border-box", marginBottom: 12 }}
+            />
+            {cat === "Promociones" && listForCat.length === 0 && !search && (
               <p style={{ fontSize: 13, color: "#8a7a63" }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
             )}
+            {search && listForCat.length === 0 && (
+              <p style={{ fontSize: 13, color: "#8a7a63" }}>Sin resultados para "{search}".</p>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-              {listForCat.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => handleItemClick(m)}
-                  style={{
-                    display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, padding: "14px 14px", borderRadius: 12,
-                    border: "none", cursor: "pointer", fontSize: 14, textAlign: "left",
-                    background: cat === "Promociones" ? "linear-gradient(135deg, #FFF3EC, #FFE4D3)" : "#fff",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-                  }}
-                >
-                  <span style={{ fontWeight: 700, color: "#2B2118" }}>{m.name}</span>
-                  <span style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(m.price)}</span>
-                </button>
-              ))}
+              {listForCat.map((m) => {
+                const inCart = cartQtyFor(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => handleItemClick(m)}
+                    style={{
+                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, padding: "14px 14px", borderRadius: 12,
+                      border: "none", cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative",
+                      background: cat === "Promociones" ? "linear-gradient(135deg, #FFF3EC, #FFE4D3)" : "#fff",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    {inCart > 0 && (
+                      <span style={{ position: "absolute", top: 8, right: 8, background: "#2E7D32", color: "#fff", borderRadius: 20, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>
+                        {inCart}
+                      </span>
+                    )}
+                    <span style={{ fontWeight: 700, color: "#2B2118" }}>{m.name}</span>
+                    <span style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(m.price)}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -1241,6 +1280,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const [discountOpen, setDiscountOpen] = useState({});
   const [discountType, setDiscountType] = useState({});
   const [discountValue, setDiscountValue] = useState({});
+  const [tipValue, setTipValue] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
   const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
 
@@ -1353,8 +1393,17 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     </button>
                   ))}
                 </div>
-                <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key))} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
-                  ✓ Cobrar y cerrar
+                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                  <input
+                    type="number"
+                    placeholder="🙌 Propina (opcional)"
+                    value={tipValue[key] || ""}
+                    onChange={(e) => setTipValue((s) => ({ ...s, [key]: e.target.value }))}
+                    style={{ ...inp, fontSize: 12 }}
+                  />
+                </div>
+                <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key])} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
+                  ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
                 </button>
               </div>
             </div>
@@ -2009,7 +2058,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                         <div style={{ fontSize: 10, color: "#C9BBA3" }}>{new Date(p.time).toLocaleString("es-NI")}</div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button onClick={() => printPayStub(emp.name, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
+                        <button onClick={() => printPayStub(emp, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
                         <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
                       </div>
                     </div>
@@ -2143,6 +2192,26 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
 
   const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const avgTicket = count > 0 ? income / count : 0;
+  const hourlyMap = {};
+  todaySales.forEach((s) => {
+    const h = new Date(s.time).getHours();
+    hourlyMap[h] = (hourlyMap[h] || 0) + s.total;
+  });
+  const peakHourEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
+  const peakHourLabel = peakHourEntry ? `${peakHourEntry[0]}:00 - ${Number(peakHourEntry[0]) + 1}:00` : null;
+
+  function exportCSV() {
+    const header = "Ticket,Referencia,Metodo,Subtotal,Descuento,Total,Hora\n";
+    const rows = todaySales.map((s) => `${s.folio || s.id},"${s.ref}",${s.method},${s.subtotal || s.total},${s.discountAmount || 0},${s.total},${new Date(s.time).toLocaleTimeString("es-NI")}`).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ventas_${selectedDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
@@ -2177,6 +2246,11 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
           <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63" }}>
             <Printer size={15} />
           </button>
+          {todaySales.length > 0 && (
+            <button onClick={exportCSV} title="Exportar a Excel/CSV" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63", fontSize: 15 }}>
+              📥
+            </button>
+          )}
         </div>
       </div>
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 12 }}>
@@ -2216,6 +2290,8 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
         <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
         <div style={statCard}><div style={statLabel}>Neto (sin nómina)</div><div style={statValue}>{money(net)}</div></div>
         <div style={statCard}><div style={statLabel}>Pedidos cerrados</div><div style={statValue}>{count}</div></div>
+        <div style={statCard}><div style={statLabel}>Ticket promedio</div><div style={statValue}>{money(avgTicket)}</div></div>
+        <div style={statCard}><div style={statLabel}>Hora pico</div><div style={{ ...statValue, fontSize: 16 }}>{peakHourLabel || "—"}</div></div>
         <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
       </div>
 
@@ -2433,6 +2509,11 @@ function ReceiptModal({ sale, onClose }) {
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, background: "#FFF3E0", padding: "6px 10px", borderRadius: 6, border: "1px solid #F2C879" }}>
               <span>💳 Forma de pago</span><span style={{ fontWeight: 800 }}>{sale.method}</span>
             </div>
+            {sale.tip > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, color: "#2E7D32", fontWeight: 700 }}>
+                <span>🙌 Propina</span><span>{money(sale.tip)}</span>
+              </div>
+            )}
           </div>
           <div style={{ textAlign: "center", padding: "16px 16px 18px" }}>
             <div style={{ borderTop: "2px dashed #E5D9C3", marginBottom: 12 }} />
