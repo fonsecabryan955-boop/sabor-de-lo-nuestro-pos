@@ -418,6 +418,12 @@ export default function App() {
   function deleteSale(id) {
     persist({ ...state, sales: sales.filter((s) => s.id !== id) });
   }
+  function deleteSalesLogEntry(id) {
+    persist({ ...state, salesLog: salesLog.filter((s) => s.id !== id) });
+  }
+  function deleteExpensesLogEntry(id) {
+    persist({ ...state, expensesLog: expensesLog.filter((e) => e.id !== id) });
+  }
   function deleteExpense(id) {
     persist({ ...state, expenses: expenses.filter((e) => e.id !== id) });
   }
@@ -559,7 +565,7 @@ export default function App() {
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
 
-        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} />}
+        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
         {view === "menutv" && <MenuBoardView promotions={promotions} />}
       </div>
@@ -791,7 +797,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
   const total = orderTotal(items);
   const baseList = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
   const listForCat = search ? baseList.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : baseList;
-  const cartQtyFor = (menuId) => items.filter((it) => it.menuId === menuId || it.menuId.startsWith(menuId + "-")).reduce((s, it) => s + it.qty, 0);
+  const cartQtyFor = (menuId) => items.filter((it) => it.menuId === menuId || String(it.menuId).startsWith(String(menuId) + "-")).reduce((s, it) => s + it.qty, 0);
 
   function handleItemClick(m) {
     if (m.cat === "Chicken Mood" && m.name.toLowerCase().includes("alita")) {
@@ -1714,7 +1720,7 @@ function MenuBoardView({ promotions }) {
   );
 }
 
-function HistorialView({ salesLog, expensesLog }) {
+function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -1758,9 +1764,12 @@ function HistorialView({ salesLog, expensesLog }) {
       {filteredSales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin ventas en este rango.</p>}
       {filteredSales.map((s) => (
         <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
-            <strong>{money(s.total)}</strong>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <strong>{money(s.total)}</strong>
+              <button onClick={() => { if (window.confirm("¿Borrar esta venta del historial permanente?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+            </div>
           </div>
           <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(s.time).toLocaleString("es-NI")}</div>
         </div>
@@ -1770,9 +1779,12 @@ function HistorialView({ salesLog, expensesLog }) {
       {filteredExpenses.length === 0 && <p style={{ color: "#8a7a63" }}>Sin gastos en este rango.</p>}
       {filteredExpenses.map((e) => (
         <div key={e.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>{e.description}</span>
-            <strong style={{ color: "#C1272D" }}>-{money(e.amount)}</strong>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <strong style={{ color: "#C1272D" }}>-{money(e.amount)}</strong>
+              <button onClick={() => { if (window.confirm("¿Borrar este gasto del historial permanente?")) onDeleteExpense(e.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+            </div>
           </div>
           <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(e.time).toLocaleString("es-NI")}</div>
         </div>
@@ -2447,11 +2459,16 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
       </div>
       {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
       {todaySales.slice().reverse().map((s) => (
-        <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <span>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontWeight: 700 }}>{money(s.total)}</span>
-            <button onClick={() => { if (window.confirm("¿Borrar esta venta?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+        <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid #E5D9C3" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+            <span style={{ fontWeight: 700 }}>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontWeight: 700 }}>{money(s.total)}</span>
+              <button onClick={() => { if (window.confirm("¿Borrar esta venta?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 4, paddingLeft: 4 }}>
+            {s.items.map((it) => `${it.qty} ${it.name}`).join(" · ")}
           </div>
         </div>
       ))}
