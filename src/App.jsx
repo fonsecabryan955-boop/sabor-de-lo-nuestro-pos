@@ -1295,7 +1295,52 @@ function changeBreakdown(amount) {
   return result;
 }
 
-function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin, salesGoal, onSetGoal }) {
+function playChaChing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    [[1568, 0], [2093, 0.08]].forEach(([freq, offset]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.3);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.32);
+    });
+  } catch (e) {}
+}
+
+function CashKeypad({ value, onChange }) {
+  function press(k) {
+    if (k === "C") return onChange("");
+    if (k === "⌫") return onChange(String(value).slice(0, -1));
+    onChange(String(value) + k);
+  }
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10 }}>
+      {keys.map((k) => (
+        <button
+          key={k}
+          onClick={() => press(k)}
+          style={{
+            padding: "14px 0", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 17,
+            background: k === "C" ? "#FCE8E8" : k === "⌫" ? "#FFF3E0" : "#fff",
+            color: k === "C" ? "#C1272D" : k === "⌫" ? "#C1531F" : "#2B2118",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
+          }}
+        >
+          {k}
+        </button>
+      ))}
+    </div>
+  );
+}
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
@@ -1308,6 +1353,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const [cashGiven, setCashGiven] = useState({});
   const [splitMode, setSplitMode] = useState({});
   const [splitSelected, setSplitSelected] = useState({});
+  const [evenSplitN, setEvenSplitN] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
   const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
 
