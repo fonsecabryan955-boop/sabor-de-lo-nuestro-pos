@@ -322,7 +322,7 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
-  function closeTicket(kind, id, method, discount, tip) {
+  function closeTicket(kind, id, method, discount, tip, itemMenuIds) {
     const disc = discount && discount.value > 0 ? discount : null;
     const tipAmount = Number(tip) || 0;
     function computeTotal(items) {
@@ -334,16 +334,20 @@ export default function App() {
     if (kind === "table") {
       const t = tables.find((t) => t.id === id);
       if (!t.items.length) return;
-      const { subtotal, discountAmount, total } = computeTotal(t.items);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}`, items: t.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
+      const splitting = itemMenuIds && itemMenuIds.length > 0 && itemMenuIds.length < t.items.length;
+      const chargedItems = splitting ? t.items.filter((it) => itemMenuIds.includes(it.menuId)) : t.items;
+      const remainingItems = splitting ? t.items.filter((it) => !itemMenuIds.includes(it.menuId)) : [];
+      if (!chargedItems.length) return;
+      const { subtotal, discountAmount, total } = computeTotal(chargedItems);
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
       const next = {
         ...state,
         sales: [...sales, sale],
         salesLog: [...salesLog, sale],
-        tables: tables.map((x) => (x.id === id ? { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null, occupiedAt: null } : x)),
+        tables: tables.map((x) => (x.id === id ? (remainingItems.length ? { ...x, items: remainingItems } : { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null, occupiedAt: null }) : x)),
       };
       persist(next);
-      setActiveTable(null);
+      if (!remainingItems.length) setActiveTable(null);
       setReceiptFor(sale);
     } else {
       const d = deliveries.find((d) => d.id === id);
@@ -1281,6 +1285,9 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const [discountType, setDiscountType] = useState({});
   const [discountValue, setDiscountValue] = useState({});
   const [tipValue, setTipValue] = useState({});
+  const [cashGiven, setCashGiven] = useState({});
+  const [splitMode, setSplitMode] = useState({});
+  const [splitSelected, setSplitSelected] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
   const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
 
@@ -1402,6 +1409,33 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     style={{ ...inp, fontSize: 12 }}
                   />
                 </div>
+
+                {m === "Efectivo" && (
+                  <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, marginBottom: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>💵 ¿Con cuánto paga el cliente?</div>
+                    <input
+                      type="number"
+                      placeholder="Efectivo recibido"
+                      value={cashGiven[key] || ""}
+                      onChange={(e) => setCashGiven((s) => ({ ...s, [key]: e.target.value }))}
+                      style={{ ...inp, marginBottom: 8 }}
+                    />
+                    {cashGiven[key] !== undefined && cashGiven[key] !== "" && (() => {
+                      const dueTotal = finalTotal + (Number(tipValue[key]) || 0);
+                      const change = Number(cashGiven[key]) - dueTotal;
+                      return (
+                        <div style={{
+                          textAlign: "center", padding: "8px 0", borderRadius: 8, fontWeight: 800, fontSize: 16,
+                          background: change >= 0 ? "#E8F5E9" : "#FCE8E8",
+                          color: change >= 0 ? "#2E7D32" : "#C1272D",
+                        }}>
+                          {change >= 0 ? `Vuelto: ${money(change)}` : `Falta: ${money(Math.abs(change))}`}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key])} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
                   ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
                 </button>
