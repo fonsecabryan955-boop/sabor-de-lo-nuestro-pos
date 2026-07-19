@@ -1281,6 +1281,20 @@ function GoalBar({ sales, salesGoal, onSetGoal }) {
   );
 }
 
+function changeBreakdown(amount) {
+  const denoms = [1000, 500, 200, 100, 50, 20, 10, 5, 1];
+  let remaining = Math.round(amount);
+  const result = [];
+  for (const d of denoms) {
+    const count = Math.floor(remaining / d);
+    if (count > 0) {
+      result.push({ denom: d, count });
+      remaining -= count * d;
+    }
+  }
+  return result;
+}
+
 function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin, salesGoal, onSetGoal }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
