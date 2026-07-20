@@ -1,200 +1,262 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Percent, Users, Archive } from "lucide-react";
 
-const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
+const SUPABASE_URL = "https://aczzqxaqxbghkwl5s2s8.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
-const supabase = createClient(supabaseUrl, supabaseKey);
-const RECORD_ID = "main"; // Caja completa: apertura/cierre, descuentos, folios
-
-const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
-const SHIFT_START = "17:00";
-const SHIFT_END = "21:00";
-const LATE_GRACE_MIN = 10;
-const DEFAULT_PIN = "1234";
+const supabase = createClient(SUPABASE_URL, supabaseKey);
+const RECORD_ID = 1;
 const POLL_MS = 4000;
 
-const MENU = [
-  { id: "b1", name: "Hamburguesa Clásica", price: 190, cat: "Hamburguesas" },
-  { id: "b2", name: "Kryspi Burguer", price: 200, cat: "Hamburguesas" },
-  { id: "b3", name: "Big Campeona", price: 250, cat: "Hamburguesas" },
-  { id: "f1", name: "Pingüi Frapp", price: 120, cat: "Frappés" },
-  { id: "f2", name: "Fresa Frapp", price: 120, cat: "Frappés" },
-  { id: "f3", name: "Oreo Frapp", price: 120, cat: "Frappés" },
-  { id: "f4", name: "Chocolate Frapp", price: 120, cat: "Frappés" },
-  { id: "c1", name: "Dedos de Pollo (6u)", price: 200, cat: "Chicken Mood" },
-  { id: "c2", name: "Alitas x6", price: 230, cat: "Chicken Mood" },
-  { id: "c3", name: "Alitas x12", price: 450, cat: "Chicken Mood" },
-  { id: "c4", name: "Alitas Fritas", price: 220, price12: 430, cat: "Chicken Mood" },
-  { id: "p1", name: "Panini de Pollo", price: 235, cat: "Paninis" },
-  { id: "p2", name: "Panini de Jamón", price: 190, cat: "Paninis" },
-  { id: "e1", name: "Papas Francesas", price: 50, cat: "Extras" },
-  { id: "e2", name: "Papas Cheddar", price: 100, cat: "Extras" },
-  { id: "e3", name: "Salchipapas", price: 160, cat: "Extras" },
-  { id: "s1", name: "Salsa BBQ", price: 30, cat: "Salsas" },
-  { id: "s2", name: "Salsa Buffalo", price: 30, cat: "Salsas" },
-  { id: "s3", name: "Salsa Ranch", price: 30, cat: "Salsas" },
-  { id: "s4", name: "Salsa de la Casa", price: 30, cat: "Salsas" },
-  { id: "d1", name: "Soda", price: 40, cat: "Bebidas" },
-  { id: "d2", name: "Té de Limón", price: 30, cat: "Bebidas" },
-  { id: "d3", name: "Jugo de Naranja", price: 40, cat: "Bebidas" },
-  { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas" },
+function money(n) {
+  return "C$" + (n || 0).toFixed(2);
+}
+
+function timeStr(d) {
+  if (!d) return "";
+  const date = new Date(d);
+  return date.toLocaleString("es-NI", { dateStyle: "long", timeStyle: "short" });
+}
+
+function computeTotal(items, discount) {
+  const subtotal = items.reduce((sum, it) => sum + (it.qty || 1) * (it.price || 0), 0);
+  let total = subtotal;
+  if (discount && discount.type) {
+    if (discount.type === "percent") total = subtotal * (1 - discount.value / 100);
+    else if (discount.type === "fixed") total = Math.max(0, subtotal - discount.value);
+  }
+  return { subtotal, total };
+}
+
+function buildOrderPayload(items) {
+  return items.map((it) => `${it.name} x${it.qty}`).join("\n");
+}
+
+const initialEmployees = () => [
+  { id: "Maria", name: "Maria", color: "#ff6b6b", active: true },
+  { id: "Luis", name: "Luis", color: "#4ecdc4", active: true },
+  { id: "Andrea", name: "Andrea", color: "#45b7d1", active: true },
+  { id: "Sofía", name: "Sofía", color: "#f9ca24", active: true },
 ];
 
-const CAT_ICONS = { "Hamburguesas": "🍔", "Frappés": "🥤", "Chicken Mood": "🍗", "Paninis": "🥪", "Extras": "🍟", "Salsas": "🥫", "Bebidas": "🧃" };
-const CATS = ["Hamburguesas", "Frappés", "Chicken Mood", "Paninis", "Extras", "Salsas", "Bebidas"];
+const fullMenu = () => [
+  { id: "c1", name: "Hamburguesa Classic", price: 9.99, cat: "Hamburguesas" },
+  { id: "c2", name: "Hamburguesa BBQ", price: 11.99, cat: "Hamburguesas" },
+  { id: "c3", name: "Pizza Napolitana", price: 12.99, cat: "Pizza" },
+  { id: "c4", name: "Pizza Hawaiana", price: 13.99, cat: "Pizza" },
+  { id: "c5", name: "Pizza de Pollo", price: 13.99, cat: "Pizza" },
+  { id: "c6", name: "Lasaña Boloñesa", price: 10.99, cat: "Pasta" },
+  { id: "c7", name: "Spaghetti Alfredo", price: 9.99, cat: "Pasta" },
+  { id: "c8", name: "Nachos de Carne", price: 7.99, cat: "Entradas" },
+  { id: "c9", name: "Aros de Cebolla", price: 5.99, cat: "Entradas" },
+  { id: "c10", name: "Café Latte", price: 3.99, cat: "Bebidas" },
+  { id: "c11", name: "Refresco Natural", price: 2.99, cat: "Bebidas" },
+  { id: "c12", name: "Vaso de Cerveza", price: 2.99, cat: "Bebidas" },
+  { id: "c13", name: "Papas Fritas", price: 3.99, cat: "Entradas" },
+  { id: "c14", name: "Alitas BBQ x6", price: 8.99, cat: "Chicken Mood" },
+  { id: "c15", name: "Alitas BBQ x12", price: 14.99, cat: "Chicken Mood" },
+  { id: "c16", name: "Alitas Honey Mustard x6", price: 8.99, cat: "Chicken Mood" },
+  { id: "c17", name: "Alitas Honey Mustard x12", price: 14.99, cat: "Chicken Mood" },
+  { id: "c18", name: "Alitas Buffalo x6", price: 8.99, cat: "Chicken Mood" },
+  { id: "c19", name: "Alitas Buffalo x12", price: 14.99, cat: "Chicken Mood" },
+  { id: "c20", name: "Alitas Fritas", price: 6.99, cat: "Chicken Mood" },
+];
 
-function money(n) {
-  return "C$" + (n || 0).toLocaleString("es-NI", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function orderTotal(items) {
-  return items.reduce((sum, it) => sum + it.price * it.qty, 0);
-}
-function emptyTables() {
-  return Array.from({ length: 5 }, (_, i) => ({ id: i + 1, status: "libre", kitchenStatus: null, items: [] }));
-}
+const wingSauces = [
+  { id: "bbq", name: "BBQ", description: "Clásica salsa BBQ ahumada" },
+  { id: "honey", name: "Honey Mustard", description: "Dulce y ligeramente picante" },
+  { id: "buffalo", name: "Buffalo", description: "Picante estilo americano" },
+  { id: "teriyaki", name: "Teriyaki", description: "Agridulce con toque oriental" },
+  { id: "lemon", name: "Lemon Pepper", description: "Cítrica y aromática" },
+  { id: "garlic", name: "Garlic Parmesan", description: "Con ajo y queso parmesano" },
+];
+
+const initialPromotions = () => [
+  { id: "p1", name: "Combo Familiar", items: ["c2", "c3", "c13"], price: 28.99, description: "Hamburguesa BBQ + Pizza Napolitana + Papas Fritas", days: "Lunes a Jueves" },
+  { id: "p2", name: "Alitas x2", items: ["c14", "c15"], price: 16.99, description: "2 órdenes de alitas (6 pzas c/u) + papas", days: "Viernes y Sábado" },
+  { id: "p3", name: "2x1 en Pizza", items: ["c3"], price: 12.99, description: "Compra 1 pizza Napolitana y lleva la segunda gratis", days: "Domingos" },
+];
+
+const initialTables = () =>
+  Array.from({ length: 16 }, (_, i) => ({
+    id: i + 1,
+    items: [],
+    waiter: null,
+    startTime: null,
+    kitchenStatus: null,
+    kitchenSentAt: null,
+  }));
+
+const initialDeliveries = () => [
+  { id: 1, customer: "Juan Pérez", phone: "8888-8888", address: "Calle 1, Casa 5", items: [], kitchenStatus: null, kitchenSentAt: null, type: "delivery" },
+  { id: 2, customer: "María López", phone: "7777-7777", address: "Av. Principal, Edif. B", items: [], kitchenStatus: null, kitchenSentAt: null, type: "delivery" },
+];
+
 function initialState() {
   return {
-    tables: emptyTables(),
-    deliveries: [],
+    tables: initialTables(),
+    deliveries: initialDeliveries(),
     sales: [],
     expenses: [],
-    employees: [],
-    clockRecords: [],
-    promotions: [],
-    salesLog: [],
-    expensesLog: [],
-    payments: [],
+    employees: initialEmployees(),
     cashSessions: [],
-    salesGoal: 0,
-    pin: DEFAULT_PIN,
+    pin: "1234",
+    salesGoal: 5000,
   };
-}
-function todayStr() {
-  return new Date().toDateString();
 }
 
 export default function App() {
   const [state, setState] = useState(initialState());
-  const [loaded, setLoaded] = useState(false);
+  const { tables, deliveries, sales, expenses, employees, cashSessions, pin, salesGoal } = state;
   const [view, setView] = useState(() => {
-    const p = new URLSearchParams(window.location.search).get("pantalla");
-    return p === "cocina" || p === "menutv" ? p : "mesas";
+    if (typeof window !== "undefined" && window.location.hash) {
+      return window.location.hash.replace("#", "");
+    }
+    return "mesas";
   });
   const [activeTable, setActiveTable] = useState(null);
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [showNewDelivery, setShowNewDelivery] = useState(false);
-  const [cajaUnlocked, setCajaUnlocked] = useState(false);
   const [receiptFor, setReceiptFor] = useState(null);
-  const [connStatus, setConnStatus] = useState("Conectando…");
+  const [connStatus, setConnStatus] = useState("Conectando...");
   const [connError, setConnError] = useState(null);
   const [lastSync, setLastSync] = useState(null);
-  const [readyToast, setReadyToast] = useState(null);
-  const [audioReady, setAudioReady] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const skipNextPoll = useRef(false);
   const initRef = useRef(false);
-  const audioCtxRef = useRef(null);
-  const prevStatusRef = useRef(null);
-  const toastTimerRef = useRef(null);
 
-  useEffect(() => {
-    function unlock() {
-      let ctx = audioCtxRef.current;
-      if (!ctx) {
-        try { ctx = new (window.AudioContext || window.webkitAudioContext)(); audioCtxRef.current = ctx; } catch (e) { return; }
+  const persist = useCallback(
+    async (next) => {
+      skipNextPoll.current = true;
+      setState(next);
+      const { data, error } = await supabase
+        .from("pos_state")
+        .update({ value: JSON.stringify(next), updated_at: new Date().toISOString() })
+        .eq("id", RECORD_ID)
+        .select("id")
+        .single();
+      if (error) {
+        setConnStatus("Error al guardar");
+        setConnError(error.message || JSON.stringify(error));
+      } else {
+        setConnStatus("Guardado en línea");
+        setConnError(null);
+        setLastSync(new Date());
       }
-      if (ctx.state === "suspended") ctx.resume();
-      try {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        gain.gain.value = 0.0001;
-        osc.frequency.value = 440;
-        osc.start();
-        osc.stop(ctx.currentTime + 0.05);
-        setAudioReady(true);
-      } catch (e) {}
+    },
+    []
+  );
+
+  function withTables(fn) {
+    persist({ ...state, tables: fn(tables) });
+  }
+  function withDeliveries(fn) {
+    persist({ ...state, deliveries: fn(deliveries) });
+  }
+  function withSales(fn) {
+    persist({ ...state, sales: fn(sales) });
+  }
+  function withExpenses(fn) {
+    persist({ ...state, expenses: fn(expenses) });
+  }
+  function withEmployees(fn) {
+    persist({ ...state, employees: fn(employees) });
+  }
+  function withCashSessions(fn) {
+    persist({ ...state, cashSessions: fn(cashSessions) });
+  }
+
+  function addItemToOrder(items, menuItem) {
+    const existing = items.find((it) => it.menuId === menuItem.id);
+    if (existing) {
+      return items.map((it) => (it.menuId === menuItem.id ? { ...it, qty: it.qty + 1 } : it));
     }
-    window.addEventListener("click", unlock);
-    window.addEventListener("touchstart", unlock);
-    return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
+    return [...items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: 1 }];
+  }
+
+  function removeItemFromOrder(items, menuId) {
+    return items
+      .map((it) => (it.menuId === menuId ? { ...it, qty: it.qty - 1 } : it))
+      .filter((it) => it.qty > 0);
+  }
+
+  function openCashSession(employee, amount) {
+    const session = { id: Date.now(), employee, openingAmount: amount, openingTime: new Date().toISOString(), closingTime: null, closingAmount: null, expectedCash: null, verified: false };
+    withCashSessions((s) => [...s, session]);
+  }
+
+  function closeCashSession(employee, amount) {
+    const active = cashSessions.filter((s) => !s.closingTime).find((s) => s.employee === employee);
+    if (!active) return alert("No hay sesión abierta para " + employee);
+    const cash = sales.filter((s) => s.method === "efectivo" && s.time >= active.openingTime && s.time <= new Date().toISOString()).reduce((sum, s) => sum + s.total, 0);
+    const expensesTotal = expenses.filter((e) => e.time >= active.openingTime && e.time <= new Date().toISOString()).reduce((sum, e) => sum + e.amount, 0);
+    const expected = active.openingAmount + cash - expensesTotal;
+    if (amount !== expected) {
+      const ok = window.confirm(`El monto ingresado (${money(amount)}) no coincide con el esperado (${money(expected)}). ¿Deseas continuar?`);
+      if (!ok) return;
+    }
+    const closed = { ...active, closingTime: new Date().toISOString(), closingAmount: amount, expectedCash: expected, verified: amount === expected };
+    withCashSessions((s) => s.map((sess) => (sess.id === active.id ? closed : sess)));
+  }
+
+  function closeTicket(kind, id, method, discount, tip, itemMenuIds) {
+    const collection = kind === "table" ? tables : deliveries;
+    const item = collection.find((x) => x.id === id);
+    if (!item) return;
+    const splitting = Array.isArray(itemMenuIds) && itemMenuIds.length > 0;
+    const itemsToCharge = splitting ? item.items.filter((it) => itemMenuIds.includes(it.menuId)) : item.items;
+    const remainingItems = splitting ? item.items.filter((it) => !itemMenuIds.includes(it.menuId)) : [];
+    const { subtotal, total } = computeTotal(itemsToCharge, discount);
+    const tipAmount = Number(tip) || 0;
+    const sale = {
+      id: Date.now() + Math.random(),
+      kind,
+      ref: kind === "table" ? `Mesa ${id}` : item.customer,
+      items: itemsToCharge,
+      subtotal,
+      total: total + tipAmount,
+      tip: tipAmount,
+      method,
+      discount,
+      time: new Date().toISOString(),
     };
-  }, []);
-
-  function playReadyBeep() {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-    [0, 0.28].forEach((offset) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.value = 1046.5;
-      gain.gain.setValueAtTime(0.0001, now + offset);
-      gain.gain.exponentialRampToValueAtTime(0.35, now + offset + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.24);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.26);
-    });
-  }
-
-  function playNewOrderBeep() {
-    const ctx = audioCtxRef.current;
-    if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-    [0, 0.15, 0.3].forEach((offset) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "square";
-      osc.frequency.value = 660;
-      gain.gain.setValueAtTime(0.0001, now + offset);
-      gain.gain.exponentialRampToValueAtTime(0.25, now + offset + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.13);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.15);
-    });
-  }
-
-  const persist = useCallback(async (next) => {
-    setState(next);
-    skipNextPoll.current = true;
-    const { error } = await supabase.from("pos_state").upsert({
-      id: RECORD_ID,
-      value: JSON.stringify(next),
-      updated_at: new Date().toISOString(),
-    });
-    if (error) {
-      setConnStatus("Error al guardar");
-      setConnError(error.message || JSON.stringify(error));
-    } else {
-      setConnStatus("Conectado");
-      setConnError(null);
-      setLastSync(new Date());
+    if (method === "efectivo" && cashGivenRef.current) {
+      const key = kind + id;
+      const given = Number(cashGivenRef.current[key]) || 0;
+      if (given > 0) sale.cashGiven = given;
     }
-  }, []);
+    withSales((s) => [...s, sale]);
+    if (kind === "table") {
+      if (remainingItems.length > 0) {
+        withTables((t) => t.map((tbl) => (tbl.id === id ? { ...tbl, items: remainingItems, startTime: tbl.startTime || new Date().toISOString() } : tbl)));
+      } else {
+        withTables((t) => t.map((tbl) => (tbl.id === id ? { ...tbl, items: [], waiter: null, startTime: null, kitchenStatus: null, kitchenSentAt: null } : tbl)));
+      }
+    } else {
+      withDeliveries((d) => d.map((del) => (del.id === id ? { ...del, items: [], kitchenStatus: null, kitchenSentAt: null } : del)));
+    }
+    setReceiptFor(sale);
+  }
 
   useEffect(() => {
     let alive = true;
     async function load() {
       const { data, error } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).maybeSingle();
       if (error) {
-        setConnStatus("Error al cargar");
-        setConnError(error.message || JSON.stringify(error));
+        if (alive) {
+          setConnStatus("Error al cargar");
+          setConnError(error.message || JSON.stringify(error));
+        }
       } else if (data && alive) {
-        setState(JSON.parse(data.value));
-        setConnStatus("Conectado");
-        setConnError(null);
-        setLastSync(new Date());
-      } else {
+        try {
+          const next = JSON.parse(data.value);
+          setState(next);
+          setConnStatus("Conectado");
+          setConnError(null);
+          setLastSync(new Date());
+        } catch (e) {
+          if (alive) setConnStatus("Datos corruptos");
+        }
+      } else if (alive) {
         setConnStatus("Conectado (sin datos aún)");
       }
       if (alive) setLoaded(true);
@@ -205,821 +267,443 @@ export default function App() {
         skipNextPoll.current = false;
         return;
       }
-      const { data, error } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).maybeSingle();
+      const { data, error } = await supabase.from("pos_state").select("value, updated_at").eq("id", RECORD_ID).maybeSingle();
       if (error) {
-        setConnStatus("Error al sincronizar");
-        setConnError(error.message || JSON.stringify(error));
+        if (alive) {
+          setConnStatus("Error al sincronizar");
+          setConnError(error.message || JSON.stringify(error));
+        }
       } else if (data && alive) {
-        setState(JSON.parse(data.value));
-        setConnStatus("Conectado");
-        setConnError(null);
-        setLastSync(new Date());
+        try {
+          const next = JSON.parse(data.value);
+          setState(next);
+          setConnStatus("Sincronizado");
+          setConnError(null);
+          setLastSync(new Date());
+        } catch (e) {
+          if (alive) setConnStatus("Datos corruptos");
+        }
       }
     }, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(iv);
-    };
+    return () => { alive = false; clearInterval(iv); };
   }, []);
 
   useEffect(() => {
     if (loaded && !initRef.current) {
       initRef.current = true;
-      supabase
-        .from("pos_state")
-        .select("id")
-        .eq("id", RECORD_ID)
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (error) {
-            setConnStatus("Error al inicializar");
-            setConnError(error.message || JSON.stringify(error));
-            return;
-          }
-          if (!data) {
-            supabase.from("pos_state").insert({ id: RECORD_ID, value: JSON.stringify(state) }).then(({ error: insErr }) => {
-              if (insErr) {
-                setConnStatus("Error al crear registro inicial");
-                setConnError(insErr.message || JSON.stringify(insErr));
-              } else {
-                setConnStatus("Conectado");
-              }
-            });
-          }
-        });
+      supabase.from("pos_state").select("id").eq("id", RECORD_ID).maybeSingle().then(({ data }) => {
+        if (!data) {
+          supabase.from("pos_state").insert({ id: RECORD_ID, value: JSON.stringify(state), updated_at: new Date().toISOString() }).then(({ error }) => {
+            if (error) console.error("Error insertando registro:", error);
+          });
+        }
+      });
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], salesGoal = 0, pin } = state;
-
+  const prevStatusRef = useRef({});
   useEffect(() => {
     const current = {};
-    tables.forEach((t) => { if (t.items.length) current["table" + t.id] = { status: t.kitchenStatus, label: `Mesa ${t.id}` }; });
-    deliveries.forEach((d) => { if (d.items.length) current["delivery" + d.id] = { status: d.kitchenStatus, label: d.customer }; });
-    if (prevStatusRef.current) {
-      let readyFound = null;
-      let newOrderFound = null;
-      for (const key in current) {
-        const prev = prevStatusRef.current[key];
-        if (current[key].status === "listo" && (!prev || prev.status !== "listo")) {
-          readyFound = current[key].label;
-        }
-        if (current[key].status === "pendiente" && (!prev || prev.status !== "pendiente")) {
-          newOrderFound = current[key].label;
-        }
-      }
-      if (newOrderFound) {
-        playNewOrderBeep();
-        setReadyToast(`🆕 Nuevo pedido: ${newOrderFound}`);
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
-      } else if (readyFound) {
+    tables.forEach((t) => { current["t-" + t.id] = { status: t.kitchenStatus, name: "Mesa " + t.id }; });
+    deliveries.forEach((d) => { current["d-" + d.id] = { status: d.kitchenStatus, name: d.customer }; });
+    Object.keys(current).forEach((key) => {
+      const prev = prevStatusRef.current[key];
+      if (prev && prev.status !== "listo" && current[key].status === "listo") {
         playReadyBeep();
-        setReadyToast(`✅ ${readyFound} está listo`);
-        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-        toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
+        setReadyToast({ name: current[key].name, show: true });
+        setTimeout(() => setReadyToast((t) => ({ ...t, show: false })), 6000);
       }
-    }
+    });
     prevStatusRef.current = current;
   }, [tables, deliveries]);
 
-  function withTables(fn) {
-    persist({ ...state, tables: fn(tables) });
-  }
-  function withDeliveries(fn) {
-    persist({ ...state, deliveries: fn(deliveries) });
-  }
+  const [readyToast, setReadyToast] = useState({ name: "", show: false });
 
-  function addItemToOrder(kind, id, menuItem) {
-    const addFn = (items) => {
-      const existing = items.find((it) => it.menuId === menuItem.id);
-      if (existing) return items.map((it) => (it.menuId === menuItem.id ? { ...it, qty: it.qty + 1 } : it));
-      return [...items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: 1, notes: "" }];
-    };
-    if (kind === "table") {
-      withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: addFn(t.items), status: "ocupada", occupiedAt: t.occupiedAt || new Date().toISOString() } : t)));
-    } else {
-      withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: addFn(d.items) } : d)));
+  useEffect(() => {
+    if (typeof window !== "undefined") window.location.hash = view;
+  }, [view]);
+
+  const audioCtxRef = useRef(null);
+  function getAudioCtx() {
+    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtxRef.current;
+  }
+  function playReadyBeep() {
+    try {
+      const ctx = getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {}
+  }
+  useEffect(() => {
+    function unlock() {
+      try { getAudioCtx().resume(); } catch (e) {}
     }
-  }
-  function changeQty(kind, id, menuId, delta) {
-    const changeFn = (items) => items.map((it) => (it.menuId === menuId ? { ...it, qty: it.qty + delta } : it)).filter((it) => it.qty > 0);
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: changeFn(t.items) } : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: changeFn(d.items) } : d)));
-  }
-  function setNote(kind, id, menuId, note) {
-    const noteFn = (items) => items.map((it) => (it.menuId === menuId ? { ...it, notes: note } : it));
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? { ...t, items: noteFn(t.items) } : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? { ...d, items: noteFn(d.items) } : d)));
-  }
-  function sendToKitchen(kind, id) {
-    const stamp = (x) => ({ ...x, kitchenStatus: "pendiente", kitchenSentAt: x.kitchenSentAt || new Date().toISOString() });
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
-  }
-  function advanceKitchen(kind, id, next) {
-    const stamp = (x) => ({ ...x, kitchenStatus: next, kitchenSentAt: new Date().toISOString() });
-    if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
-    else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
-  }
-  function closeTicket(kind, id, method, discount, tip, itemMenuIds) {
-    const disc = discount && discount.value > 0 ? discount : null;
-    const tipAmount = Number(tip) || 0;
-    function computeTotal(items) {
-      const sub = orderTotal(items);
-      if (!disc) return { subtotal: sub, discountAmount: 0, total: sub };
-      const discountAmount = disc.type === "percent" ? Math.round(sub * (disc.value / 100)) : Math.min(disc.value, sub);
-      return { subtotal: sub, discountAmount, total: Math.max(0, sub - discountAmount) };
-    }
-    if (kind === "table") {
-      const t = tables.find((t) => t.id === id);
-      if (!t.items.length) return;
-      const splitting = itemMenuIds && itemMenuIds.length > 0 && itemMenuIds.length < t.items.length;
-      const chargedItems = splitting ? t.items.filter((it) => itemMenuIds.includes(it.menuId)) : t.items;
-      const remainingItems = splitting ? t.items.filter((it) => !itemMenuIds.includes(it.menuId)) : [];
-      if (!chargedItems.length) return;
-      const { subtotal, discountAmount, total } = computeTotal(chargedItems);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
-      const next = {
-        ...state,
-        sales: [...sales, sale],
-        salesLog: [...salesLog, sale],
-        tables: tables.map((x) => (x.id === id ? (remainingItems.length ? { ...x, items: remainingItems } : { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null, occupiedAt: null }) : x)),
-      };
-      persist(next);
-      if (!remainingItems.length) setActiveTable(null);
-      setReceiptFor(sale);
-    } else {
-      const d = deliveries.find((d) => d.id === id);
-      if (!d.items.length) return;
-      const { subtotal, discountAmount, total } = computeTotal(d.items);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
-      const next = {
-        ...state,
-        sales: [...sales, sale],
-        salesLog: [...salesLog, sale],
-        deliveries: deliveries.map((x) => (x.id === id ? { ...x, kitchenStatus: "entregado" } : x)),
-      };
-      persist(next);
-      setActiveDelivery(null);
-      setReceiptFor(sale);
-    }
-  }
-  function addExpense(exp) {
-    const record = { id: Date.now(), ...exp, time: new Date().toISOString() };
-    persist({ ...state, expenses: [...expenses, record], expensesLog: [...expensesLog, record] });
-  }
-  function addEmployee(name, dailyWage, role, phone) {
-    if (!name.trim()) return;
-    persist({ ...state, employees: [...employees, { id: Date.now(), name: name.trim(), dailyWage: Number(dailyWage) || 0, role: role || "Personal", phone: phone || "", hireDate: new Date().toISOString(), active: true }] });
-  }
-  function toggleEmployeeActive(id) {
-    persist({ ...state, employees: employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)) });
-  }
-  function clockIn(employeeName) {
-    const now = new Date();
-    const [sh, sm] = SHIFT_START.split(":").map(Number);
-    const shiftMinutes = sh * 60 + sm;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const late = nowMinutes > shiftMinutes + LATE_GRACE_MIN;
-    const minsLate = late ? nowMinutes - shiftMinutes : 0;
-    persist({
-      ...state,
-      clockRecords: [
-        ...clockRecords,
-        { id: Date.now(), employee: employeeName, time: now.toISOString(), late, minsLate },
-      ],
-    });
-  }
-  function addPromotion(promo) {
-    persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
-  }
-  function addPayment(employeeName, amount, note) {
-    persist({ ...state, payments: [...payments, { id: Date.now(), employeeName, amount: Number(amount), note: note || "", time: new Date().toISOString() }] });
-  }
-  function deletePayment(id) {
-    persist({ ...state, payments: payments.filter((p) => p.id !== id) });
-  }
-  function openCashSession(openedBy, openingAmount) {
-    persist({ ...state, cashSessions: [...cashSessions, { id: Date.now(), openedBy, openingAmount: Number(openingAmount) || 0, openedAt: new Date().toISOString(), closedAt: null }] });
-  }
-  function closeCashSession(sessionId, countedCash, expectedCash, notes) {
-    persist({
-      ...state,
-      cashSessions: cashSessions.map((s) => (s.id === sessionId ? { ...s, closedAt: new Date().toISOString(), countedCash: Number(countedCash), expectedCash, difference: Number(countedCash) - expectedCash, notes: notes || "" } : s)),
-    });
-  }
-  function setSalesGoal(amount) {
-    persist({ ...state, salesGoal: Number(amount) || 0 });
-  }
-  function deletePromotion(id) {
-    persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
-  }
-  function deleteSale(id) {
-    persist({ ...state, sales: sales.filter((s) => s.id !== id) });
-  }
-  function deleteSalesLogEntry(id) {
-    persist({ ...state, salesLog: salesLog.filter((s) => s.id !== id) });
-  }
-  function deleteExpensesLogEntry(id) {
-    persist({ ...state, expensesLog: expensesLog.filter((e) => e.id !== id) });
-  }
-  function deleteExpense(id) {
-    persist({ ...state, expenses: expenses.filter((e) => e.id !== id) });
-  }
-  function clearDay(dayStr) {
-    persist({
-      ...state,
-      sales: sales.filter((s) => new Date(s.time).toDateString() !== dayStr),
-      expenses: expenses.filter((e) => new Date(e.time).toDateString() !== dayStr),
-    });
-  }
-  function clearMonth(monthKey) {
-    persist({
-      ...state,
-      sales: sales.filter((s) => s.time.slice(0, 7) !== monthKey),
-      expenses: expenses.filter((e) => e.time.slice(0, 7) !== monthKey),
-    });
-  }
-
-  const nav = [
-    { id: "mesas", label: "Mesas", icon: UtensilsCrossed },
-    { id: "cocina", label: "Cocina", icon: ChefHat },
-    { id: "caja", label: "Caja", icon: Receipt },
-    { id: "delivery", label: "Delivery", icon: Bike },
-    { id: "promos", label: "Promos", icon: Tag },
-    { id: "clientes", label: "Clientes", icon: Users },
-    { id: "empleados", label: "Empleados", icon: UserCheck },
-    { id: "reportes", label: "Reportes", icon: BarChart3 },
-    { id: "historial", label: "Historial", icon: Archive },
-    { id: "menutv", label: "Menú TV", icon: Tv },
-  ];
-
-  const kiosk = !!new URLSearchParams(window.location.search).get("pantalla");
-
-  if (!loaded) {
-    return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63" }}>Cargando…</div>;
-  }
+    document.addEventListener("click", unlock);
+    document.addEventListener("touchstart", unlock);
+    return () => { document.removeEventListener("click", unlock); document.removeEventListener("touchstart", unlock); };
+  }, []);
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", background: "#FFF8ED", minHeight: "100vh", color: "#2B2118" }}>
-      {readyToast && (
-        <div
-          onClick={() => setReadyToast(null)}
-          style={{
-            position: "fixed", top: 14, left: "50%", transform: "translateX(-50%)", zIndex: 100,
-            background: "linear-gradient(135deg, #00E676, #00A152)", color: "#fff", fontWeight: 800, fontSize: 14,
-            padding: "12px 22px", borderRadius: 30, boxShadow: "0 6px 20px rgba(0,161,82,0.5)", cursor: "pointer",
-          }}
-        >
-          🔔 {readyToast}
-        </div>
-      )}
-      <button
-        onClick={() => {
-          if (!audioCtxRef.current) {
-            try { audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)(); setAudioReady(true); } catch (e) {}
-          } else if (audioCtxRef.current.state === "suspended") {
-            audioCtxRef.current.resume();
-          }
-          playReadyBeep();
-        }}
-        title="Tocar para activar/probar el sonido"
-        style={{
-          position: "fixed", bottom: 16, right: 16, zIndex: 100, width: 52, height: 52, borderRadius: "50%",
-          border: "none", cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center",
-          background: audioReady ? "#2E7D32" : "#C1272D", color: "#fff", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
-        }}
-      >
-        {audioReady ? "🔊" : "🔇"}
-      </button>
-      {!kiosk && (
-        <>
-          <div style={{
-            background: connError ? "#C1272D" : "#2E7D32", color: "#fff", fontSize: 12, fontWeight: 700,
-            padding: "6px 14px", textAlign: "center",
-          }}>
-            {connError ? `⚠️ ${connStatus}: ${connError}` : `✅ ${connStatus}${lastSync ? " · última sync " + lastSync.toLocaleTimeString("es-NI") : ""}`}
-          </div>
-          <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-            <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
-              🍔🍗 {RESTAURANT_NAME}
-            </h1>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              {nav.map((n) => {
-                const Icon = n.icon;
-                const active = view === n.id;
-                return (
-                  <button
-                    key={n.id}
-                    onClick={() => setView(n.id)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none",
-                      cursor: "pointer", fontWeight: 700, fontSize: 13,
-                      background: active ? "#E8A33D" : "#3d2f22", color: active ? "#2B2118" : "#F2C879",
-                    }}
-                  >
-                    <Icon size={16} /> {n.label}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => { playReadyBeep(); }}
-                title="Probar sonido"
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: "none",
-                  cursor: "pointer", fontWeight: 700, fontSize: 13,
-                  background: audioReady ? "#2E7D32" : "#8a7a63", color: "#fff",
-                }}
-              >
-                {audioReady ? "🔊" : "🔇"} Probar sonido
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
-        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} />}
-
-        {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} />}
-
-        {view === "caja" &&
-          (cajaUnlocked ? (
-            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
-          ) : (
-            <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />
-          ))}
-
+    <div>
+      <nav style={{ display: "flex", gap: 6, padding: 10, background: "#1a1a2e", color: "#fff" }}>
+        {[
+          { k: "mesas", label: "🍽 Mesas" },
+          { k: "cocina", label: "👨‍🍳 Cocina" },
+          { k: "caja", label: "💵 Caja" },
+          { k: "delivery", label: "🛵 Delivery" },
+          { k: "reportes", label: "📊 Reportes" },
+          { k: "clientes", label: "👥 Clientes" },
+          { k: "admin", label: "⚙️ Admin" },
+        ].map((v) => (
+          <button key={v.k} onClick={() => setView(v.k)} style={{ padding: "8px 12px", borderRadius: 6, border: "none", cursor: "pointer", background: view === v.k ? "#e94560" : "#16213e", color: "#fff" }}>{v.label}</button>
+        ))}
+      </nav>
+      <div style={{ padding: 10, color: "#333" }}>
+        {connStatus && <div style={{ fontSize: 12, color: "#666" }}>{connStatus}{lastSync ? " · " + lastSync.toLocaleTimeString() : ""}{connError ? " · " + connError : ""}</div>}
+        {view === "mesas" && (
+          <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} />
+        )}
+        {view === "cocina" && (
+          <CocinaView tables={tables} deliveries={deliveries} onUpdate={(kind, id, status) => {
+            if (kind === "table") withTables((t) => t.map((tbl) => (tbl.id === id ? { ...tbl, kitchenStatus: status } : tbl)));
+            else withDeliveries((d) => d.map((del) => (del.id === id ? { ...del, kitchenStatus: status } : del)));
+          }} />
+        )}
+        {view === "caja" && (
+          <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
+        )}
         {view === "delivery" && (
           <DeliveryView deliveries={deliveries} onNew={() => setShowNewDelivery(true)} onOpen={(id) => setActiveDelivery(id)} />
         )}
-
-        {view === "promos" && <PromoView promotions={promotions} onAdd={addPromotion} onDelete={deletePromotion} />}
-
-        {view === "clientes" && <ClientesView salesLog={salesLog} />}
-
-        {view === "empleados" && (
-          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} onToggleActive={toggleEmployeeActive} />
+        {view === "reportes" && (
+          <ReportesView sales={sales} expenses={expenses} />
         )}
-
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
-
-        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
-
-        {view === "menutv" && <MenuBoardView promotions={promotions} />}
+        {view === "clientes" && (
+          <ClientesView sales={sales} deliveries={deliveries} />
+        )}
+        {view === "admin" && (
+          <AdminView employees={employees} onUpdateEmployees={withEmployees} />
+        )}
       </div>
-
       {activeTable && (
         <OrderModal
-          title={`Mesa ${activeTable}`}
-          items={tables.find((t) => t.id === activeTable).items}
-          kitchenStatus={tables.find((t) => t.id === activeTable).kitchenStatus}
-          promotions={promotions}
-          onAdd={(item) => addItemToOrder("table", activeTable, item)}
-          onQty={(menuId, d) => changeQty("table", activeTable, menuId, d)}
-          onNote={(menuId, note) => setNote("table", activeTable, menuId, note)}
-          onSend={() => sendToKitchen("table", activeTable)}
+          table={tables.find((t) => t.id === activeTable)}
+          employees={employees}
+          menu={fullMenu()}
+          promotions={initialPromotions()}
           onClose={() => setActiveTable(null)}
+          onAddItem={(menuItem) => withTables((t) => t.map((tbl) => (tbl.id === activeTable ? { ...tbl, items: addItemToOrder(tbl.items, menuItem), startTime: tbl.startTime || new Date().toISOString() } : tbl)))}
+          onRemoveItem={(menuId) => withTables((t) => t.map((tbl) => (tbl.id === activeTable ? { ...tbl, items: removeItemFromOrder(tbl.items, menuId) } : tbl)))}
+          onSetWaiter={(waiter) => withTables((t) => t.map((tbl) => (tbl.id === activeTable ? { ...tbl, waiter } : tbl)))}
+          onSendToKitchen={() => {
+            const tbl = tables.find((t) => t.id === activeTable);
+            if (!tbl || tbl.items.length === 0) return alert("Agrega productos antes de enviar a cocina.");
+            withTables((t) => t.map((tb) => (tb.id === activeTable ? { ...tb, kitchenStatus: "pendiente", kitchenSentAt: new Date().toISOString() } : tb)));
+            alert("Orden enviada a cocina.");
+          }}
         />
       )}
-
       {activeDelivery && (
         <OrderModal
-          title={`Delivery — ${deliveries.find((d) => d.id === activeDelivery).customer}`}
-          items={deliveries.find((d) => d.id === activeDelivery).items}
-          kitchenStatus={deliveries.find((d) => d.id === activeDelivery).kitchenStatus}
-          promotions={promotions}
-          onAdd={(item) => addItemToOrder("delivery", activeDelivery, item)}
-          onQty={(menuId, d) => changeQty("delivery", activeDelivery, menuId, d)}
-          onNote={(menuId, note) => setNote("delivery", activeDelivery, menuId, note)}
-          onSend={() => sendToKitchen("delivery", activeDelivery)}
+          table={deliveries.find((d) => d.id === activeDelivery)}
+          employees={employees}
+          menu={fullMenu()}
+          promotions={initialPromotions()}
+          isDelivery
           onClose={() => setActiveDelivery(null)}
+          onAddItem={(menuItem) => withDeliveries((d) => d.map((del) => (del.id === activeDelivery ? { ...del, items: addItemToOrder(del.items, menuItem) } : del)))}
+          onRemoveItem={(menuId) => withDeliveries((d) => d.map((del) => (del.id === activeDelivery ? { ...del, items: removeItemFromOrder(del.items, menuId) } : del)))}
+          onSendToKitchen={() => {
+            const del = deliveries.find((d) => d.id === activeDelivery);
+            if (!del || del.items.length === 0) return alert("Agrega productos antes de enviar a cocina.");
+            withDeliveries((d) => d.map((de) => (de.id === activeDelivery ? { ...de, kitchenStatus: "pendiente", kitchenSentAt: new Date().toISOString() } : de)));
+            alert("Orden enviada a cocina.");
+          }}
         />
       )}
-
       {showNewDelivery && (
         <NewDeliveryModal
+          pickupCount={deliveries.filter((d) => d.type === "pickup").length}
           onCreate={(data) => {
-            const id = Date.now();
-            persist({ ...state, deliveries: [...deliveries, { id, ...data, items: [], kitchenStatus: null }] });
+            const nextId = Math.max(0, ...deliveries.map((d) => d.id)) + 1;
+            withDeliveries((d) => [...d, { ...data, id: nextId, items: [], kitchenStatus: null, kitchenSentAt: null }]);
             setShowNewDelivery(false);
-            setActiveDelivery(id);
+            setActiveDelivery(nextId);
+            setView("delivery");
           }}
           onClose={() => setShowNewDelivery(false)}
         />
       )}
-
       {receiptFor && <ReceiptModal sale={receiptFor} onClose={() => setReceiptFor(null)} />}
+      {readyToast.show && (
+        <div style={{ position: "fixed", top: 20, right: 20, background: "#4ecdc4", color: "#fff", padding: "12px 16px", borderRadius: 8, fontWeight: 700, zIndex: 1000 }}>
+          ✅ {readyToast.name} ¡Orden lista!
+        </div>
+      )}
     </div>
   );
 }
 
-function statusStyle(kitchenStatus, hasItems) {
-  if (!hasItems) return { grad: "linear-gradient(135deg, #26A65B, #158A4A)", text: "#fff", label: "Libre", icon: "🟢", glow: "rgba(38,166,91,0.4)" };
-  if (!kitchenStatus) return { grad: "linear-gradient(135deg, #FFC107, #FF8F00)", text: "#2B2118", label: "Armando orden", icon: "📝", glow: "rgba(255,143,0,0.4)" };
-  if (kitchenStatus === "pendiente") return { grad: "linear-gradient(135deg, #FF5722, #D84315)", text: "#fff", label: "En cocina", icon: "🆕", glow: "rgba(216,67,21,0.45)" };
-  if (kitchenStatus === "preparando") return { grad: "linear-gradient(135deg, #E53935, #B71C1C)", text: "#fff", label: "Preparando", icon: "🔥", glow: "rgba(183,28,28,0.5)" };
-  if (kitchenStatus === "listo") return { grad: "linear-gradient(135deg, #00E676, #00A152)", text: "#fff", label: "¡Listo!", icon: "✅", glow: "rgba(0,161,82,0.55)" };
-  return { grad: "linear-gradient(135deg, #26A65B, #158A4A)", text: "#fff", label: "Libre", icon: "🟢", glow: "rgba(38,166,91,0.4)" };
+function statusStyle(status) {
+  if (status === "listo") return { background: "#4ecdc4", color: "#fff" };
+  if (status === "preparando") return { background: "#f9ca24", color: "#333" };
+  if (!status) return { background: "#eee", color: "#666" };
+  return { background: "#ff6b6b", color: "#fff" };
 }
 
 function PinGate({ pin, onUnlock }) {
   const [val, setVal] = useState("");
-  const [err, setErr] = useState(false);
   return (
-    <div style={{ maxWidth: 320, margin: "60px auto", textAlign: "center" }}>
-      <Lock size={32} style={{ marginBottom: 12 }} />
-      <h3 style={{ marginTop: 0 }}>Caja protegida</h3>
-      <p style={{ fontSize: 13, color: "#8a7a63" }}>Ingresa el PIN para acceder</p>
-      <input
-        type="password"
-        inputMode="numeric"
-        value={val}
-        onChange={(e) => { setVal(e.target.value); setErr(false); }}
-        style={{ width: "100%", padding: 12, fontSize: 20, textAlign: "center", letterSpacing: 6, borderRadius: 8, border: "1px solid #E5D9C3", boxSizing: "border-box" }}
-      />
-      {err && <p style={{ color: "#C1272D", fontSize: 12, marginTop: 6 }}>PIN incorrecto</p>}
-      <button
-        onClick={() => (val === pin ? onUnlock() : setErr(true))}
-        style={{ marginTop: 12, width: "100%", padding: 12, border: "none", borderRadius: 8, background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}
-      >
-        Entrar
-      </button>
+    <div style={{ padding: 20 }}>
+      <h3>🔒 Ingresa PIN</h3>
+      <input type="password" maxLength={4} value={val} onChange={(e) => setVal(e.target.value)} style={{ fontSize: 24, padding: 10, width: 120, textAlign: "center" }} />
+      <button onClick={() => { if (val === pin) onUnlock(); else { alert("PIN incorrecto"); setVal(""); } }} style={{ marginLeft: 10, padding: "10px 16px" }}>Desbloquear</button>
     </div>
   );
 }
 
-function TableElapsed({ occupiedAt }) {
-  const [now, setNow] = useState(Date.now());
+function TableElapsed({ startTime }) {
+  const [elapsed, setElapsed] = useState("");
   useEffect(() => {
-    const iv = setInterval(() => setNow(Date.now()), 30000);
+    if (!startTime) return;
+    const tick = () => {
+      const diff = Math.floor((Date.now() - new Date(startTime).getTime()) / 60000);
+      setElapsed(diff < 1 ? "< 1 min" : `${diff} min`);
+    };
+    tick();
+    const iv = setInterval(tick, 30000);
     return () => clearInterval(iv);
-  }, []);
-  if (!occupiedAt) return null;
-  const mins = Math.max(0, Math.floor((now - new Date(occupiedAt).getTime()) / 60000));
-  return <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>⏱ {mins} min ocupada</span>;
+  }, [startTime]);
+  return <span>{elapsed}</span>;
 }
 
 function MesasView({ tables, onOpen }) {
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🍽️ Piso del restaurante</h2>
-        <span style={{ fontSize: 12, color: "#8a7a63" }}>{tables.length} mesas</span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-        {tables.map((t) => {
-          const st = statusStyle(t.kitchenStatus, t.items.length > 0);
-          const total = orderTotal(t.items);
-          const itemCount = t.items.reduce((s, it) => s + it.qty, 0);
-          return (
-            <button
-              key={t.id}
-              onClick={() => onOpen(t.id)}
-              style={{
-                background: st.grad, border: "none", borderRadius: 16, padding: "20px 14px", cursor: "pointer",
-                textAlign: "left", color: st.text, boxShadow: `0 6px 16px ${st.glow}`, position: "relative", overflow: "hidden",
-              }}
-            >
-              <div style={{ fontSize: 26, position: "absolute", top: 10, right: 12, opacity: 0.85 }}>{st.icon}</div>
-              <div style={{ fontSize: 26, fontWeight: 800 }}>Mesa {t.id}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.9 }}>{st.label}</div>
-              {t.items.length > 0 && (
-                <>
-                  <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>
-                  <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{itemCount} ítem{itemCount !== 1 ? "s" : ""}</div>
-                  <div style={{ marginTop: 4 }}><TableElapsed occupiedAt={t.occupiedAt} /></div>
-                </>
-              )}
-            </button>
-          );
-        })}
+      <h2>🍽 Mesas</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+        {tables.map((t) => (
+          <div key={t.id} onClick={() => onOpen(t.id)} style={{ cursor: "pointer", border: "1px solid #ddd", borderRadius: 8, padding: 12, ...statusStyle(t.kitchenStatus) }}>
+            <div style={{ fontWeight: 700 }}>Mesa {t.id}</div>
+            <div>{t.items.length} productos</div>
+            <div>{t.waiter || "Sin asignar"}</div>
+            {t.startTime && <div><TableElapsed startTime={t.startTime} /></div>}
+            {t.kitchenStatus && <div style={{ fontSize: 12, fontWeight: 600 }}>{t.kitchenStatus.toUpperCase()}</div>}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
-
-const WING_SAUCES = [
-  { id: "bbq", label: "BBQ" },
-  { id: "buffalo", label: "Buffalo" },
-  { id: "ranch", label: "Ranch" },
-  { id: "casa", label: "Salsa de la Casa" },
-];
 
 function WingOptionsModal({ item, onConfirm, onClose }) {
-  const needsQty = !!item.price12;
   const [qty, setQty] = useState(6);
-  const [sauce, setSauce] = useState(WING_SAUCES[0]);
+  const [sauce, setSauce] = useState(wingSauces[0]);
   const [pres, setPres] = useState("Bañadas");
-  const finalPrice = needsQty && qty === 12 ? item.price12 : item.price;
-  const finalName = needsQty ? `${item.name} x${qty}` : item.name;
+  const price = item.price || 8.99;
+  const price12 = item.price12 || 14.99;
+  const total = (qty === 12 ? price12 : price) * (qty / 6);
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
-      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 360, padding: 20 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 4 }}>🍗 {item.name}</h3>
-        <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Elige {needsQty ? "cantidad, salsa y presentación" : "la salsa y cómo las quieren"}</p>
-
-        {needsQty && (
-          <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Cantidad</div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              {[6, 12].map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setQty(q)}
-                  style={{
-                    flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13,
-                    background: qty === q ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
-                    color: qty === q ? "#fff" : "#5a4c3a",
-                  }}
-                >
-                  {q} pzas · {money(q === 12 ? item.price12 : item.price)}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Salsa</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          {WING_SAUCES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setSauce(s)}
-              style={{
-                padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13,
-                background: sauce.id === s.id ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
-                color: sauce.id === s.id ? "#fff" : "#5a4c3a",
-              }}
-            >
-              {s.label}
-            </button>
-          ))}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", padding: 20, borderRadius: 12, maxWidth: 400, width: "90%" }}>
+        <h3>🍗 {item.name}</h3>
+        <div style={{ margin: "10px 0" }}>
+          <label>Cantidad: </label>
+          <select value={qty} onChange={(e) => setQty(Number(e.target.value))}>
+            <option value={6}>6 piezas</option>
+            <option value={12}>12 piezas</option>
+          </select>
         </div>
-
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>Presentación</div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          {["Bañadas", "Salsa aparte"].map((p) => (
-            <button
-              key={p}
-              onClick={() => setPres(p)}
-              style={{
-                flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13,
-                background: pres === p ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
-                color: pres === p ? "#fff" : "#5a4c3a",
-              }}
-            >
-              {p}
-            </button>
-          ))}
+        <div style={{ margin: "10px 0" }}>
+          <label>Salsa: </label>
+          <select value={sauce.id} onChange={(e) => setSauce(wingSauces.find((s) => s.id === e.target.value))}>
+            {wingSauces.map((s) => (
+              <option key={s.id} value={s.id}>{s.name} - {s.description}</option>
+            ))}
+          </select>
         </div>
-
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
-          <button
-            onClick={() => onConfirm({ id: `${item.id}-${qty}-${sauce.id}-${pres === "Bañadas" ? "banadas" : "aparte"}`, name: `${finalName} · ${sauce.label} (${pres})`, price: finalPrice })}
-            style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}
-          >
-            Agregar
-          </button>
+        <div style={{ margin: "10px 0" }}>
+          <label>Presentación: </label>
+          <select value={pres} onChange={(e) => setPres(e.target.value)}>
+            <option value="Bañadas">Bañadas en salsa</option>
+            <option value="Aparte">Salsa aparte</option>
+          </select>
+        </div>
+        <div style={{ fontWeight: 700, margin: "10px 0" }}>Total: {money(total)}</div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "8px 12px" }}>Cancelar</button>
+          <button onClick={() => onConfirm({ ...item, name: `${item.name} (${qty} pzas, ${sauce.name}, ${pres})`, price: total, qty: 1, id: `${item.id}-${qty}-${sauce.id}-${pres === "Bañadas" ? "banadas" : "aparte"}` })} style={{ padding: "8px 12px", background: "#e94560", color: "#fff", border: "none", borderRadius: 6 }}>Agregar</button>
         </div>
       </div>
     </div>
   );
 }
 
-function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onNote, onSend, onClose }) {
-  const allCats = promotions && promotions.length > 0 ? [...CATS, "Promociones"] : CATS;
-  const [cat, setCat] = useState(allCats[0]);
-  const [search, setSearch] = useState("");
+function OrderModal({ table, employees, menu, promotions, isDelivery, onClose, onAddItem, onRemoveItem, onSetWaiter, onSendToKitchen }) {
   const [wingItem, setWingItem] = useState(null);
-  const total = orderTotal(items);
-  const baseList = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
-  const listForCat = search ? baseList.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : baseList;
-  const cartQtyFor = (menuId) => items.filter((it) => it.menuId === menuId || String(it.menuId).startsWith(String(menuId) + "-")).reduce((s, it) => s + it.qty, 0);
+  const allCats = useMemo(() => {
+    const cats = [...new Set(menu.map((m) => m.cat))];
+    if (promotions.length > 0) cats.unshift("Promociones");
+    return cats;
+  }, [menu, promotions]);
+  const [cat, setCat] = useState(allCats[0]);
 
   function handleItemClick(m) {
     if (m.cat === "Chicken Mood" && m.name.toLowerCase().includes("alita")) {
       setWingItem(m);
+    } else if (m.cat === "Promociones") {
+      const promo = promotions.find((p) => p.id === m.promoId);
+      if (promo) {
+        promo.items.forEach((pid) => {
+          const item = menu.find((x) => x.id === pid);
+          if (item) onAddItem(item);
+        });
+      }
     } else {
-      onAdd(m);
+      onAddItem(m);
     }
   }
+
+  const baseList = cat === "Promociones"
+    ? promotions.map((p) => ({ id: p.id, name: p.name, price: p.price, cat: "Promociones", promoId: p.id, description: p.description }))
+    : menu.filter((m) => m.cat === cat);
+
+  const cartQtyFor = (menuId) => {
+    const direct = table.items.reduce((sum, it) => (it.menuId === menuId ? sum + it.qty : sum), 0);
+    const custom = table.items.reduce((sum, it) => (String(it.menuId).startsWith(String(menuId) + "-") ? sum + it.qty : sum), 0);
+    return direct + custom;
+  };
+
   return (
-    <>
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 680, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", padding: 20, borderRadius: 12, maxWidth: 800, width: "90%", maxHeight: "90vh", overflow: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3>{isDelivery ? "🛵 Delivery" : "🍽 Mesa " + table.id}</h3>
+          <button onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
-        <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
-          <div style={{ width: 160, borderRight: "1px solid #E5D9C3", flexShrink: 0, background: "#FBF2E4", padding: 6 }}>
-            {allCats.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCat(c)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "12px 12px", borderRadius: 10, marginBottom: 4,
-                  border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
-                  background: cat === c ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "transparent",
-                  color: cat === c ? "#fff" : (c === "Promociones" ? "#C1272D" : "#5a4c3a"),
-                  boxShadow: cat === c ? "0 3px 8px rgba(193,39,45,0.3)" : "none",
-                }}
-              >
-                <span style={{ fontSize: 16 }}>{c === "Promociones" ? "🏷️" : CAT_ICONS[c]}</span> {c}
-              </button>
-            ))}
+        {!isDelivery && (
+          <div style={{ margin: "10px 0" }}>
+            <label>Mesero: </label>
+            <select value={table.waiter || ""} onChange={(e) => onSetWaiter(e.target.value || null)}>
+              <option value="">Seleccionar...</option>
+              {employees.filter((e) => e.active).map((e) => (
+                <option key={e.id} value={e.id}>{e.name}</option>
+              ))}
+            </select>
           </div>
-          <div style={{ flex: 1, padding: 14, overflow: "auto" }}>
-            <input
-              placeholder="🔍 Buscar producto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #E5D9C3", fontSize: 13, boxSizing: "border-box", marginBottom: 12 }}
-            />
-            {cat === "Promociones" && listForCat.length === 0 && !search && (
-              <p style={{ fontSize: 13, color: "#8a7a63" }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
-            )}
-            {search && listForCat.length === 0 && (
-              <p style={{ fontSize: 13, color: "#8a7a63" }}>Sin resultados para "{search}".</p>
-            )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-              {listForCat.map((m) => {
-                const inCart = cartQtyFor(m.id);
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => handleItemClick(m)}
-                    style={{
-                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, padding: "14px 14px", borderRadius: 12,
-                      border: "none", cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative",
-                      background: cat === "Promociones" ? "linear-gradient(135deg, #FFF3EC, #FFE4D3)" : "#fff",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-                    }}
-                  >
-                    {inCart > 0 && (
-                      <span style={{ position: "absolute", top: 8, right: 8, background: "#2E7D32", color: "#fff", borderRadius: 20, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>
-                        {inCart}
-                      </span>
-                    )}
-                    <span style={{ fontWeight: 700, color: "#2B2118" }}>{m.name}</span>
-                    <span style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(m.price)}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-        <div style={{ borderTop: "1px solid #E5D9C3", padding: 14, maxHeight: 200, overflow: "auto", background: "#FBF2E4" }}>
-          {items.length === 0 && <p style={{ fontSize: 13, color: "#8a7a63" }}>Sin productos agregados todavía.</p>}
-          {items.map((it) => (
-            <div key={it.menuId} style={{ marginBottom: 8, background: "#fff", borderRadius: 10, padding: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{it.name}</span>
-                <button onClick={() => onQty(it.menuId, -1)} style={iconBtn}><Minus size={14} /></button>
-                <span style={{ minWidth: 18, textAlign: "center", fontSize: 13, fontWeight: 700 }}>{it.qty}</span>
-                <button onClick={() => onQty(it.menuId, 1)} style={iconBtn}><Plus size={14} /></button>
-                <span style={{ minWidth: 70, textAlign: "right", fontSize: 13, fontWeight: 800, color: "#C1272D" }}>{money(it.price * it.qty)}</span>
-              </div>
-              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "6px 8px", borderRadius: 6, border: "1px solid #E5D9C3", boxSizing: "border-box" }} />
-            </div>
+        )}
+        <div style={{ display: "flex", gap: 6, margin: "10px 0", flexWrap: "wrap" }}>
+          {allCats.map((c) => (
+            <button key={c} onClick={() => setCat(c)} style={{ padding: "6px 10px", borderRadius: 6, border: "none", cursor: "pointer", background: cat === c ? "#e94560" : "#eee", color: cat === c ? "#fff" : "#333" }}>{c}</button>
           ))}
         </div>
-        <div style={{ padding: 16, borderTop: "1px solid #E5D9C3", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "#fff" }}>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>Total: {money(total)}</div>
-          <button onClick={onSend} disabled={!items.length} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 10, border: "none", cursor: items.length ? "pointer" : "not-allowed", background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, opacity: items.length ? 1 : 0.5, fontSize: 14 }}>
-            <Send size={16} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
-          </button>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, maxHeight: 300, overflow: "auto" }}>
+          {baseList.length === 0 ? (
+            <div style={{ gridColumn: "1 / -1", padding: 20, textAlign: "center", color: "#888" }}>No hay promociones activas</div>
+          ) : (
+            baseList.map((m) => (
+              <button key={m.id} onClick={() => handleItemClick(m)} style={{ position: "relative", padding: 10, borderRadius: 8, border: "1px solid #ddd", background: "#f8f9fa", cursor: "pointer", textAlign: "left" }}>
+                <div style={{ fontWeight: 700 }}>{m.name}</div>
+                <div style={{ fontSize: 12, color: "#666" }}>{m.cat}</div>
+                <div style={{ fontWeight: 700, color: "#e94560" }}>{money(m.price)}</div>
+                {m.description && <div style={{ fontSize: 11, color: "#888" }}>{m.description}</div>}
+                {cartQtyFor(m.id) > 0 && <span style={{ position: "absolute", top: 4, right: 4, background: "#e94560", color: "#fff", borderRadius: "50%", width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>{cartQtyFor(m.id)}</span>}
+              </button>
+            ))
+          )}
         </div>
-      </div>
-    </div>
-    {wingItem && (
-      <WingOptionsModal
-        item={wingItem}
-        onConfirm={(customItem) => { onAdd(customItem); setWingItem(null); }}
-        onClose={() => setWingItem(null)}
-      />
-    )}
-    </>
-  );
-}
-
-const iconBtn = { width: 24, height: 24, borderRadius: 6, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
-function ElapsedBadge({ sentAt }) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const iv = setInterval(() => setNow(Date.now()), 15000);
-    return () => clearInterval(iv);
-  }, []);
-  if (!sentAt) return null;
-  const mins = Math.max(0, Math.floor((now - new Date(sentAt).getTime()) / 60000));
-  const urgent = mins >= 10;
-  return (
-    <span style={{
-      fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-      background: urgent ? "#C1272D" : "rgba(255,255,255,0.25)", color: "#fff",
-      animation: urgent ? "pulseBadge 1.2s infinite" : "none",
-    }}>
-      ⏱ {mins} min
-    </span>
-  );
-}
-
-function CocinaView({ tables, deliveries, onAdvance }) {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const iv = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(iv);
-  }, []);
-
-  const nuevos = [
-    ...tables.filter((t) => t.kitchenStatus === "pendiente").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "pendiente").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
-  ];
-  const preparando = [
-    ...tables.filter((t) => t.kitchenStatus === "preparando").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
-  ];
-  const listos = [
-    ...tables.filter((t) => t.kitchenStatus === "listo").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
-  ];
-
-  const columns = [
-    { key: "nuevos", title: "NUEVOS", emoji: "🆕", items: nuevos, accent: "#FF5252", action: "preparando", actionLabel: "Empezar a preparar" },
-    { key: "preparando", title: "PREPARANDO", emoji: "🔥", items: preparando, accent: "#FFB300", action: "listo", actionLabel: "Marcar listo" },
-    { key: "listos", title: "LISTOS", emoji: "✅", items: listos, accent: "#00E676", action: null, actionLabel: null },
-  ];
-
-  return (
-    <div style={{ background: "radial-gradient(circle at top, #2d2418, #16110c)", borderRadius: 20, padding: "22px 20px", margin: "-4px", boxShadow: "0 10px 30px rgba(0,0,0,0.35)" }}>
-      <style>{`
-        @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes cardIn { from { transform: scale(0.94) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-        @keyframes glowPulse { 0%,100% { box-shadow: 0 0 0px rgba(255,255,255,0); } 50% { box-shadow: 0 0 18px rgba(255,255,255,0.15); } }
-      `}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: "#F2C879", letterSpacing: 0.5 }}>👨‍🍳 PANTALLA DE COCINA</h2>
-          <div style={{ fontSize: 11, color: "#9a8a6f", letterSpacing: 1 }}>{RESTAURANT_NAME.toUpperCase()}</div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", fontFamily: "'Courier New', monospace" }}>{now.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</div>
-          <div style={{ fontSize: 11, color: "#9a8a6f" }}>{now.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}</div>
-        </div>
-      </div>
-
-      {nuevos.length === 0 && preparando.length === 0 && listos.length === 0 && (
-        <div style={{ textAlign: "center", padding: "70px 20px", color: "#7a6c56" }}>
-          <div style={{ fontSize: 48, marginBottom: 10 }}>🍽️</div>
-          <p style={{ fontSize: 15 }}>Todo tranquilo — no hay pedidos en cocina.</p>
-        </div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 18, alignItems: "start" }}>
-        {columns.map((col) => (
-          <div key={col.key} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, border: `1px solid ${col.accent}33`, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `2px solid ${col.accent}` }}>
-              <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: 1.5, color: col.accent }}>{col.emoji} {col.title}</span>
-              <span style={{ background: col.accent, color: "#1a1410", borderRadius: 20, padding: "2px 12px", fontSize: 13, fontWeight: 800 }}>{col.items.length}</span>
-            </div>
-            <div style={{ padding: 12, minHeight: 100, display: "flex", flexDirection: "column", gap: 12 }}>
-              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#5a4c3a", textAlign: "center", padding: "20px 0" }}>— vacío —</div>}
-              {col.items.map((o) => (
-                <div
-                  key={o.kind + o.id}
-                  style={{
-                    background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 14, padding: 16, color: "#F5ECD9",
-                    animation: "cardIn 0.3s ease", border: `1px solid ${col.accent}55`, borderLeft: `4px solid ${col.accent}`,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <strong style={{ fontSize: 17, letterSpacing: 0.3 }}>{o.label}</strong>
-                    <ElapsedBadge sentAt={o.kitchenSentAt} />
-                  </div>
-                  <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 14, lineHeight: 1.6, color: "#E4D8C0" }}>
-                    {o.items.map((it) => (
-                      <li key={it.menuId}>
-                        <strong style={{ color: "#F2C879" }}>{it.qty}x</strong> {it.name}
-                        {it.notes && <div style={{ fontSize: 12, color: "#C1531F", fontStyle: "italic" }}>↳ {it.notes}</div>}
-                      </li>
-                    ))}
-                  </ul>
-                  {col.action && (
-                    <button
-                      onClick={() => onAdvance(o.kind, o.id, col.action)}
-                      style={{ width: "100%", padding: "11px 0", border: "none", borderRadius: 10, background: col.accent, color: "#1a1410", fontWeight: 800, fontSize: 13, cursor: "pointer", letterSpacing: 0.3 }}
-                    >
-                      {col.actionLabel} →
-                    </button>
-                  )}
-                  {!col.action && (
-                    <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: col.accent, letterSpacing: 0.5 }}>🔔 AVISAR AL MESERO</div>
-                  )}
+        <h4 style={{ marginTop: 16 }}>🛒 Orden ({table.items.length} ítems)</h4>
+        <div style={{ maxHeight: 200, overflow: "auto" }}>
+          {table.items.length === 0 ? (
+            <div style={{ color: "#888" }}>Sin productos</div>
+          ) : (
+            table.items.map((it) => (
+              <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #eee" }}>
+                <div>{it.name} x{it.qty}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div>{money(it.qty * it.price)}</div>
+                  <button onClick={() => onRemoveItem(it.menuId)} style={{ background: "#ff6b6b", color: "#fff", border: "none", borderRadius: 4, width: 24, height: 24, cursor: "pointer" }}>-</button>
                 </div>
+              </div>
+            ))
+          )}
+        </div>
+        <div style={{ marginTop: 10, fontWeight: 700, fontSize: 18 }}>Total: {money(table.items.reduce((sum, it) => sum + it.qty * it.price, 0))}</div>
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <button onClick={onSendToKitchen} style={{ flex: 1, padding: 12, background: "#f9ca24", border: "none", borderRadius: 6, cursor: "pointer", fontWeight: 700 }}>👨‍🍳 Enviar a Cocina</button>
+          <button onClick={onClose} style={{ padding: "12px 16px", background: "#eee", border: "none", borderRadius: 6, cursor: "pointer" }}>Cerrar</button>
+        </div>
+      </div>
+      {wingItem && (
+        <WingOptionsModal
+          item={wingItem}
+          onConfirm={(customItem) => { onAddItem(customItem); setWingItem(null); }}
+          onClose={() => setWingItem(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+const iconBtn = (label, emoji, active, onClick) => (
+  <button onClick={onClick} style={{ padding: "8px 10px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: active ? "#e94560" : "#fff", color: active ? "#fff" : "#333", fontWeight: 600 }}>
+    {emoji} {label}
+  </button>
+);
+
+function ElapsedBadge({ sentAt }) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!sentAt) return;
+    const tick = () => {
+      const diff = Math.floor((Date.now() - new Date(sentAt).getTime()) / 60000);
+      setElapsed(diff < 1 ? "< 1 min" : `${diff} min`);
+    };
+    tick();
+    const iv = setInterval(tick, 30000);
+    return () => clearInterval(iv);
+  }, [sentAt]);
+  return <span style={{ fontSize: 12, color: "#888" }}>{elapsed}</span>;
+}
+
+function CocinaView({ tables, deliveries, onUpdate }) {
+  const pending = [
+    ...tables.filter((t) => t.kitchenStatus && t.kitchenStatus !== "entregado").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, items: t.items, status: t.kitchenStatus, sentAt: t.kitchenSentAt })),
+    ...deliveries.filter((d) => d.kitchenStatus && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, items: d.items, status: d.kitchenStatus, sentAt: d.kitchenSentAt })),
+  ];
+  return (
+    <div>
+      <h2>👨‍🍳 Cocina</h2>
+      {pending.length === 0 && <div style={{ color: "#888" }}>No hay órdenes pendientes</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+        {pending.map((o) => (
+          <div key={o.kind + o.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, ...statusStyle(o.status) }}>
+            <div style={{ fontWeight: 700 }}>{o.label}</div>
+            <div style={{ fontSize: 12 }}><ElapsedBadge sentAt={o.sentAt} /></div>
+            <div style={{ margin: "8px 0" }}>
+              {o.items.map((it) => (
+                <div key={it.menuId} style={{ fontSize: 14 }}>• {it.name} x{it.qty}</div>
               ))}
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {o.status !== "pendiente" && (
+                <button onClick={() => onUpdate(o.kind, o.id, "pendiente")} style={{ flex: 1, padding: 6, borderRadius: 4, border: "none", cursor: "pointer", background: "#eee" }}>Pendiente</button>
+              )}
+              {o.status !== "preparando" && (
+                <button onClick={() => onUpdate(o.kind, o.id, "preparando")} style={{ flex: 1, padding: 6, borderRadius: 4, border: "none", cursor: "pointer", background: "#f9ca24" }}>Preparando</button>
+              )}
+              {o.status !== "listo" && (
+                <button onClick={() => onUpdate(o.kind, o.id, "listo")} style={{ flex: 1, padding: 6, borderRadius: 4, border: "none", cursor: "pointer", background: "#4ecdc4", color: "#fff" }}>Listo</button>
+              )}
             </div>
           </div>
         ))}
@@ -1028,488 +712,353 @@ function CocinaView({ tables, deliveries, onAdvance }) {
   );
 }
 
-function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, onCloseSession }) {
-  const active = cashSessions.find((s) => !s.closedAt);
-  const [openedBy, setOpenedBy] = useState("");
-  const [openingAmount, setOpeningAmount] = useState("");
-  const [counted, setCounted] = useState("");
-  const [notes, setNotes] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
-
-  const closedSessions = cashSessions.filter((s) => s.closedAt).slice().reverse();
-
-  if (!active) {
-    return (
-      <div style={{ background: "linear-gradient(160deg, #fff, #FFF8ED)", border: "2px dashed #C1272D", borderRadius: 16, padding: 22, marginBottom: 22, boxShadow: "0 6px 18px rgba(193,39,45,0.08)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg, #C1272D, #E8A33D)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔓</div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16 }}>Abrir caja</div>
-            <div style={{ fontSize: 11, color: "#8a7a63" }}>Necesario para empezar a cobrar en este turno</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <select value={openedBy} onChange={(e) => setOpenedBy(e.target.value)} style={{ ...inp, maxWidth: 200 }}>
-            <option value="">¿Quién abre la caja?</option>
-            {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
-          </select>
-          <input placeholder="Fondo inicial (C$)" type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
-          <button
-            disabled={!openedBy || !openingAmount}
-            onClick={() => { onOpenSession(openedBy, openingAmount); setOpenedBy(""); setOpeningAmount(""); }}
-            style={{ padding: "0 20px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: openedBy && openingAmount ? 1 : 0.5, boxShadow: "0 3px 10px rgba(193,39,45,0.3)" }}
-          >
-            🔓 Abrir caja
-          </button>
-        </div>
-        {closedSessions.length > 0 && (
-          <button onClick={() => setShowHistory((s) => !s)} style={{ marginTop: 14, fontSize: 12, background: "none", border: "none", color: "#8a7a63", cursor: "pointer", textDecoration: "underline", fontWeight: 700 }}>
-            📜 {showHistory ? "Ocultar" : "Ver"} historial de cortes anteriores ({closedSessions.length})
-          </button>
-        )}
-        {showHistory && <SessionHistory sessions={closedSessions} sales={sales} expenses={expenses} />}
-      </div>
-    );
-  }
-
-  const cashSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cardSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const sessionSalesCount = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt)).length;
-  const sessionExpenses = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).reduce((sum, e) => sum + Number(e.amount), 0);
-  const expectedCash = active.openingAmount + cashSales - sessionExpenses;
-  const diff = counted !== "" ? Number(counted) - expectedCash : null;
-
+function CorteCaja({ employees, sessions, onOpen, onClose }) {
+  const [employee, setEmployee] = useState(employees[0]?.id || "");
+  const [amount, setAmount] = useState("");
+  const active = sessions.filter((s) => !s.closingTime);
   return (
-    <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 22, marginBottom: 22, color: "#fff", boxShadow: "0 10px 24px rgba(0,0,0,0.25)", border: "1px solid rgba(242,200,121,0.2)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(242,200,121,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔐</div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: "#F2C879" }}>Caja abierta — {active.openedBy}</div>
-            <div style={{ fontSize: 11, color: "#C9BBA3" }}>Desde: {new Date(active.openedAt).toLocaleString("es-NI")}</div>
-          </div>
-        </div>
-        <div style={{ textAlign: "right", background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: "8px 14px" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3", letterSpacing: 0.5 }}>FONDO INICIAL</div>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>{money(active.openingAmount)}</div>
-        </div>
+    <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginBottom: 12 }}>
+      <h3>🧾 Corte de Caja</h3>
+      <div style={{ marginBottom: 10 }}>
+        <label>Empleado: </label>
+        <select value={employee} onChange={(e) => setEmployee(e.target.value)}>
+          {employees.filter((e) => e.active).map((e) => (
+            <option key={e.id} value={e.id}>{e.name}</option>
+          ))}
+        </select>
       </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, margin: "12px 0" }}>
-        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #26A65B" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💵 Ventas efectivo</div>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cashSales)}</div>
-        </div>
-        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #1565C0" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💳 Ventas tarjeta</div>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cardSales)}</div>
-        </div>
-        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #FF5252" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>📤 Gastos del turno</div>
-          <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionExpenses)}</div>
-        </div>
-        <div style={{ background: "#F2C879", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontSize: 10, color: "#2B2118", fontWeight: 700 }}>💰 EFECTIVO ESPERADO</div>
-          <div style={{ fontWeight: 800, fontSize: 17, color: "#2B2118" }}>{money(expectedCash)}</div>
-        </div>
+      <div style={{ marginBottom: 10 }}>
+        <label>Monto: </label>
+        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" style={{ width: 120 }} />
       </div>
-      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong></div>
-
-      <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 10, letterSpacing: 0.5 }}>🧮 CONTEO FÍSICO PARA CERRAR</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <input placeholder="Efectivo contado" type="number" value={counted} onChange={(e) => setCounted(e.target.value)} style={{ ...inp, maxWidth: 190, color: "#2B2118", fontWeight: 700 }} />
-          <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 180, color: "#2B2118" }} />
-        </div>
-
-        {counted !== "" && (
-          <div style={{
-            marginTop: 12, padding: "10px 14px", borderRadius: 10, fontWeight: 800, fontSize: 14, textAlign: "center",
-            background: diff === 0 ? "rgba(0,230,118,0.15)" : diff > 0 ? "rgba(242,200,121,0.15)" : "rgba(255,82,82,0.15)",
-            color: diff === 0 ? "#00E676" : diff > 0 ? "#F2C879" : "#FF5252",
-            border: `1px solid ${diff === 0 ? "#00E676" : diff > 0 ? "#F2C879" : "#FF5252"}44`,
-          }}>
-            {diff === 0 ? "✅ Cuadra exacto" : diff > 0 ? `📈 Sobran ${money(diff)}` : `📉 Faltan ${money(Math.abs(diff))}`}
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => { onOpen(employee, Number(amount)); setAmount(""); }} style={{ padding: "8px 12px", background: "#4ecdc4", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Abrir Caja</button>
+        <button onClick={() => { onClose(employee, Number(amount)); setAmount(""); }} style={{ padding: "8px 12px", background: "#e94560", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Cerrar Caja</button>
+      </div>
+      <div style={{ marginTop: 10 }}>
+        {active.length === 0 ? <div style={{ color: "#888" }}>No hay sesiones abiertas</div> : active.map((s) => (
+          <div key={s.id} style={{ fontSize: 12, margin: "4px 0" }}>
+            {s.employee} - Abierto: {timeStr(s.openingTime)} - Monto: {money(s.openingAmount)}
           </div>
-        )}
-
-        <button
-          disabled={counted === ""}
-          onClick={() => { if (window.confirm("¿Cerrar la caja con estos datos?")) onCloseSession(active.id, counted, expectedCash, notes); }}
-          style={{ marginTop: 14, width: "100%", padding: 13, border: "none", borderRadius: 10, background: counted !== "" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "rgba(255,255,255,0.1)", color: "#fff", fontWeight: 800, cursor: counted !== "" ? "pointer" : "not-allowed", fontSize: 14, letterSpacing: 0.3 }}
-        >
-          🔒 Cerrar caja
-        </button>
+        ))}
       </div>
     </div>
   );
 }
 
-function printSessionReport(session, sales, expenses) {
-  const start = new Date(session.openedAt);
-  const end = session.closedAt ? new Date(session.closedAt) : new Date();
-  const sessionSales = sales.filter((s) => new Date(s.time) >= start && new Date(s.time) <= end);
-  const sessionExpenses = expenses.filter((e) => new Date(e.time) >= start && new Date(e.time) <= end);
-  const cash = sessionSales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
-  const card = sessionSales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const expensesTotal = sessionExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-
-  const rows = sessionSales.map((s) => `
-    <tr>
-      <td>#${String(s.folio || s.id).padStart(5, "0")}</td>
-      <td>${s.ref}</td>
-      <td>${s.method}</td>
-      <td style="text-align:right">${money(s.total)}</td>
-    </tr>`).join("");
-
-  const expenseRows = sessionExpenses.map((e) => `
-    <tr><td colspan="3">${e.description}</td><td style="text-align:right">-${money(e.amount)}</td></tr>`).join("");
-
+function printSessionReport(session) {
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return alert("Permite ventanas emergentes para imprimir");
   const html = `
-    <html><head><title>Corte de Caja</title><style>
-      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 16px; color: #2B2118; }
-      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 14px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      td, th { padding: 4px 2px; border-bottom: 1px dashed #ccc; text-align: left; }
-      .totals td { border: none; font-weight: bold; }
-      .big { font-size: 15px; }
-      hr { border: none; border-top: 2px dashed #333; margin: 10px 0; }
-      @page { margin: 10mm; }
-    </style></head><body>
-      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
-      <div class="sub">CORTE DE CAJA · MASATEPE, MASAYA</div>
-      <div>Abierta por: <strong>${session.openedBy}</strong></div>
-      <div>Desde: ${start.toLocaleString("es-NI")}</div>
-      <div>Hasta: ${end.toLocaleString("es-NI")}</div>
-      <hr/>
-      <table>
-        <tr><th>Ticket</th><th>Ref</th><th>Pago</th><th style="text-align:right">Total</th></tr>
-        ${rows || '<tr><td colspan="4">Sin ventas registradas</td></tr>'}
-      </table>
-      <hr/>
-      <table class="totals">
-        <tr><td>Fondo inicial</td><td colspan="2"></td><td style="text-align:right">${money(session.openingAmount)}</td></tr>
-        <tr><td>Ventas efectivo</td><td colspan="2"></td><td style="text-align:right">${money(cash)}</td></tr>
-        <tr><td>Ventas tarjeta</td><td colspan="2"></td><td style="text-align:right">${money(card)}</td></tr>
-        <tr><td>Gastos</td><td colspan="2"></td><td style="text-align:right">-${money(expensesTotal)}</td></tr>
-        <tr class="big"><td>EFECTIVO ESPERADO</td><td colspan="2"></td><td style="text-align:right">${money(session.expectedCash != null ? session.expectedCash : session.openingAmount + cash - expensesTotal)}</td></tr>
-        ${session.countedCash != null ? `<tr class="big"><td>EFECTIVO CONTADO</td><td colspan="2"></td><td style="text-align:right">${money(session.countedCash)}</td></tr>
-        <tr class="big"><td>DIFERENCIA</td><td colspan="2"></td><td style="text-align:right">${session.difference >= 0 ? "+" : ""}${money(session.difference)}</td></tr>` : ""}
-      </table>
-      ${sessionExpenses.length ? `<hr/><div style="font-weight:bold;margin-bottom:4px;">Gastos del turno</div><table>${expenseRows}</table>` : ""}
-      <hr/>
-      <div style="text-align:center;margin-top:10px;">${sessionSales.length} ventas registradas · Generado ${new Date().toLocaleString("es-NI")}</div>
-    </body></html>`;
-
-  const w = window.open("", "_blank", "width=380,height=650");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.print();
+    <html><head><title>Reporte de Caja</title></head><body>
+    <h2>Reporte de Caja</h2>
+    <table border="1" cellpadding="6" cellspacing="0">
+      <tr><td>Empleado</td><td>${session.employee}</td></tr>
+      <tr><td>Apertura</td><td>${timeStr(session.openingTime)}</td></tr>
+      <tr><td>Cierre</td><td>${timeStr(session.closingTime)}</td></tr>
+      <tr><td>Monto Apertura</td><td>${money(session.openingAmount)}</td></tr>
+      <tr><td>Monto Cierre</td><td>${money(session.closingAmount)}</td></tr>
+      <tr class="big"><td>EFECTIVO ESPERADO</td><td colspan="2"></td><td style="text-align:right">${money(session.expectedCash != null ? session.expectedCash : session.openingAmount + session.cash - session.expensesTotal)}</td></tr>
+      <tr><td>Diferencia</td><td>${money(session.closingAmount - (session.expectedCash || 0))}</td></tr>
+      <tr><td>Verificado</td><td>${session.verified ? "✅ Sí" : "❌ No"}</td></tr>
+    </table>
+    </body></html>
+  `;
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.print();
 }
 
 function SessionHistory({ sessions, sales, expenses }) {
+  const [filter, setFilter] = useState("");
+  const filtered = sessions.filter((s) => s.closingTime).filter((s) => !filter || s.employee === filter);
   return (
-    <div style={{ marginTop: 12, background: "#fff", borderRadius: 12, padding: "6px 14px", border: "1px solid #F0E8D8" }}>
-      {sessions.map((s) => (
-        <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span><strong>{s.openedBy}</strong> · {new Date(s.openedAt).toLocaleDateString("es-NI")}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{
-                fontWeight: 800, padding: "2px 10px", borderRadius: 20,
-                background: s.difference === 0 ? "#E8F5E9" : s.difference > 0 ? "#FFF8E1" : "#FCE8E8",
-                color: s.difference === 0 ? "#2E7D32" : s.difference > 0 ? "#C99A1E" : "#C1272D",
-              }}>
-                {s.difference === 0 ? "Cuadró" : s.difference > 0 ? `+${money(s.difference)}` : `-${money(Math.abs(s.difference))}`}
-              </span>
-              <button onClick={() => printSessionReport(s, sales, expenses)} title="Imprimir corte" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 8px", cursor: "pointer", color: "#8a7a63" }}>
-                <Printer size={13} />
-              </button>
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 3 }}>Fondo: {money(s.openingAmount)} · Esperado: {money(s.expectedCash)} · Contado: {money(s.countedCash)}{s.notes ? ` · ${s.notes}` : ""}</div>
-        </div>
-      ))}
+    <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
+      <h3>📜 Historial de Cortes</h3>
+      <div style={{ marginBottom: 10 }}>
+        <label>Filtrar por empleado: </label>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="">Todos</option>
+          {[...new Set(sessions.map((s) => s.employee))].map((e) => (
+            <option key={e} value={e}>{e}</option>
+          ))}
+        </select>
+      </div>
+      {filtered.length === 0 ? <div style={{ color: "#888" }}>Sin cortes registrados</div> : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ background: "#f0f0f0" }}><th>Empleado</th><th>Apertura</th><th>Cierre</th><th>Monto Cierre</th><th>Esperado</th><th>Diferencia</th><th>Acciones</th></tr></thead>
+          <tbody>
+            {filtered.map((s) => {
+              const cash = sales.filter((x) => x.method === "efectivo" && x.time >= s.openingTime && x.time <= s.closingTime).reduce((sum, x) => sum + x.total, 0);
+              const expensesTotal = expenses.filter((e) => e.time >= s.openingTime && e.time <= s.closingTime).reduce((sum, e) => sum + e.amount, 0);
+              const expectedCash = s.expectedCash != null ? s.expectedCash : s.openingAmount + cash - expensesTotal;
+              const diff = s.closingAmount - expectedCash;
+              return (
+                <tr key={s.id} style={{ borderBottom: "1px solid #eee" }}>
+                  <td>{s.employee}</td>
+                  <td>{timeStr(s.openingTime)}</td>
+                  <td>{timeStr(s.closingTime)}</td>
+                  <td>{money(s.closingAmount)}</td>
+                  <td>{money(expectedCash)}</td>
+                  <td style={{ color: diff === 0 ? "green" : "red", fontWeight: 700 }}>{money(diff)}</td>
+                  <td><button onClick={() => printSessionReport({ ...s, cash, expensesTotal })} style={{ padding: "4px 8px", fontSize: 12 }}>🖨️ Imprimir</button></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
 
 function GoalBar({ sales, salesGoal, onSetGoal }) {
   const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(salesGoal || "");
-  const today = todayStr();
-  const todayTotal = sales.filter((s) => new Date(s.time).toDateString() === today).reduce((sum, s) => sum + s.total, 0);
-  const pct = salesGoal > 0 ? Math.min(100, Math.round((todayTotal / salesGoal) * 100)) : 0;
-  const reached = salesGoal > 0 && todayTotal >= salesGoal;
-
-  if (!salesGoal || editing) {
-    return (
-      <div style={{ background: "#fff", border: "2px dashed #E8A33D", borderRadius: 14, padding: 16, marginBottom: 18, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 20 }}>🎯</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#5a4c3a" }}>Meta de ventas de hoy:</span>
-        <input type="number" placeholder="Ej: 5000" value={val} onChange={(e) => setVal(e.target.value)} style={{ ...inp, maxWidth: 130 }} />
-        <button
-          disabled={!val}
-          onClick={() => { onSetGoal(val); setEditing(false); }}
-          style={{ padding: "8px 16px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: val ? 1 : 0.5 }}
-        >
-          Guardar meta
-        </button>
-      </div>
-    );
-  }
-
+  const [val, setVal] = useState(String(salesGoal));
+  const total = sales.reduce((sum, s) => sum + s.total, 0);
+  const pct = Math.min(100, Math.round((total / salesGoal) * 100));
   return (
-    <div style={{ background: reached ? "linear-gradient(135deg, #00C853, #009624)" : "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 14, padding: 16, marginBottom: 18, color: "#fff" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-        <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 0.5 }}>{reached ? "🎉 ¡META ALCANZADA!" : "🎯 META DE VENTAS DE HOY"}</span>
-        <button onClick={() => { setVal(salesGoal); setEditing(true); }} style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", color: "#fff" }}>✏️ Cambiar</button>
+    <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3>🎯 Meta de Ventas</h3>
+        <button onClick={() => { setEditing(!editing); setVal(String(salesGoal)); }} style={{ fontSize: 12, padding: "4px 8px" }}>{editing ? "Cancelar" : "Editar"}</button>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <span style={{ fontWeight: 800, fontSize: 22 }}>{money(todayTotal)}</span>
-        <span style={{ fontSize: 13, opacity: 0.85 }}>de {money(salesGoal)} ({pct}%)</span>
-      </div>
-      <div style={{ background: "rgba(255,255,255,0.2)", borderRadius: 20, height: 14, overflow: "hidden" }}>
-        <div style={{ background: reached ? "#fff" : "linear-gradient(90deg, #E8A33D, #F2C879)", height: "100%", width: `${pct}%`, borderRadius: 20, transition: "width 0.5s ease" }} />
-      </div>
-      {!reached && salesGoal > todayTotal && (
-        <div style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Faltan {money(salesGoal - todayTotal)} para la meta</div>
+      {editing && (
+        <div style={{ marginBottom: 10 }}>
+          <input type="number" value={val} onChange={(e) => setVal(e.target.value)} style={{ width: 120 }} />
+          <button onClick={() => { onSetGoal(Number(val)); setEditing(false); }} style={{ marginLeft: 8, padding: "4px 8px" }}>Guardar</button>
+        </div>
       )}
+      <div style={{ fontSize: 14, marginBottom: 6 }}>Ventas: {money(total)} / Meta: {money(salesGoal)} ({pct}%)</div>
+      <div style={{ height: 20, background: "#eee", borderRadius: 10, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: pct >= 100 ? "#4ecdc4" : "#e94560", transition: "width 0.5s" }} />
+      </div>
     </div>
   );
 }
 
-function changeBreakdown(amount) {
-  const denoms = [1000, 500, 200, 100, 50, 20, 10, 5, 1];
-  let remaining = Math.round(amount);
-  const result = [];
+function changeBreakdown(change) {
+  const denoms = [100, 50, 20, 10, 5, 1, 0.5, 0.25, 0.1, 0.05, 0.01];
+  const counts = {};
+  let remaining = change;
   for (const d of denoms) {
-    const count = Math.floor(remaining / d);
-    if (count > 0) {
-      result.push({ denom: d, count });
-      remaining -= count * d;
+    if (remaining >= d) {
+      counts[d] = Math.floor(remaining / d);
+      remaining = Math.round((remaining - counts[d] * d) * 100) / 100;
     }
   }
-  return result;
+  return Object.entries(counts).map(([denom, count]) => ({ denom: Number(denom), count }));
 }
 
 function playChaChing() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const now = ctx.currentTime;
-    [[1568, 0], [2093, 0.08]].forEach(([freq, offset]) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "triangle";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, now + offset);
-      gain.gain.exponentialRampToValueAtTime(0.3, now + offset + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.3);
-      osc.start(now + offset);
-      osc.stop(now + offset + 0.32);
-    });
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1200, ctx.currentTime);
+    osc.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
   } catch (e) {}
 }
 
 function CashKeypad({ value, onChange }) {
-  function press(k) {
-    if (k === "C") return onChange("");
-    if (k === "⌫") return onChange(String(value).slice(0, -1));
-    onChange(String(value) + k);
-  }
-  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "C"];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, maxWidth: 180 }}>
       {keys.map((k) => (
-        <button
-          key={k}
-          onClick={() => press(k)}
-          style={{
-            padding: "14px 0", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 17,
-            background: k === "C" ? "#FCE8E8" : k === "⌫" ? "#FFF3E0" : "#fff",
-            color: k === "C" ? "#C1272D" : k === "⌫" ? "#C1531F" : "#2B2118",
-            boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
-          }}
-        >
+        <button key={k} onClick={() => { if (k === "C") onChange(""); else onChange(String(value || "") + k); }} style={{ padding: 12, fontSize: 18, borderRadius: 6, border: "1px solid #ddd", cursor: "pointer" }}>
           {k}
         </button>
       ))}
     </div>
   );
 }
+
+const cashGivenRef = { current: {} };
+
+function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin, salesGoal, onSetGoal }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `🛵 ${d.customer}`, ...d })),
   ];
   const [method, setMethod] = useState({});
-  const [discountOpen, setDiscountOpen] = useState({});
-  const [discountType, setDiscountType] = useState({});
-  const [discountValue, setDiscountValue] = useState({});
   const [tipValue, setTipValue] = useState({});
+  const [discType, setDiscType] = useState({});
+  const [discValue, setDiscValue] = useState({});
+  const [cajaUnlocked, setCajaUnlocked] = useState(false);
+  const [showPinSettings, setShowPinSettings] = useState(false);
   const [cashGiven, setCashGiven] = useState({});
   const [splitMode, setSplitMode] = useState({});
   const [splitSelected, setSplitSelected] = useState({});
-  const [evenSplitN, setEvenSplitN] = useState({});
-  const [showPinSettings, setShowPinSettings] = useState(false);
-  const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
+
+  useEffect(() => {
+    cashGivenRef.current = cashGiven;
+  }, [cashGiven]);
 
   function getDiscount(key) {
-    const val = Number(discountValue[key] || 0);
-    if (!val) return null;
-    return { type: discountType[key] || "percent", value: val };
+    const type = discType[key];
+    const value = Number(discValue[key]) || 0;
+    if (!type || value <= 0) return null;
+    return { type, value };
   }
-  function discountedTotal(items, key) {
-    const sub = orderTotal(items);
-    const disc = getDiscount(key);
-    if (!disc) return sub;
-    const amt = disc.type === "percent" ? Math.round(sub * (disc.value / 100)) : Math.min(disc.value, sub);
-    return Math.max(0, sub - amt);
+
+  function toggleSplitItem(key, menuId) {
+    setSplitSelected((prev) => {
+      const arr = prev[key] || [];
+      if (arr.includes(menuId)) return { ...prev, [key]: arr.filter((id) => id !== menuId) };
+      return { ...prev, [key]: [...arr, menuId] };
+    });
+  }
+
+  if (!cajaUnlocked) {
+    return <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />;
   }
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>💵 Caja</h2>
-        <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>⚙️ Cambiar PIN</button>
-      </div>
-
+      <h2>💵 Caja</h2>
+      <CorteCaja employees={employees} sessions={cashSessions} onOpen={onOpenSession} onClose={onCloseSession} />
+      <SessionHistory sessions={cashSessions} sales={sales} expenses={expenses} />
       <GoalBar sales={sales} salesGoal={salesGoal} onSetGoal={onSetGoal} />
-
-      <CorteCaja sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={onOpenSession} onCloseSession={onCloseSession} />
-
-      {abiertas.length > 0 && (
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>CUENTAS ABIERTAS: {abiertas.length}</span>
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(grandTotal)}</span>
-        </div>
-      )}
-      {showPinSettings && <ChangePin current={pin} onChange={(p) => { onChangePin(p); setShowPinSettings(false); }} />}
-      {abiertas.length === 0 && (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>💵</div>
-          <p>No hay cuentas abiertas.</p>
-        </div>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-        {abiertas.map((o) => {
-          const total = orderTotal(o.items);
-          const key = o.kind + o.id;
-          const m = method[key] || "Efectivo";
-          const finalTotal = discountedTotal(o.items, key);
-          const hasDiscount = finalTotal < total;
-          const typeIcon = o.kind === "table" ? "🍽️" : (o.type === "pickup" ? "🥡" : "🛵");
-          return (
-            <div key={key} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 18px rgba(43,33,24,0.1)", border: "1px solid #F0E8D8" }}>
-              <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{typeIcon} {o.label}</span>
-                <span style={{ color: "#F2C879", fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
-              </div>
-              <div style={{ padding: 18 }}>
-                <div style={{ fontFamily: "'Courier New', monospace" }}>
-                  {o.items.map((it) => (
-                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#5a4c3a" }}>
-                      <span>{it.qty}x {it.name}</span>
-                      <span>{money(it.price * it.qty)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ borderTop: "1px dashed #E5D9C3", margin: "10px 0" }} />
-
-                <button
-                  onClick={() => setDiscountOpen((s) => ({ ...s, [key]: !s[key] }))}
-                  style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700, marginBottom: 10 }}
-                >
-                  <Percent size={13} /> {discountOpen[key] ? "Ocultar descuento" : "Aplicar descuento"}
-                </button>
-
-                {discountOpen[key] && (
-                  <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
-                    <select value={discountType[key] || "percent"} onChange={(e) => setDiscountType((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 90, padding: 7 }}>
-                      <option value="percent">%</option>
-                      <option value="amount">C$</option>
-                    </select>
-                    <input type="number" placeholder="0" value={discountValue[key] || ""} onChange={(e) => setDiscountValue((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, padding: 7 }} />
-                  </div>
-                )}
-
-                {hasDiscount ? (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", textDecoration: "line-through" }}>
-                      <span>Subtotal</span><span>{money(total)}</span>
-                    </div>
-                    <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(finalTotal)}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(total)}</span>
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                  {["Efectivo", "Tarjeta"].map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => setMethod((s) => ({ ...s, [key]: opt }))}
-                      style={{
-                        flex: 1, padding: 11, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13,
-                        border: m === opt ? "none" : "1px solid #E5D9C3",
-                        background: m === opt ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#fff", color: m === opt ? "#fff" : "#5a4c3a",
-                      }}
-                    >
-                      <Wallet size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{opt}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                  <input
-                    type="number"
-                    placeholder="🙌 Propina (opcional)"
-                    value={tipValue[key] || ""}
-                    onChange={(e) => setTipValue((s) => ({ ...s, [key]: e.target.value }))}
-                    style={{ ...inp, fontSize: 12 }}
-                  />
-                </div>
-
-                {m === "Efectivo" && (
-                  <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>💵 ¿Con cuánto paga el cliente?</div>
-                    <input
-                      type="number"
-                      placeholder="Efectivo recibido"
-                      value={cashGiven[key] || ""}
-                      onChange={(e) => setCashGiven((s) => ({ ...s, [key]: e.target.value }))}
-                      style={{ ...inp, marginBottom: 8 }}
-                    />
-                    {cashGiven[key] !== undefined && cashGiven[key] !== "" && (() => {
-                      const dueTotal = finalTotal + (Number(tipValue[key]) || 0);
-                      const change = Number(cashGiven[key]) - dueTotal;
-                      return (
-                        <div style={{
-                          textAlign: "center", padding: "8px 0", borderRadius: 8, fontWeight: 800, fontSize: 16,
-                          background: change >= 0 ? "#E8F5E9" : "#FCE8E8",
-                          color: change >= 0 ? "#2E7D32" : "#C1272D",
-                        }}>
-                          {change >= 0 ? `Vuelto: ${money(change)}` : `Falta: ${money(Math.abs(change))}`}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key])} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
-                  ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      <div style={{ margin: "10px 0" }}>
+        <button onClick={() => setShowPinSettings(!showPinSettings)} style={{ padding: "8px 12px" }}>🔑 Cambiar PIN</button>
+        {showPinSettings && <ChangePin current={pin} onChange={(p) => { onChangePin(p); setShowPinSettings(false); }} />}
       </div>
+      <h3>🧾 Cuentas Abiertas ({abiertas.length})</h3>
+      {abiertas.length === 0 && <div style={{ color: "#888" }}>No hay cuentas abiertas</div>}
+      {abiertas.map((o) => {
+        const key = o.kind + o.id;
+        const m = method[key] || "efectivo";
+        const isSplit = !!splitMode[key];
+        const selectedIds = splitSelected[key] || [];
+        const activeItems = isSplit && selectedIds.length > 0 ? o.items.filter((it) => selectedIds.includes(it.menuId)) : o.items;
+        const { subtotal, total } = computeTotal(activeItems, getDiscount(key));
+        const finalTotal = total + (Number(tipValue[key]) || 0);
+        const given = Number(cashGiven[key]) || 0;
+        const change = given - finalTotal;
+        const canCharge = !isSplit || selectedIds.length > 0;
+
+        return (
+          <div key={key} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>{o.label}</div>
+
+            <div style={{ margin: "8px 0", display: "flex", gap: 8, alignItems: "center" }}>
+              <button onClick={() => setSplitMode((prev) => ({ ...prev, [key]: !prev[key] }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: isSplit ? "#e94560" : "#fff", color: isSplit ? "#fff" : "#333", fontWeight: 600 }}>
+                {isSplit ? "✅ Dividir Cuenta (Activo)" : "🔄 Dividir Cuenta"}
+              </button>
+              {isSplit && <span style={{ fontSize: 12, color: "#666" }}>Selecciona los productos a cobrar</span>}
+            </div>
+
+            <div style={{ margin: "8px 0" }}>
+              {o.items.map((it) => {
+                const checked = selectedIds.includes(it.menuId);
+                return (
+                  <div key={it.menuId} style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: "1px solid #f0f0f0", opacity: isSplit && !checked ? 0.5 : 1 }}>
+                    {isSplit && (
+                      <input type="checkbox" checked={checked} onChange={() => toggleSplitItem(key, it.menuId)} style={{ cursor: "pointer" }} />
+                    )}
+                    <span style={{ flex: 1 }}>• {it.name} x{it.qty}</span>
+                    <span>{money(it.qty * it.price)}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {isSplit && selectedIds.length > 0 && (
+              <div style={{ fontSize: 12, color: "#666", marginBottom: 6 }}>Cobrando {selectedIds.length} de {o.items.length} productos</div>
+            )}
+
+            <div style={{ margin: "8px 0", display: "flex", gap: 8, alignItems: "center" }}>
+              {["efectivo", "tarjeta", "transferencia"].map((mt) => (
+                <button key={mt} onClick={() => setMethod((prev) => ({ ...prev, [key]: mt }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: m === mt ? "#e94560" : "#fff", color: m === mt ? "#fff" : "#333", fontWeight: 600, textTransform: "capitalize" }}>{mt}</button>
+              ))}
+            </div>
+            <div style={{ margin: "8px 0", display: "flex", gap: 8, alignItems: "center" }}>
+              <label>Descuento:</label>
+              <select value={discType[key] || ""} onChange={(e) => setDiscType((prev) => ({ ...prev, [key]: e.target.value }))}>
+                <option value="">Ninguno</option>
+                <option value="percent">%</option>
+                <option value="fixed">Fijo C$</option>
+              </select>
+              {discType[key] && <input type="number" value={discValue[key] || ""} onChange={(e) => setDiscValue((prev) => ({ ...prev, [key]: e.target.value }))} placeholder="0" style={{ width: 80 }} />}
+            </div>
+            <div style={{ margin: "8px 0" }}>
+              <label>Propina: </label>
+              <input type="number" value={tipValue[key] || ""} onChange={(e) => setTipValue((prev) => ({ ...prev, [key]: e.target.value }))} placeholder="0.00" style={{ width: 80 }} />
+            </div>
+
+            {m === "efectivo" && (
+              <div style={{ margin: "12px 0", padding: 12, background: "#f8f9fa", borderRadius: 8, border: "1px solid #eee" }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>💵 Pago en Efectivo</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <button onClick={() => setCashGiven((prev) => ({ ...prev, [key]: String(finalTotal.toFixed(2)) }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "#fff" }}>Exacto {money(finalTotal)}</button>
+                  {[5, 10, 20, 50, 100].map((bill) => {
+                    const next = Math.ceil(finalTotal / bill) * bill;
+                    if (next > finalTotal) {
+                      return (
+                        <button key={bill} onClick={() => setCashGiven((prev) => ({ ...prev, [key]: String(next.toFixed(2)) }))} style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", cursor: "pointer", background: "#fff" }}>
+                          Paga {money(next)}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+                <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <CashKeypad value={cashGiven[key] || ""} onChange={(v) => setCashGiven((prev) => ({ ...prev, [key]: v }))} />
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontSize: 14, color: "#666", marginBottom: 4 }}>Paga con: <strong style={{ color: "#333" }}>{money(given)}</strong></div>
+                    {given >= finalTotal ? (
+                      <>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: "#4ecdc4" }}>Vuelto: {money(change)}</div>
+                        {change > 0 && (
+                          <div style={{ marginTop: 6, padding: 8, background: "#fff", borderRadius: 6, border: "1px solid #eee" }}>
+                            <div style={{ fontSize: 12, color: "#666", marginBottom: 4, fontWeight: 600 }}>Desglose del vuelto:</div>
+                            {changeBreakdown(change).map((cb) => (
+                              <div key={cb.denom} style={{ fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+                                <span>{cb.count}x {money(cb.denom)}</span>
+                                <span>{money(cb.count * cb.denom)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 28, fontWeight: 700, color: "#e94560" }}>Falta: {money(finalTotal - given)}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ fontWeight: 700, fontSize: 18 }}>Subtotal: {money(subtotal)}</div>
+            {getDiscount(key) && <div style={{ color: "green" }}>Descuento: {money(subtotal - total)}</div>}
+            <div style={{ fontWeight: 700, fontSize: 20, color: "#e94560" }}>Total: {money(finalTotal)}</div>
+            <button
+              disabled={!canCharge}
+              onClick={() => {
+                playChaChing();
+                const itemMenuIds = isSplit && selectedIds.length > 0 ? selectedIds : undefined;
+                onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key], itemMenuIds);
+                if (isSplit) {
+                  setSplitMode((prev) => ({ ...prev, [key]: false }));
+                  setSplitSelected((prev) => ({ ...prev, [key]: [] }));
+                }
+                setCashGiven((prev) => ({ ...prev, [key]: "" }));
+              }}
+              style={{ marginTop: 8, padding: "10px 16px", background: canCharge ? "#4ecdc4" : "#ccc", color: "#fff", border: "none", borderRadius: 6, cursor: canCharge ? "pointer" : "not-allowed", fontWeight: 700 }}
+            >
+              ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1517,77 +1066,55 @@ function CashKeypad({ value, onChange }) {
 function ChangePin({ current, onChange }) {
   const [oldPin, setOldPin] = useState("");
   const [newPin, setNewPin] = useState("");
-  const [err, setErr] = useState("");
+  const [confirm, setConfirm] = useState("");
   return (
-    <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: 12, marginBottom: 16, maxWidth: 320 }}>
-      <p style={{ fontSize: 12, fontWeight: 700, margin: "0 0 8px" }}>Cambiar PIN de caja</p>
-      <input placeholder="PIN actual" type="password" value={oldPin} onChange={(e) => setOldPin(e.target.value)} style={inp} />
-      <input placeholder="PIN nuevo" type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} style={{ ...inp, marginTop: 6 }} />
-      {err && <p style={{ color: "#C1272D", fontSize: 12 }}>{err}</p>}
-      <button
-        onClick={() => {
-          if (oldPin !== current) return setErr("El PIN actual no coincide.");
-          if (newPin.length < 4) return setErr("El PIN nuevo debe tener al menos 4 dígitos.");
-          onChange(newPin);
-        }}
-        style={{ marginTop: 8, width: "100%", padding: 8, border: "none", borderRadius: 6, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer" }}
-      >
-        Guardar
-      </button>
+    <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 10 }}>
+      <h4>🔑 Cambiar PIN</h4>
+      <div><input type="password" maxLength={4} value={oldPin} onChange={(e) => setOldPin(e.target.value)} placeholder="PIN actual" style={{ margin: "4px 0", padding: 6, width: 120 }} /></div>
+      <div><input type="password" maxLength={4} value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="Nuevo PIN" style={{ margin: "4px 0", padding: 6, width: 120 }} /></div>
+      <div><input type="password" maxLength={4} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirmar PIN" style={{ margin: "4px 0", padding: 6, width: 120 }} /></div>
+      <button onClick={() => {
+        if (oldPin !== current) return alert("PIN actual incorrecto");
+        if (newPin.length !== 4) return alert("El PIN debe tener 4 dígitos");
+        if (newPin !== confirm) return alert("Los PINs no coinciden");
+        onChange(newPin);
+        alert("PIN actualizado");
+        setOldPin(""); setNewPin(""); setConfirm("");
+      }} style={{ marginTop: 8, padding: "8px 12px", background: "#e94560", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Guardar</button>
     </div>
   );
 }
 
 function DeliveryView({ deliveries, onNew, onOpen }) {
-  const activos = deliveries.filter((d) => d.kitchenStatus !== "entregado");
-  const delivery = activos.filter((d) => d.type !== "pickup");
-  const pickup = activos.filter((d) => d.type === "pickup");
-
-  function Section({ title, icon, list }) {
-    return (
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#8a7a63", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>{icon} {title} ({list.length})</h3>
-        {list.length === 0 && <p style={{ color: "#C9BBA3", fontSize: 13 }}>Sin pedidos activos.</p>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
-          {list.map((d) => {
-            const st = statusStyle(d.kitchenStatus, d.items.length > 0);
-            return (
-              <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <strong style={{ fontSize: 16 }}>{d.customer}</strong>
-                  <span style={{ fontSize: 20 }}>{st.icon}</span>
-                </div>
-                {d.address && <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>}
-                <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>
-                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
+  const active = deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado");
+  const completed = deliveries.filter((d) => d.kitchenStatus === "entregado" || d.items.length === 0);
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🛵 Delivery &amp; Para llevar</h2>
-        <button onClick={onNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 8px rgba(193,39,45,0.3)" }}>
-          <Plus size={16} /> Nuevo pedido
-        </button>
+      <h2>🛵 Delivery</h2>
+      <button onClick={onNew} style={{ padding: "10px 16px", background: "#e94560", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", marginBottom: 12 }}>➕ Nuevo Delivery</button>
+      <h3>Activos</h3>
+      {active.length === 0 && <div style={{ color: "#888" }}>Sin deliveries activos</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+        {active.map((d) => (
+          <div key={d.id} onClick={() => onOpen(d.id)} style={{ cursor: "pointer", border: "1px solid #ddd", borderRadius: 8, padding: 12, ...statusStyle(d.kitchenStatus) }}>
+            <div style={{ fontWeight: 700 }}>{d.customer}</div>
+            <div style={{ fontSize: 12 }}>{d.address || "Para llevar"}</div>
+            <div>{d.items.length} productos</div>
+            {d.kitchenStatus && <div style={{ fontSize: 12, fontWeight: 600 }}>{d.kitchenStatus.toUpperCase()}</div>}
+          </div>
+        ))}
       </div>
-      {activos.length === 0 && (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🛵</div>
-          <p>No hay pedidos activos.</p>
-        </div>
-      )}
-      {activos.length > 0 && (
-        <>
-          <Section title="Delivery" icon="🛵" list={delivery} />
-          <Section title="Para llevar" icon="🥡" list={pickup} />
-        </>
-      )}
+      <h3 style={{ marginTop: 20 }}>Completados / Vacíos</h3>
+      {completed.length === 0 && <div style={{ color: "#888" }}>Sin registros</div>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+        {completed.map((d) => (
+          <div key={d.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, opacity: 0.6 }}>
+            <div style={{ fontWeight: 700 }}>{d.customer}</div>
+            <div style={{ fontSize: 12 }}>{d.address || "Para llevar"}</div>
+            <div>{d.kitchenStatus === "entregado" ? "Entregado" : "Vacío"}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1597,1077 +1124,297 @@ function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
   const [customer, setCustomer] = useState("");
   const [address, setAddress] = useState("");
   const valid = type === "delivery" ? customer && address : true;
-
-  function handleCreate() {
-    if (type === "pickup") {
-      onCreate({ type: "pickup", customer: `Para llevar #${pickupCount + 1}`, phone: "", address: "" });
-    } else {
-      onCreate({ type: "delivery", customer, phone: "", address });
-    }
-  }
-
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 12, width: "100%", maxWidth: 380, padding: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Nuevo pedido</h3>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "delivery" ? "#fff" : "#5a4c3a" }}>🛵 Delivery</button>
-          <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "pickup" ? "#fff" : "#5a4c3a" }}>🥡 Para llevar</button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", padding: 20, borderRadius: 12, maxWidth: 400, width: "90%" }}>
+        <h3>➕ Nuevo Delivery</h3>
+        <div style={{ margin: "10px 0" }}>
+          <label>Tipo: </label>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="delivery">Delivery a domicilio</option>
+            <option value="pickup">Para llevar</option>
+          </select>
         </div>
-        {type === "delivery" ? (
+        {type === "delivery" && (
           <>
-            <label style={lbl}>Nombre del cliente</label>
-            <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={inp} />
-            <label style={lbl}>Dirección</label>
-            <input value={address} onChange={(e) => setAddress(e.target.value)} style={inp} />
+            <div style={{ margin: "10px 0" }}>
+              <label>Cliente: </label>
+              <input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Nombre del cliente" style={{ width: "100%" }} />
+            </div>
+            <div style={{ margin: "10px 0" }}>
+              <label>Dirección: </label>
+              <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Dirección de entrega" style={{ width: "100%" }} />
+            </div>
           </>
-        ) : (
-          <p style={{ fontSize: 13, color: "#8a7a63", margin: "10px 0" }}>No se necesita ningún dato — solo confirma para crear el pedido.</p>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
-          <button disabled={!valid} onClick={handleCreate} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: valid ? 1 : 0.5 }}>
-            Crear
-          </button>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+          <button onClick={onClose} style={{ padding: "8px 12px" }}>Cancelar</button>
+          <button disabled={!valid} onClick={() => {
+            if (type === "pickup") {
+              onCreate({ type: "pickup", customer: `Para llevar #${pickupCount + 1}`, phone: "", address: "" });
+            } else {
+              onCreate({ type: "delivery", customer, phone: "", address });
+            }
+          }} style={{ padding: "8px 12px", background: "#e94560", color: "#fff", border: "none", borderRadius: 6, cursor: valid ? "pointer" : "not-allowed", opacity: valid ? 1 : 0.5 }}>Crear</button>
         </div>
       </div>
     </div>
   );
 }
-
-function ClientesView({ salesLog }) {
-  const [expanded, setExpanded] = useState(null);
-
-  const customers = useMemo(() => {
-    const map = {};
-    salesLog.filter((s) => s.kind === "delivery" && s.ref).forEach((s) => {
-      const key = s.ref;
-      if (!map[key]) map[key] = { name: s.ref, orders: [], total: 0 };
-      map[key].orders.push(s);
-      map[key].total += s.total;
-    });
-    return Object.values(map).sort((a, b) => b.total - a.total);
-  }, [salesLog]);
-
-  return (
-    <div>
-      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Historial de Clientes</h2>
-      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
-        Agrupa automáticamente los pedidos de Delivery y Para llevar por nombre de cliente, con lo que ha comprado cada vez.
-      </p>
-
-      {customers.length === 0 && (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>👥</div>
-          <p>Aún no hay pedidos de delivery o para llevar registrados.</p>
-        </div>
-      )}
-
-      <div style={{ display: "grid", gap: 10 }}>
-        {customers.map((c) => {
-          const isOpen = expanded === c.name;
-          return (
-            <div key={c.name} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)" }}>
-              <button
-                onClick={() => setExpanded(isOpen ? null : c.name)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
-              >
-                <div style={{ width: 40, height: 40, borderRadius: "50%", background: avatarColor(c.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
-                  {initials(c.name)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{c.orders.length} pedido{c.orders.length !== 1 ? "s" : ""}</div>
-                </div>
-                <div style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(c.total)}</div>
-              </button>
-              {isOpen && (
-                <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
-                  {c.orders.slice().reverse().map((o) => (
-                    <div key={o.id} style={{ padding: "10px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700 }}>{new Date(o.time).toLocaleDateString("es-NI", { day: "numeric", month: "short", year: "numeric" })}</span>
-                        <span style={{ fontWeight: 800 }}>{money(o.total)}</span>
-                      </div>
-                      <ul style={{ margin: 0, paddingLeft: 16, color: "#8a7a63" }}>
-                        {o.items.map((it) => <li key={it.menuId}>{it.qty}x {it.name}</li>)}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PromoView({ promotions, onAdd, onDelete }) {
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  return (
-    <div>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Promociones</h2>
-      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0 }}>Agrega ofertas o combos temporales — aparecen en una pestaña extra al armar pedidos, sin tocar el menú fijo.</p>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        <input placeholder="Nombre de la promoción (ej: Combo Familiar)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 260 }} />
-        <input placeholder="Precio" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
-        <button
-          disabled={!name || !price}
-          onClick={() => { onAdd({ name, price: Number(price) }); setName(""); setPrice(""); }}
-          style={{ padding: "0 16px", border: "none", borderRadius: 6, background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name && price ? 1 : 0.5 }}
-        >
-          Agregar promoción
-        </button>
-      </div>
-
-      {promotions.length === 0 && <p style={{ color: "#8a7a63" }}>No hay promociones activas por ahora.</p>}
-      {promotions.map((p) => (
-        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", marginBottom: 8, background: "#fff", border: "1px solid #F0997B", borderRadius: 8 }}>
-          <span style={{ fontWeight: 700 }}>🏷️ {p.name}</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontWeight: 700, color: "#C1272D" }}>{money(p.price)}</span>
-            <button onClick={() => onDelete(p.id)} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer" }}><X size={18} /></button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MenuBoardView({ promotions }) {
-  return (
-    <div style={{ background: "#2B2118", borderRadius: 16, padding: "28px 24px", color: "#FFF8ED" }}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div style={{ fontSize: 40 }}>🍔🍗</div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: "#F2C879" }}>{RESTAURANT_NAME}</div>
-        <div style={{ fontSize: 13, color: "#C9BBA3", letterSpacing: 1 }}>MASATEPE · MASAYA · NICARAGUA</div>
-      </div>
-
-      {promotions && promotions.length > 0 && (
-        <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 12, padding: "14px 18px", marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 8, letterSpacing: 1 }}>🏷️ PROMOCIONES DE HOY</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
-            {promotions.map((p) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ fontWeight: 700, color: "#fff" }}>{p.name}</span>
-                <span style={{ fontWeight: 800, color: "#fff" }}>{money(p.price)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-        {CATS.map((cat) => (
-          <div key={cat}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#F2C879", borderBottom: "2px solid #F2C879", paddingBottom: 4, marginBottom: 8, letterSpacing: 0.5 }}>
-              {CAT_ICONS[cat]} {cat.toUpperCase()}
-            </div>
-            {MENU.filter((m) => m.cat === cat).map((m) => (
-              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 15 }}>
-                <span>{m.name}</span>
-                <span style={{ fontWeight: 700, color: "#F2C879" }}>{money(m.price)}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense }) {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-
-  const inRange = (isoTime) => {
-    const t = isoTime.slice(0, 10);
-    if (from && t < from) return false;
-    if (to && t > to) return false;
-    return true;
-  };
-
-  const filteredSales = salesLog.filter((s) => inRange(s.time)).slice().reverse();
-  const filteredExpenses = expensesLog.filter((e) => inRange(e.time)).slice().reverse();
-  const totalIncome = filteredSales.reduce((sum, s) => sum + s.total, 0);
-  const totalSpent = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-
-  return (
-    <div>
-      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🗄️ Historial permanente</h2>
-      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
-        Este registro nunca se borra, aunque uses los botones de "Borrar" en Reportes — queda como respaldo completo de todo lo vendido y gastado.
-      </p>
-
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
-        <label style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63" }}>Desde</label>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
-        <label style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63" }}>Hasta</label>
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
-        {(from || to) && (
-          <button onClick={() => { setFrom(""); setTo(""); }} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "6px 10px", cursor: "pointer", color: "#8a7a63" }}>Limpiar filtro</button>
-        )}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
-        <div style={statCard}><div style={statLabel}>Ingresos totales</div><div style={statValue}>{money(totalIncome)}</div></div>
-        <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(totalSpent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Neto</div><div style={statValue}>{money(totalIncome - totalSpent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Ventas registradas</div><div style={statValue}>{filteredSales.length}</div></div>
-      </div>
-
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Ventas</h3>
-      {filteredSales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin ventas en este rango.</p>}
-      {filteredSales.map((s) => (
-        <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <strong>{money(s.total)}</strong>
-              <button onClick={() => { if (window.confirm("¿Borrar esta venta del historial permanente?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(s.time).toLocaleString("es-NI")}</div>
-        </div>
-      ))}
-
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 20 }}>Gastos</h3>
-      {filteredExpenses.length === 0 && <p style={{ color: "#8a7a63" }}>Sin gastos en este rango.</p>}
-      {filteredExpenses.map((e) => (
-        <div key={e.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{e.description}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <strong style={{ color: "#C1272D" }}>-{money(e.amount)}</strong>
-              <button onClick={() => { if (window.confirm("¿Borrar este gasto del historial permanente?")) onDeleteExpense(e.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(e.time).toLocaleString("es-NI")}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const AVATAR_COLORS = ["#C1272D", "#2E7D32", "#E8A33D", "#1565C0", "#6A1B9A", "#00838F"];
-function avatarColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-function initials(name) {
-  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-}
-
-const ROLES = ["Cocinero/a", "Mesero/a", "Cajero/a", "Repartidor/a", "Personal"];
-const ROLE_ICONS = { "Cocinero/a": "👨‍🍳", "Mesero/a": "🧑‍🍽️", "Cajero/a": "💵", "Repartidor/a": "🛵", "Personal": "👤" };
-
-function printPayStub(employee, payment) {
-  const html = `
-    <html><head><title>Recibo de Pago</title><style>
-      body { font-family: 'Courier New', monospace; font-size: 13px; padding: 20px; color: #2B2118; }
-      h1 { font-size: 15px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
-      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ccc; }
-      .big { font-size: 20px; font-weight: bold; text-align: center; margin: 14px 0; background: #F2C879; padding: 10px; border-radius: 8px; }
-      hr { border: none; border-top: 2px dashed #333; margin: 12px 0; }
-      @page { margin: 12mm; }
-    </style></head><body>
-      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
-      <div class="sub">RECIBO DE PAGO · MASATEPE, MASAYA</div>
-      <hr/>
-      <div class="row"><span>Empleado</span><strong>${employee.name}</strong></div>
-      <div class="row"><span>Puesto</span><span>${employee.role || "Personal"}</span></div>
-      <div class="row"><span>Pago por día</span><span>${money(employee.dailyWage)}</span></div>
-      <div class="row"><span>Fecha de pago</span><span>${new Date(payment.time).toLocaleString("es-NI")}</span></div>
-      <div class="row"><span>Concepto</span><span>${payment.note || "Pago de días trabajados"}</span></div>
-      <div class="big">${money(payment.amount)}</div>
-      <hr/>
-      <div style="text-align:center;font-size:11px;margin-top:20px;">Firma del empleado: _____________________</div>
-      <div style="text-align:center;font-size:10px;color:#888;margin-top:20px;">Generado ${new Date().toLocaleString("es-NI")}</div>
-    </body></html>`;
-  const w = window.open("", "_blank", "width=360,height=560");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.print();
-}
-
-function printPayrollSummary(employees, payments, clockRecords) {
-  const monthKey = new Date().toISOString().slice(0, 7);
-  const rows = employees.map((emp) => {
-    const empPayments = payments.filter((p) => p.employeeName === emp.name);
-    const monthPaid = empPayments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((s, p) => s + p.amount, 0);
-    const empClock = clockRecords.filter((r) => r.employee === emp.name);
-    const lateCount = empClock.filter((r) => r.late).length;
-    const punctuality = empClock.length > 0 ? Math.round(((empClock.length - lateCount) / empClock.length) * 100) : 100;
-    return `<tr>
-      <td>${emp.name}</td>
-      <td>${emp.role || "Personal"}</td>
-      <td style="text-align:right">${money(emp.dailyWage)}</td>
-      <td style="text-align:center">${empClock.length}</td>
-      <td style="text-align:center">${punctuality}%</td>
-      <td style="text-align:right">${money(monthPaid)}</td>
-    </tr>`;
-  }).join("");
-  const totalMonth = employees.reduce((sum, emp) => sum + payments.filter((p) => p.employeeName === emp.name && p.time.slice(0, 7) === monthKey).reduce((s, p) => s + p.amount, 0), 0);
-
-  const html = `
-    <html><head><title>Reporte de Nómina</title><style>
-      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 18px; color: #2B2118; }
-      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      td, th { padding: 6px 4px; border-bottom: 1px solid #ddd; text-align: left; }
-      th { font-size: 10px; text-transform: uppercase; color: #555; }
-      .total td { border: none; font-weight: bold; font-size: 14px; padding-top: 12px; }
-      hr { border: none; border-top: 2px dashed #333; margin: 12px 0; }
-      @page { margin: 12mm; }
-    </style></head><body>
-      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
-      <div class="sub">REPORTE DE NÓMINA · ${new Date().toLocaleDateString("es-NI", { month: "long", year: "numeric" }).toUpperCase()}</div>
-      <hr/>
-      <table>
-        <tr><th>Empleado</th><th>Puesto</th><th style="text-align:right">Pago/día</th><th style="text-align:center">Entradas</th><th style="text-align:center">Puntualidad</th><th style="text-align:right">Pagado (mes)</th></tr>
-        ${rows}
-        <tr class="total"><td colspan="5">TOTAL NÓMINA DEL MES</td><td style="text-align:right">${money(totalMonth)}</td></tr>
-      </table>
-      <hr/>
-      <div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">Generado ${new Date().toLocaleString("es-NI")}</div>
-    </body></html>`;
-  const w = window.open("", "_blank", "width=420,height=650");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.print();
-}
-
-function AttendanceMini({ employeeName, clockRecords }) {
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dayStr = d.toDateString();
-    const rec = clockRecords.find((r) => r.employee === employeeName && new Date(r.time).toDateString() === dayStr);
-    days.push({ date: d, status: rec ? (rec.late ? "late" : "ontime") : "none" });
-  }
-  return (
-    <div style={{ marginTop: 10 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>📅 Asistencia (últimos 14 días)</div>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {days.map((d, i) => (
-          <div
-            key={i}
-            title={`${d.date.toLocaleDateString("es-NI")}: ${d.status === "ontime" ? "A tiempo" : d.status === "late" ? "Tarde" : "No marcó"}`}
-            style={{
-              width: 18, height: 18, borderRadius: 4,
-              background: d.status === "ontime" ? "#26A65B" : d.status === "late" ? "#E53935" : "#E5D9C3",
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function seniorityLabel(hireDate) {
-  if (!hireDate) return null;
-  const days = Math.floor((Date.now() - new Date(hireDate).getTime()) / 86400000);
-  if (days < 30) return `${days} día${days !== 1 ? "s" : ""}`;
-  if (days < 365) return `${Math.floor(days / 30)} mes${Math.floor(days / 30) !== 1 ? "es" : ""}`;
-  const years = Math.floor(days / 365);
-  const months = Math.floor((days % 365) / 30);
-  return `${years} año${years !== 1 ? "s" : ""}${months ? ` ${months} mes${months !== 1 ? "es" : ""}` : ""}`;
-}
-
-function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment, onToggleActive }) {
-  const [name, setName] = useState("");
-  const [wage, setWage] = useState("");
-  const [role, setRole] = useState(ROLES[0]);
-  const [phone, setPhone] = useState("");
-  const [search, setSearch] = useState("");
-  const [showInactive, setShowInactive] = useState(false);
-  const [selected, setSelected] = useState("");
-  const [expanded, setExpanded] = useState(null);
-  const [payNote, setPayNote] = useState({});
-  const today = todayStr();
-  const monthKey = new Date().toISOString().slice(0, 7);
-  const todayRecords = clockRecords.filter((r) => new Date(r.time).toDateString() === today).slice().reverse();
-
-  const monthPayroll = payments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((sum, p) => sum + p.amount, 0);
-
-  function employeeStats(emp) {
-    const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().sort((a, b) => new Date(a.time) - new Date(b.time));
-    const lastPayment = empPayments[empPayments.length - 1];
-    const cutoff = lastPayment ? new Date(lastPayment.time) : null;
-    const empClockAll = clockRecords.filter((r) => r.employee === emp.name);
-    const pendingDays = cutoff ? empClockAll.filter((r) => new Date(r.time) > cutoff).length : empClockAll.length;
-    const owed = pendingDays * (emp.dailyWage || 0);
-    const lateCount = empClockAll.filter((r) => r.late).length;
-    const punctuality = empClockAll.length > 0 ? Math.round(((empClockAll.length - lateCount) / empClockAll.length) * 100) : 100;
-    return { empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed, totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount, totalDays: empClockAll.length, punctuality };
-  }
-
-  const activeEmployees = employees.filter((e) => e.active !== false);
-  const inactiveEmployees = employees.filter((e) => e.active === false);
-  const totalOwedAll = activeEmployees.reduce((sum, emp) => sum + employeeStats(emp).owed, 0);
-  const visibleEmployees = (showInactive ? employees : activeEmployees).filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
-
-  return (
-    <div>
-      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal y Nómina</h2>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <p style={{ fontSize: 12, color: "#8a7a63", margin: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
-        {employees.length > 0 && (
-          <button onClick={() => printPayrollSummary(employees, payments, clockRecords)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>
-            <Printer size={13} /> Imprimir nómina del mes
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, margin: "14px 0 20px" }}>
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ color: "#F2C879", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>💰 PAGADO ESTE MES</div>
-          <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(monthPayroll)}</div>
-        </div>
-        <div style={{ background: totalOwedAll > 0 ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "linear-gradient(135deg, #26A65B, #158A4A)", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ color: "#fff", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>⏳ PENDIENTE DE PAGAR</div>
-          <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(totalOwedAll)}</div>
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ color: "#8a7a63", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>👥 EQUIPO ACTIVO</div>
-          <div style={{ color: "#2B2118", fontWeight: 800, fontSize: 22 }}>{employees.length}</div>
-        </div>
-      </div>
-
-      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 24 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>➕ Agregar nuevo empleado</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-          {ROLES.map((r) => (
-            <button key={r} onClick={() => setRole(r)} style={{ padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: role === r ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: role === r ? "#fff" : "#5a4c3a" }}>
-              {ROLE_ICONS[r]} {r}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input placeholder="Nombre del empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 180 }} />
-          <input placeholder="Teléfono (opcional)" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
-          <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...inp, maxWidth: 140 }} />
-          <button onClick={() => { onAdd(name, wage, role, phone); setName(""); setWage(""); setPhone(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>Agregar</button>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        <input placeholder="🔍 Buscar empleado..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
-        {inactiveEmployees.length > 0 && (
-          <button onClick={() => setShowInactive((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 12px", cursor: "pointer", color: "#8a7a63", fontWeight: 700 }}>
-            {showInactive ? "Ocultar" : "Ver"} inactivos ({inactiveEmployees.length})
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-        <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ ...inp, maxWidth: 220 }}>
-          <option value="">Selecciona un empleado</option>
-          {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
-        </select>
-        <button
-          disabled={!selected}
-          onClick={() => onClockIn(selected)}
-          style={{ padding: "10px 16px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: selected ? 1 : 0.5 }}
-        >
-          Marcar entrada
-        </button>
-      </div>
-
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginBottom: 10 }}>Equipo</h3>
-      {visibleEmployees.length === 0 && <p style={{ color: "#8a7a63" }}>No se encontraron empleados.</p>}
-      <div style={{ display: "grid", gap: 10 }}>
-        {visibleEmployees.map((emp) => {
-          const st = employeeStats(emp);
-          const isOpen = expanded === emp.id;
-          const key = emp.id;
-          const isInactive = emp.active === false;
-          return (
-            <div key={emp.id} style={{ background: isInactive ? "#F5F0E8" : "#fff", border: st.owed > 0 && !isInactive ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)", opacity: isInactive ? 0.7 : 1 }}>
-              <button
-                onClick={() => setExpanded(isOpen ? null : emp.id)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
-              >
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: avatarColor(emp.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, flexShrink: 0 }}>
-                  {initials(emp.name)}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: "#F3ECE0", color: "#5a4c3a", padding: "2px 8px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
-                    {isInactive && <span style={{ fontSize: 10, fontWeight: 700, background: "#FCE8E8", color: "#C1272D", padding: "2px 8px", borderRadius: 20 }}>Inactivo</span>}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 2 }}>
-                    {money(emp.dailyWage)}/día · {st.totalDays} entradas ·
-                    <span style={{ color: st.punctuality >= 90 ? "#2E7D32" : st.punctuality >= 70 ? "#C99A1E" : "#C1272D", fontWeight: 700 }}> {st.punctuality}% puntual</span>
-                    {emp.hireDate && <span> · Antigüedad: {seniorityLabel(emp.hireDate)}</span>}
-                  </div>
-                  {emp.phone && <div style={{ fontSize: 11, color: "#8a7a63" }}>📞 {emp.phone}</div>}
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  {st.owed > 0 ? (
-                    <>
-                      <div style={{ fontWeight: 800, color: "#C1272D", fontSize: 16 }}>{money(st.owed)}</div>
-                      <div style={{ fontSize: 10, color: "#C1531F", fontWeight: 700 }}>se le debe · {st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</div>
-                    </>
-                  ) : (
-                    <>
-                      <div style={{ fontWeight: 800, color: "#2E7D32", fontSize: 15 }}>Al día ✅</div>
-                      <div style={{ fontSize: 10, color: "#8a7a63" }}>{money(st.totalPaid)} pagado total</div>
-                    </>
-                  )}
-                </div>
-              </button>
-              {isOpen && (
-                <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
-                  <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
-                  <button
-                    onClick={() => onToggleActive(emp.id)}
-                    style={{ marginTop: 10, fontSize: 12, background: "none", border: `1px solid ${isInactive ? "#2E7D32" : "#C1272D"}`, color: isInactive ? "#2E7D32" : "#C1272D", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
-                  >
-                    {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
-                  </button>
-                  {st.owed > 0 && (
-                    <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                      <div style={{ fontSize: 12 }}>
-                        <strong>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
-                        {st.lastPayment && <div style={{ color: "#8a7a63" }}>Último pago: {new Date(st.lastPayment.time).toLocaleDateString("es-NI")}</div>}
-                      </div>
-                      <button
-                        onClick={() => onAddPayment(emp.name, st.owed, payNote[key] || "Pago de días trabajados")}
-                        style={{ padding: "10px 18px", border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13 }}
-                      >
-                        💵 Pagar {money(st.owed)}
-                      </button>
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                    <input placeholder="Nota (ej: adelanto, bono)" value={payNote[key] || ""} onChange={(e) => setPayNote((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 180 }} />
-                    <PayCustomButton onPay={(amt) => onAddPayment(emp.name, amt, payNote[key] || "")} />
-                  </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
-                  {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
-                  {st.empPayments.map((p) => (
-                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
-                        <div style={{ fontSize: 10, color: "#C9BBA3" }}>{new Date(p.time).toLocaleString("es-NI")}</div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button onClick={() => printPayStub(emp, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
-                        <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 24 }}>Entradas de hoy</h3>
-      {todayRecords.length === 0 && <p style={{ color: "#8a7a63" }}>Nadie ha marcado entrada todavía hoy.</p>}
-      {todayRecords.map((r) => (
-        <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 14 }}>
-          <span>{r.employee}</span>
-          <span>{new Date(r.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</span>
-          {r.late ? (
-            <span style={{ color: "#791F1F", background: "#FCEBEB", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>Tarde ({r.minsLate} min)</span>
-          ) : (
-            <span style={{ color: "#3B6D11", background: "#EAF3DE", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>A tiempo</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PayCustomButton({ onPay }) {
-  const [amt, setAmt] = useState("");
-  return (
-    <>
-      <input placeholder="Monto libre" type="number" value={amt} onChange={(e) => setAmt(e.target.value)} style={{ ...inp, maxWidth: 110 }} />
-      <button
-        disabled={!amt}
-        onClick={() => { onPay(Number(amt)); setAmt(""); }}
-        style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#F2C879", fontWeight: 700, cursor: "pointer", opacity: amt ? 1 : 0.5 }}
-      >
-        Registrar
-      </button>
-    </>
-  );
-}
-
-const lbl = { display: "block", fontSize: 12, fontWeight: 700, marginTop: 10, marginBottom: 4 };
-const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 14, boxSizing: "border-box" };
-
-function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insumos, payroll, realProfit) {
-  const daySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
-  const dayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
-  const rows = daySales.map((s) => `<tr><td>#${String(s.folio || s.id).padStart(5, "0")}</td><td>${s.ref}</td><td>${s.method}</td><td style="text-align:right">${money(s.total)}</td></tr>`).join("");
-  const expRows = dayExpenses.map((e) => `<tr><td colspan="3">${(e.category || "Otro") === "Insumos" ? "🍗" : "🧾"} ${e.description}</td><td style="text-align:right">-${money(e.amount)}</td></tr>`).join("");
-  const html = `
-    <html><head><title>Reporte del Día</title><style>
-      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 18px; color: #2B2118; }
-      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      td, th { padding: 4px 2px; border-bottom: 1px dashed #ccc; text-align: left; }
-      .totals td { border: none; font-weight: bold; }
-      .big { font-size: 16px; background: #F2C879; padding: 10px; border-radius: 8px; text-align: center; margin: 12px 0; }
-      hr { border: none; border-top: 2px dashed #333; margin: 10px 0; }
-      @page { margin: 10mm; }
-    </style></head><body>
-      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
-      <div class="sub">REPORTE DIARIO · ${dateLabel.toUpperCase()}</div>
-      <hr/>
-      <table><tr><th>Ticket</th><th>Ref</th><th>Pago</th><th style="text-align:right">Total</th></tr>
-      ${rows || '<tr><td colspan="4">Sin ventas</td></tr>'}</table>
-      <hr/>
-      <table class="totals">
-        <tr><td>Ingresos</td><td colspan="2"></td><td style="text-align:right">${money(income)}</td></tr>
-        <tr><td>Insumos</td><td colspan="2"></td><td style="text-align:right">-${money(insumos)}</td></tr>
-        <tr><td>Otros gastos</td><td colspan="2"></td><td style="text-align:right">-${money(spent - insumos)}</td></tr>
-        <tr><td>Nómina pagada</td><td colspan="2"></td><td style="text-align:right">-${money(payroll)}</td></tr>
-      </table>
-      <div class="big">GANANCIA NETA REAL: ${money(realProfit)}</div>
-      ${dayExpenses.length ? `<hr/><div style="font-weight:bold;">Gastos del día</div><table>${expRows}</table>` : ""}
-      <hr/>
-      <div style="text-align:center;font-size:10px;color:#888;">Generado ${new Date().toLocaleString("es-NI")}</div>
-    </body></html>`;
-  const w = window.open("", "_blank", "width=400,height=650");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.print();
-}
-
-function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    const tz = d.getTimezoneOffset() * 60000;
-    return new Date(d - tz).toISOString().slice(0, 10);
-  });
-
-  const dayStr = new Date(selectedDate + "T12:00:00").toDateString();
-  const isToday = dayStr === todayStr();
-
-  const todaySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
-  const todayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
-  const todayPayments = (payments || []).filter((p) => new Date(p.time).toDateString() === dayStr);
-  const income = todaySales.reduce((sum, s) => sum + s.total, 0);
-  const spent = todayExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const insumos = todayExpenses.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
-  const otrosGastos = spent - insumos;
-  const payroll = todayPayments.reduce((sum, p) => sum + p.amount, 0);
-  const net = income - spent;
-  const realProfit = income - spent - payroll;
-  const foodCostPct = income > 0 ? Math.round((insumos / income) * 100) : 0;
-  const count = todaySales.length;
-  const lateToday = clockRecords.filter((r) => new Date(r.time).toDateString() === dayStr && r.late).length;
-
-  const monthKey = selectedDate.slice(0, 7);
-  const monthSales = sales.filter((s) => s.time.slice(0, 7) === monthKey);
-  const monthExpenses = expenses.filter((e) => e.time.slice(0, 7) === monthKey);
-  const monthPayments = (payments || []).filter((p) => p.time.slice(0, 7) === monthKey);
-  const monthIncome = monthSales.reduce((sum, s) => sum + s.total, 0);
-  const monthSpent = monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const monthInsumos = monthExpenses.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
-  const monthPayroll = monthPayments.reduce((sum, p) => sum + p.amount, 0);
-  const monthNet = monthIncome - monthSpent;
-  const monthRealProfit = monthIncome - monthSpent - monthPayroll;
-  const monthFoodCostPct = monthIncome > 0 ? Math.round((monthInsumos / monthIncome) * 100) : 0;
-  const [yy, mm] = monthKey.split("-");
-  const monthLabel = new Date(Number(yy), Number(mm) - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
-
-  const prevMonthDate = new Date(Number(yy), Number(mm) - 2, 1);
-  const prevMonthKey = prevMonthDate.toISOString().slice(0, 7);
-  const prevMonthIncome = sales.filter((s) => s.time.slice(0, 7) === prevMonthKey).reduce((sum, s) => sum + s.total, 0);
-  const monthChangePct = prevMonthIncome > 0 ? Math.round(((monthIncome - prevMonthIncome) / prevMonthIncome) * 100) : null;
-
-  const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const avgTicket = count > 0 ? income / count : 0;
-  const hourlyMap = {};
-  todaySales.forEach((s) => {
-    const h = new Date(s.time).getHours();
-    hourlyMap[h] = (hourlyMap[h] || 0) + s.total;
-  });
-  const peakHourEntry = Object.entries(hourlyMap).sort((a, b) => b[1] - a[1])[0];
-  const peakHourLabel = peakHourEntry ? `${peakHourEntry[0]}:00 - ${Number(peakHourEntry[0]) + 1}:00` : null;
-
-  function exportCSV() {
-    const header = "Ticket,Referencia,Metodo,Subtotal,Descuento,Total,Hora\n";
-    const rows = todaySales.map((s) => `${s.folio || s.id},"${s.ref}",${s.method},${s.subtotal || s.total},${s.discountAmount || 0},${s.total},${new Date(s.time).toLocaleTimeString("es-NI")}`).join("\n");
-    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `ventas_${selectedDate}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("Insumos");
-
-  const byItem = useMemo(() => {
-    const map = {};
-    todaySales.forEach((s) => s.items.forEach((it) => { map[it.name] = (map[it.name] || 0) + it.qty; }));
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, [todaySales]);
-  const maxItemQty = byItem.length > 0 ? byItem[0][1] : 1;
-
-  const last7Days = useMemo(() => {
-    const arr = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const ds = d.toDateString();
-      const total = sales.filter((s) => new Date(s.time).toDateString() === ds).reduce((sum, s) => sum + s.total, 0);
-      arr.push({ label: d.toLocaleDateString("es-NI", { weekday: "short" }), total });
-    }
-    return arr;
-  }, [sales]);
-  const max7 = Math.max(1, ...last7Days.map((d) => d.total));
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{isToday ? "Reporte de hoy" : "Reporte del día seleccionado"}</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
-          <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63" }}>
-            <Printer size={15} />
-          </button>
-          {todaySales.length > 0 && (
-            <button onClick={exportCSV} title="Exportar a Excel/CSV" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63", fontSize: 15 }}>
-              📥
-            </button>
-          )}
-        </div>
-      </div>
-      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 12 }}>
-        Viendo: {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-      </p>
-
-      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 10 }}>📈 Tendencia de ventas — últimos 7 días</div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
-          {last7Days.map((d, i) => (
-            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div style={{ fontSize: 9, color: "#8a7a63" }}>{d.total > 0 ? money(d.total).replace("C$", "") : ""}</div>
-              <div style={{ width: "100%", height: Math.max(4, (d.total / max7) * 60), background: "linear-gradient(180deg, #E8A33D, #C1272D)", borderRadius: 4 }} />
-              <div style={{ fontSize: 10, color: "#8a7a63", textTransform: "capitalize" }}>{d.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#fff" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL (hoy)</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
-          <div><div style={{ color: "#C9BBA3" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(income)}</div></div>
-          <div><div style={{ color: "#C9BBA3" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(insumos)}</div></div>
-          <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(otrosGastos)}</div></div>
-          <div><div style={{ color: "#C9BBA3" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(payroll)}</div></div>
-        </div>
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, fontWeight: 700 }}>= Te queda realmente</span>
-          <span style={{ fontSize: 22, fontWeight: 800, color: realProfit >= 0 ? "#00E676" : "#FF5252" }}>{money(realProfit)}</span>
-        </div>
-        {income > 0 && <div style={{ fontSize: 11, color: "#C9BBA3", marginTop: 8 }}>🍗 Costo de insumos: {foodCostPct}% de las ventas {foodCostPct > 35 ? "⚠️ (alto, ideal 30-35%)" : "✅"}</div>}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <div style={statCard}><div style={statLabel}>Ingresos</div><div style={statValue}>{money(income)}</div></div>
-        <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Neto (sin nómina)</div><div style={statValue}>{money(net)}</div></div>
-        <div style={statCard}><div style={statLabel}>Pedidos cerrados</div><div style={statValue}>{count}</div></div>
-        <div style={statCard}><div style={statLabel}>Ticket promedio</div><div style={statValue}>{money(avgTicket)}</div></div>
-        <div style={statCard}><div style={statLabel}>Hora pico</div><div style={{ ...statValue, fontSize: 16 }}>{peakHourLabel || "—"}</div></div>
-        <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
-      </div>
-
-      {income > 0 && (
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 10 }}>💳 Método de pago (hoy)</div>
-          <div style={{ display: "flex", gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                <span>💵 Efectivo</span><span style={{ fontWeight: 700 }}>{money(cashToday)}</span>
-              </div>
-              <div style={{ background: "#F0E8D8", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                <div style={{ width: `${income > 0 ? (cashToday / income) * 100 : 0}%`, height: "100%", background: "#26A65B", borderRadius: 6 }} />
-              </div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
-                <span>💳 Tarjeta</span><span style={{ fontWeight: 700 }}>{money(cardToday)}</span>
-              </div>
-              <div style={{ background: "#F0E8D8", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                <div style={{ width: `${income > 0 ? (cardToday / income) * 100 : 0}%`, height: "100%", background: "#1565C0", borderRadius: 6 }} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Balance del mes — {monthLabel}</h3>
-        {(monthSales.length > 0 || monthExpenses.length > 0) && (
-          <button
-            onClick={() => { if (window.confirm(`¿Borrar TODAS las ventas y gastos de ${monthLabel}? Esto no se puede deshacer.`)) onClearMonth(monthKey); }}
-            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
-          >
-            Borrar mes completo
-          </button>
-        )}
-      </div>
-      {monthChangePct !== null && (
-        <div style={{ fontSize: 12, margin: "6px 0 10px", color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D", fontWeight: 700 }}>
-          {monthChangePct >= 0 ? "📈" : "📉"} {monthChangePct >= 0 ? "+" : ""}{monthChangePct}% vs. mes anterior ({money(prevMonthIncome)})
-        </div>
-      )}
-      <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, margin: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontSize: 12, color: "#5a4c3a" }}>💎 Ganancia neta real del mes (ventas − insumos − otros gastos − nómina){monthIncome > 0 ? ` · costo insumos: ${monthFoodCostPct}%` : ""}</div>
-        <div style={{ fontWeight: 800, fontSize: 20, color: monthRealProfit >= 0 ? "#2E7D32" : "#C1272D" }}>{money(monthRealProfit)}</div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
-        <div style={statCard}><div style={statLabel}>Insumos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthInsumos)}</div></div>
-        <div style={statCard}><div style={statLabel}>Nómina del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthPayroll)}</div></div>
-        <div style={statCard}><div style={statLabel}>Ventas del mes</div><div style={statValue}>{monthSales.length}</div></div>
-      </div>
-
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Registrar gasto</h3>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        {["Insumos", "Otro"].map((c) => (
-          <button
-            key={c}
-            onClick={() => setCategory(c)}
-            style={{
-              padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
-              background: category === c ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
-              color: category === c ? "#fff" : "#5a4c3a",
-            }}
-          >
-            {c === "Insumos" ? "🍗 Insumos" : "🧾 Otro gasto"}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        <input placeholder="Descripción (ej: pollo, gas)" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
-        <input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
-        <button
-          disabled={!desc || !amount}
-          onClick={() => { onAddExpense({ description: desc, amount: Number(amount), category }); setDesc(""); setAmount(""); }}
-          style={{ padding: "0 16px", border: "none", borderRadius: 6, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: desc && amount ? 1 : 0.5 }}
-        >
-          Agregar gasto
-        </button>
-      </div>
-      {todayExpenses.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          {todayExpenses.slice().reverse().map((e) => (
-            <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-              <span>{(e.category || "Otro") === "Insumos" ? "🍗" : "🧾"} {e.description}</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 700, color: "#C1272D" }}>-{money(e.amount)}</span>
-                <button onClick={() => onDeleteExpense(e.id)} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Productos más vendidos</h3>
-      {byItem.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no hay ventas registradas ese día.</p>}
-      {byItem.map(([name, qty]) => (
-        <div key={name} style={{ marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
-            <span>{name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
-          </div>
-          <div style={{ background: "#F0E8D8", borderRadius: 6, height: 8, overflow: "hidden" }}>
-            <div style={{ width: `${(qty / maxItemQty) * 100}%`, height: "100%", background: "linear-gradient(90deg, #E8A33D, #C1272D)", borderRadius: 6 }} />
-          </div>
-        </div>
-      ))}
-
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
-        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Historial de cobros</h3>
-        {(todaySales.length > 0 || todayExpenses.length > 0) && (
-          <button
-            onClick={() => { if (window.confirm("¿Borrar todas las ventas y gastos de este día? Esto no se puede deshacer.")) onClearDay(dayStr); }}
-            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
-          >
-            Borrar día completo
-          </button>
-        )}
-      </div>
-      {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
-      {todaySales.slice().reverse().map((s) => (
-        <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid #E5D9C3" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-            <span style={{ fontWeight: 700 }}>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontWeight: 700 }}>{money(s.total)}</span>
-              <button onClick={() => { if (window.confirm("¿Borrar esta venta?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
-            </div>
-          </div>
-          <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 4, paddingLeft: 4 }}>
-            {s.items.map((it) => `${it.qty} ${it.name}`).join(" · ")}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const statCard = { background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: 14 };
-const statLabel = { fontSize: 12, color: "#8a7a63", marginBottom: 4 };
-const statValue = { fontSize: 22, fontWeight: 800 };
 
 function ReceiptModal({ sale, onClose }) {
-  const date = new Date(sale.time);
   const [contact, setContact] = useState(sale.phone || "");
+  const subtotal = sale.subtotal || sale.total;
+  const discount = sale.discount;
+  const total = sale.total;
+  const tip = sale.tip || 0;
+  const final = total + tip;
+  const change = sale.cashGiven ? sale.cashGiven - final : 0;
+  const message = `🧾 *Recibo - ${sale.ref}*
+\n${sale.items.map((it) => `• ${it.name} x${it.qty} - ${money(it.qty * it.price)}`).join("\n")}
+\nSubtotal: ${money(subtotal)}
+${discount ? `Descuento: ${money(subtotal - total)}` : ""}
+Total: ${money(total)}
+${tip ? `Propina: ${money(tip)}` : ""}
+${sale.cashGiven ? `Paga con: ${money(sale.cashGiven)}` : ""}
+${sale.cashGiven ? `Vuelto: ${money(change)}` : ""}
+*Total a pagar: ${money(final)}*
+\nMétodo: ${sale.method}
+Fecha: ${timeStr(sale.time)}
+`;
 
-  const receiptText = [
-    RESTAURANT_NAME,
-    date.toLocaleString("es-NI"),
-    sale.ref,
-    "",
-    ...sale.items.map((it) => `${it.qty}x ${it.name} - ${money(it.price * it.qty)}`),
-    "",
-    ...(sale.discountAmount > 0 ? [`Subtotal: ${money(sale.subtotal)}`, `Descuento (${sale.discountLabel}): -${money(sale.discountAmount)}`] : []),
-    `Total: ${money(sale.total)}`,
-    `Pago: ${sale.method}`,
-    "",
-    "¡Gracias por su compra!",
-  ].join("\n");
-
-  function sendWhatsapp() {
-    const digits = contact.replace(/[^0-9]/g, "");
-    const url = digits
-      ? `https://wa.me/${digits}?text=${encodeURIComponent(receiptText)}`
-      : `https://api.whatsapp.com/send?text=${encodeURIComponent(receiptText)}`;
+  function sendWhatsApp() {
+    if (!contact) return alert("Ingresa un número de teléfono");
+    const clean = contact.replace(/\D/g, "");
+    const url = `https://wa.me/${clean}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
   }
+
   function sendEmail() {
-    const url = `mailto:${contact.includes("@") ? contact : ""}?subject=${encodeURIComponent("Recibo - " + RESTAURANT_NAME)}&body=${encodeURIComponent(receiptText)}`;
-    window.open(url, "_blank");
+    if (!contact) return alert("Ingresa un correo electrónico");
+    const subject = encodeURIComponent(`Recibo - ${sale.ref}`);
+    const body = encodeURIComponent(message);
+    window.location.href = `mailto:${contact}?subject=${subject}&body=${body}`;
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 60, padding: 16 }}>
-      <div style={{ background: "#fff", borderRadius: 12, width: "100%", maxWidth: 320, overflow: "hidden" }}>
-        <div id="printable-receipt" style={{ padding: 0, fontFamily: "'Courier New', monospace", fontSize: 13, background: "#fff" }}>
-          <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", padding: "18px 16px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: 26, marginBottom: 2 }}>🍔🍗</div>
-            <div style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: 0.5, textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>{RESTAURANT_NAME}</div>
-            <div style={{ color: "#FFF3E0", fontSize: 10, marginTop: 3, letterSpacing: 0.5 }}>MASATEPE · MASAYA · NICARAGUA</div>
-            {sale.folio && <div style={{ color: "#fff", fontSize: 11, marginTop: 6, fontWeight: 800, background: "rgba(0,0,0,0.2)", display: "inline-block", padding: "2px 12px", borderRadius: 20 }}>TICKET #{String(sale.folio).padStart(5, "0")}</div>}
-          </div>
-          <div style={{ padding: "14px 16px 0" }}>
-            <div style={{ textAlign: "center", fontSize: 11, color: "#666", marginBottom: 10 }}>{date.toLocaleString("es-NI", { dateStyle: "long", timeStyle: "short" })}</div>
-            <div style={{ borderTop: "2px dashed #E5D9C3", margin: "6px 0 10px" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontWeight: 800, fontSize: 14 }}>{sale.ref}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: sale.kind === "delivery" ? "#2E7D32" : "#C1531F", padding: "3px 8px", borderRadius: 20 }}>
-                {sale.kind === "delivery" ? "🛵 DELIVERY" : "🍽️ MESA"}
-              </span>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", padding: 20, borderRadius: 12, maxWidth: 400, width: "90%" }}>
+        <h3>🧾 Recibo</h3>
+        <div style={{ margin: "8px 0", fontWeight: 700 }}>{sale.ref}</div>
+        <div style={{ margin: "8px 0", fontSize: 12, color: "#888" }}>{timeStr(sale.time)}</div>
+        <div style={{ margin: "8px 0" }}>
+          {sale.items.map((it) => (
+            <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+              <span>{it.name} x{it.qty}</span>
+              <span>{money(it.qty * it.price)}</span>
             </div>
-            <div style={{ display: "flex", fontSize: 10, color: "#8a7a63", fontWeight: 800, marginBottom: 6, borderBottom: "1px solid #EEE", paddingBottom: 4 }}>
-              <span style={{ flex: 1 }}>PRODUCTO</span>
-              <span style={{ width: 30, textAlign: "center" }}>CANT</span>
-              <span style={{ width: 65, textAlign: "right" }}>SUBTOTAL</span>
+          ))}
+        </div>
+        <div style={{ borderTop: "1px solid #eee", margin: "8px 0", paddingTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}><span>Subtotal</span><span>{money(subtotal)}</span></div>
+          {discount && <div style={{ display: "flex", justifyContent: "space-between", color: "green" }}><span>Descuento</span><span>-{money(subtotal - total)}</span></div>}
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700 }}><span>Total</span><span>{money(total)}</span></div>
+          {tip > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>Propina</span><span>{money(tip)}</span></div>}
+          {sale.cashGiven > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>Paga con</span><span>{money(sale.cashGiven)}</span></div>}
+          {sale.cashGiven > 0 && <div style={{ display: "flex", justifyContent: "space-between", color: "#4ecdc4" }}><span>Vuelto</span><span>{money(change)}</span></div>}
+          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 18, color: "#e94560" }}><span>Total a pagar</span><span>{money(final)}</span></div>
+        </div>
+        <div style={{ margin: "8px 0" }}>Método: {sale.method}</div>
+        <div style={{ margin: "8px 0" }}>
+          <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Teléfono o email" style={{ width: "100%", padding: 6 }} />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button onClick={sendWhatsApp} style={{ flex: 1, padding: "8px 12px", background: "#25d366", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>WhatsApp</button>
+          <button onClick={sendEmail} style={{ flex: 1, padding: "8px 12px", background: "#ea4335", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Email</button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+          <button onClick={onClose} style={{ padding: "8px 12px" }}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportesView({ sales, expenses }) {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const date = new Date(selectedDate + "T12:00:00");
+  const monthKey = selectedDate.slice(0, 7);
+  const daySales = sales.filter((s) => s.time && s.time.startsWith(selectedDate));
+  const dayExpenses = expenses.filter((e) => e.time && e.time.startsWith(selectedDate));
+  const monthSales = sales.filter((s) => s.time && s.time.startsWith(monthKey));
+  const monthExpenses = expenses.filter((e) => e.time && e.time.startsWith(monthKey));
+  const totalSales = daySales.reduce((sum, s) => sum + s.total, 0);
+  const totalExpenses = dayExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const monthIncome = monthSales.reduce((sum, s) => sum + s.total, 0) - monthExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const prevMonthKey = new Date(date.getFullYear(), date.getMonth() - 1, 1).toISOString().slice(0, 7);
+  const prevMonthIncome = sales.filter((s) => s.time && s.time.startsWith(prevMonthKey)).reduce((sum, s) => sum + s.total, 0) - expenses.filter((e) => e.time && e.time.startsWith(prevMonthKey)).reduce((sum, e) => sum + e.amount, 0);
+  const monthChangePct = prevMonthIncome ? Math.round(((monthIncome - prevMonthIncome) / prevMonthIncome) * 100) : null;
+  const byMethod = {};
+  daySales.forEach((s) => { byMethod[s.method] = (byMethod[s.method] || 0) + s.total; });
+  const byCategory = {};
+  daySales.forEach((s) => { s.items.forEach((it) => { byCategory[it.name] = (byCategory[it.name] || 0) + it.qty * it.price; }); });
+  const topItems = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  return (
+    <div>
+      <h2>📊 Reportes</h2>
+      <div style={{ marginBottom: 12 }}>
+        <label>Fecha: </label>
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#888" }}>Ventas del día</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#4ecdc4" }}>{money(totalSales)}</div>
+        </div>
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#888" }}>Gastos del día</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#e94560" }}>{money(totalExpenses)}</div>
+        </div>
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#888" }}>Balance del día</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: totalSales - totalExpenses >= 0 ? "#4ecdc4" : "#e94560" }}>{money(totalSales - totalExpenses)}</div>
+        </div>
+        <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
+          <div style={{ fontSize: 12, color: "#888" }}>Ventas del mes</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: "#4ecdc4" }}>{money(monthIncome)}</div>
+          {monthChangePct !== null && <div style={{ fontSize: 12, color: monthChangePct >= 0 ? "green" : "red" }}>{monthChangePct >= 0 ? "▲" : "▼"} {Math.abs(monthChangePct)}% vs mes anterior</div>}
+        </div>
+      </div>
+      <h3>💳 Por Método de Pago</h3>
+      {Object.keys(byMethod).length === 0 ? <div style={{ color: "#888" }}>Sin datos</div> : (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          {Object.entries(byMethod).map(([m, v]) => (
+            <div key={m} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, minWidth: 120 }}>
+              <div style={{ fontSize: 12, color: "#888", textTransform: "capitalize" }}>{m}</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{money(v)}</div>
             </div>
-            {sale.items.map((it) => (
-              <div key={it.menuId} style={{ marginBottom: 6 }}>
-                <div style={{ display: "flex" }}>
-                  <span style={{ flex: 1, fontWeight: 600 }}>{it.name}</span>
-                  <span style={{ width: 30, textAlign: "center" }}>{it.qty}</span>
-                  <span style={{ width: 65, textAlign: "right", fontWeight: 700 }}>{money(it.price * it.qty)}</span>
-                </div>
-                {it.notes && <div style={{ fontSize: 10, color: "#C1531F", fontStyle: "italic" }}>↳ {it.notes}</div>}
-              </div>
+          ))}
+        </div>
+      )}
+      <h3>🔥 Productos más vendidos</h3>
+      {topItems.length === 0 ? <div style={{ color: "#888" }}>Sin datos</div> : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ background: "#f0f0f0" }}><th>Producto</th><th style={{ textAlign: "right" }}>Monto</th></tr></thead>
+          <tbody>
+            {topItems.map(([name, v]) => (
+              <tr key={name} style={{ borderBottom: "1px solid #eee" }}><td>{name}</td><td style={{ textAlign: "right" }}>{money(v)}</td></tr>
             ))}
-            <div style={{ borderTop: "1px dashed #E5D9C3", margin: "10px 0 8px" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63" }}>
-              <span>Subtotal</span><span>{money(sale.subtotal || sale.total)}</span>
+          </tbody>
+        </table>
+      )}
+      <h3>📝 Detalle de Ventas</h3>
+      {daySales.length === 0 ? <div style={{ color: "#888" }}>Sin ventas</div> : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ background: "#f0f0f0" }}><th>Hora</th><th>Ref</th><th>Consumo</th><th>Método</th><th style={{ textAlign: "right" }}>Total</th></tr></thead>
+          <tbody>
+            {daySales.map((s) => (
+              <tr key={s.id} style={{ borderBottom: "1px solid #eee" }}>
+                <td style={{ verticalAlign: "top", whiteSpace: "nowrap" }}>{new Date(s.time).toLocaleTimeString()}</td>
+                <td style={{ verticalAlign: "top" }}>{s.ref}</td>
+                <td style={{ verticalAlign: "top" }}>
+                  {s.items.map((it) => (
+                    <div key={it.menuId} style={{ fontSize: 12 }}>• {it.name} x{it.qty}</div>
+                  ))}
+                </td>
+                <td style={{ verticalAlign: "top" }}>{s.method}</td>
+                <td style={{ textAlign: "right", verticalAlign: "top", fontWeight: 700 }}>{money(s.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <h3>💸 Detalle de Gastos</h3>
+      {dayExpenses.length === 0 ? <div style={{ color: "#888" }}>Sin gastos</div> : (
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ background: "#f0f0f0" }}><th>Hora</th><th>Descripción</th><th style={{ textAlign: "right" }}>Monto</th></tr></thead>
+          <tbody>
+            {dayExpenses.map((e) => (
+              <tr key={e.id} style={{ borderBottom: "1px solid #eee" }}><td>{new Date(e.time).toLocaleTimeString()}</td><td>{e.description}</td><td style={{ textAlign: "right" }}>{money(e.amount)}</td></tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function ClientesView({ sales, deliveries }) {
+  const customers = useMemo(() => {
+    const map = {};
+    sales.forEach((s) => {
+      const name = s.ref || "Desconocido";
+      if (!map[name]) map[name] = { name, visits: 0, total: 0, lastVisit: null };
+      map[name].visits += 1;
+      map[name].total += s.total;
+      if (!map[name].lastVisit || s.time > map[name].lastVisit) map[name].lastVisit = s.time;
+    });
+    deliveries.forEach((d) => {
+      if (d.customer) {
+        if (!map[d.customer]) map[d.customer] = { name: d.customer, visits: 0, total: 0, lastVisit: null };
+        map[d.customer].visits += 1;
+        if (!map[d.customer].lastVisit || d.kitchenSentAt > map[d.customer].lastVisit) map[d.customer].lastVisit = d.kitchenSentAt;
+      }
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }, [sales, deliveries]);
+
+  return (
+    <div>
+      <h2>👥 Clientes</h2>
+      {customers.length === 0 ? <div style={{ color: "#888" }}>Sin clientes registrados</div> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+          {customers.map((c) => (
+            <div key={c.name} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12 }}>
+              <div style={{ fontWeight: 700 }}>{c.name}</div>
+              <div style={{ fontSize: 12, color: "#888" }}>{c.visits} visitas</div>
+              <div style={{ fontSize: 12, color: "#888" }}>Última: {c.lastVisit ? timeStr(c.lastVisit) : "N/A"}</div>
+              <div style={{ fontWeight: 700, color: "#e94560" }}>Total: {money(c.total)}</div>
             </div>
-            {sale.discountAmount > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#C1272D", fontWeight: 700 }}>
-                <span>🏷️ Descuento ({sale.discountLabel})</span><span>-{money(sale.discountAmount)}</span>
-              </div>
-            )}
-            <div style={{ background: "#2B2118", borderRadius: 8, padding: "10px 14px", margin: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>TOTAL</span>
-              <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(sale.total)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, background: "#FFF3E0", padding: "6px 10px", borderRadius: 6, border: "1px solid #F2C879" }}>
-              <span>💳 Forma de pago</span><span style={{ fontWeight: 800 }}>{sale.method}</span>
-            </div>
-            {sale.tip > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, color: "#2E7D32", fontWeight: 700 }}>
-                <span>🙌 Propina</span><span>{money(sale.tip)}</span>
-              </div>
-            )}
-          </div>
-          <div style={{ textAlign: "center", padding: "16px 16px 18px" }}>
-            <div style={{ borderTop: "2px dashed #E5D9C3", marginBottom: 12 }} />
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#C1272D" }}>¡Gracias por su compra! 🙏</div>
-            <div style={{ fontSize: 10, color: "#8a7a63", marginTop: 3 }}>Vuelva pronto — le esperamos con gusto</div>
-            <div style={{ fontSize: 16, marginTop: 8, letterSpacing: 3 }}>🌿 🍔 🌿</div>
-          </div>
+          ))}
         </div>
-        <div style={{ padding: "0 12px 12px" }}>
-          <input
-            placeholder="Número WhatsApp o correo (opcional)"
-            value={contact}
-            onChange={(e) => setContact(e.target.value)}
-            style={{ width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 13, boxSizing: "border-box", marginBottom: 8 }}
-          />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={sendWhatsapp} style={{ flex: 1, padding: 9, borderRadius: 8, border: "none", background: "#25D366", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-              WhatsApp
+      )}
+    </div>
+  );
+}
+
+function AdminView({ employees, onUpdateEmployees }) {
+  const [newName, setNewName] = useState("");
+  const [newColor, setNewColor] = useState("#e94560");
+  return (
+    <div>
+      <h2>⚙️ Admin</h2>
+      <h3>Empleados</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+        {employees.map((e) => (
+          <div key={e.id} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 20, height: 20, borderRadius: "50%", background: e.color }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700 }}>{e.name}</div>
+              <div style={{ fontSize: 12, color: "#888" }}>{e.active ? "Activo" : "Inactivo"}</div>
+            </div>
+            <button onClick={() => onUpdateEmployees((emps) => emps.map((emp) => (emp.id === e.id ? { ...emp, active: !emp.active } : emp)))} style={{ padding: "4px 8px", fontSize: 12 }}>
+              {e.active ? "Desactivar" : "Activar"}
             </button>
-            <button onClick={sendEmail} style={{ flex: 1, padding: 9, borderRadius: 8, border: "none", background: "#2B2118", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
-              Correo
-            </button>
           </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 16, border: "1px solid #ddd", borderRadius: 8, padding: 16 }}>
+        <h4>➕ Agregar Empleado</h4>
+        <div style={{ margin: "8px 0" }}>
+          <label>Nombre: </label>
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nombre del empleado" />
         </div>
-        <div style={{ display: "flex", gap: 8, padding: 12, borderTop: "1px solid #eee" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cerrar</button>
-          <button
-            onClick={() => {
-              const content = document.getElementById("printable-receipt").outerHTML;
-              const w = window.open("", "_blank", "width=320,height=600");
-              w.document.write(`<html><head><title>Recibo</title><style>
-                @page { size: 80mm auto; margin: 4mm; }
-                body { font-family: monospace; font-size: 12px; }
-              </style></head><body>${content}</body></html>`);
-              w.document.close();
-              w.focus();
-              w.print();
-            }}
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}
-          >
-            <Printer size={16} /> Imprimir
-          </button>
+        <div style={{ margin: "8px 0" }}>
+          <label>Color: </label>
+          <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} />
         </div>
+        <button onClick={() => {
+          if (!newName.trim()) return alert("Ingresa un nombre");
+          onUpdateEmployees((emps) => [...emps, { id: Date.now().toString(), name: newName.trim(), color: newColor, active: true }]);
+          setNewName("");
+        }} style={{ padding: "8px 12px", background: "#e94560", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>Agregar</button>
       </div>
     </div>
   );
