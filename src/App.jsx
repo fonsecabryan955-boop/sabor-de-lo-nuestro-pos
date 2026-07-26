@@ -26,6 +26,8 @@ const MENU = [
   { id: "c2", name: "Alitas x6", price: 230, cat: "Chicken Mood" },
   { id: "c3", name: "Alitas x12", price: 450, cat: "Chicken Mood" },
   { id: "c4", name: "Alitas Fritas", price: 220, price12: 430, cat: "Chicken Mood" },
+  { id: "a1", name: "Hotdog", price: 60, cat: "Antojitos" },
+  { id: "a2", name: "Tacos al Pastor", price: 195, cat: "Antojitos" },
   { id: "p1", name: "Panini de Pollo", price: 235, cat: "Paninis" },
   { id: "p2", name: "Panini de Jamón", price: 190, cat: "Paninis" },
   { id: "e1", name: "Papas Francesas", price: 50, cat: "Extras" },
@@ -39,9 +41,6 @@ const MENU = [
   { id: "d2", name: "Té de Limón", price: 30, cat: "Bebidas" },
   { id: "d3", name: "Jugo de Naranja", price: 40, cat: "Bebidas" },
   { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas" },
-  { id: "g5", name: "hot dog", price:60, cat: "antojitos" },
-  { id: "g6", name: "tacos al pastor", price:195, cat: "antojitos" },
-  
 ];
 
 const CAT_ICONS = { "Hamburguesas": "🍔", "Frappés": "🥤", "Chicken Mood": "🍗", "Antojitos": "🌮", "Paninis": "🥪", "Extras": "🍟", "Salsas": "🥫", "Bebidas": "🧃" };
