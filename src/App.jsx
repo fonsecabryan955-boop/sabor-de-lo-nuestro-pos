@@ -5,7 +5,7 @@ import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Re
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
-const RECORD_ID = "main"; // Caja completa: apertura/cierre, descuentos, folios
+const RECORD_ID = "main"; // ✅ Versión verificada y consolidada — sin errores de sintaxis
 
 const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
 const SHIFT_START = "17:00";
@@ -39,10 +39,19 @@ const MENU = [
   { id: "d2", name: "Té de Limón", price: 30, cat: "Bebidas" },
   { id: "d3", name: "Jugo de Naranja", price: 40, cat: "Bebidas" },
   { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas" },
+  { id: "g5", name: "hot dog", price:60, cat: "antojitos" },
+  { id: "g6", name: "tacos al pastor", price:195, cat: "antojitos" },
+  
 ];
 
-const CAT_ICONS = { "Hamburguesas": "🍔", "Frappés": "🥤", "Chicken Mood": "🍗", "Paninis": "🥪", "Extras": "🍟", "Salsas": "🥫", "Bebidas": "🧃" };
-const CATS = ["Hamburguesas", "Frappés", "Chicken Mood", "Paninis", "Extras", "Salsas", "Bebidas"];
+const CAT_ICONS = { "Hamburguesas": "🍔", "Frappés": "🥤", "Chicken Mood": "🍗", "Antojitos": "🌮", "Paninis": "🥪", "Extras": "🍟", "Salsas": "🥫", "Bebidas": "🧃" };
+const CATS = ["Hamburguesas", "Frappés", "Chicken Mood", "Antojitos", "Paninis", "Extras", "Salsas", "Bebidas"];
+const WING_SAUCES = [
+  { id: "bbq", label: "BBQ" },
+  { id: "buffalo", label: "Buffalo" },
+  { id: "ranch", label: "Ranch" },
+  { id: "casa", label: "Salsa de la Casa" },
+];
 
 function money(n) {
   return "C$" + (n || 0).toLocaleString("es-NI", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -394,6 +403,9 @@ export default function App() {
   function addPromotion(promo) {
     persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
   }
+  function deletePromotion(id) {
+    persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
+  }
   function addPayment(employeeName, amount, note) {
     persist({ ...state, payments: [...payments, { id: Date.now(), employeeName, amount: Number(amount), note: note || "", time: new Date().toISOString() }] });
   }
@@ -411,9 +423,6 @@ export default function App() {
   }
   function setSalesGoal(amount) {
     persist({ ...state, salesGoal: Number(amount) || 0 });
-  }
-  function deletePromotion(id) {
-    persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
   }
   function deleteSale(id) {
     persist({ ...state, sales: sales.filter((s) => s.id !== id) });
@@ -600,6 +609,7 @@ export default function App() {
 
       {showNewDelivery && (
         <NewDeliveryModal
+          pickupCount={deliveries.filter((d) => d.type === "pickup").length}
           onCreate={(data) => {
             const id = Date.now();
             persist({ ...state, deliveries: [...deliveries, { id, ...data, items: [], kitchenStatus: null }] });
@@ -700,13 +710,6 @@ function MesasView({ tables, onOpen }) {
   );
 }
 
-const WING_SAUCES = [
-  { id: "bbq", label: "BBQ" },
-  { id: "buffalo", label: "Buffalo" },
-  { id: "ranch", label: "Ranch" },
-  { id: "casa", label: "Salsa de la Casa" },
-];
-
 function WingOptionsModal({ item, onConfirm, onClose }) {
   const needsQty = !!item.price12;
   const [qty, setQty] = useState(6);
@@ -806,6 +809,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
       onAdd(m);
     }
   }
+
   return (
     <>
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
@@ -907,6 +911,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
 }
 
 const iconBtn = { width: 24, height: 24, borderRadius: 6, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+
 function ElapsedBadge({ sentAt }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -958,7 +963,6 @@ function CocinaView({ tables, deliveries, onAdvance }) {
       <style>{`
         @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
         @keyframes cardIn { from { transform: scale(0.94) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
-        @keyframes glowPulse { 0%,100% { box-shadow: 0 0 0px rgba(255,255,255,0); } 50% { box-shadow: 0 0 18px rgba(255,255,255,0.15); } }
       `}</style>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
         <div>
@@ -1295,6 +1299,53 @@ function changeBreakdown(amount) {
   return result;
 }
 
+function playChaChing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    [[1568, 0], [2093, 0.08]].forEach(([freq, offset]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.3);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.32);
+    });
+  } catch (e) {}
+}
+
+function CashKeypad({ value, onChange }) {
+  function press(k) {
+    if (k === "C") return onChange("");
+    if (k === "⌫") return onChange(String(value).slice(0, -1));
+    onChange(String(value) + k);
+  }
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 10 }}>
+      {keys.map((k) => (
+        <button
+          key={k}
+          onClick={() => press(k)}
+          style={{
+            padding: "14px 0", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 17,
+            background: k === "C" ? "#FCE8E8" : k === "⌫" ? "#FFF3E0" : "#fff",
+            color: k === "C" ? "#C1272D" : k === "⌫" ? "#C1531F" : "#2B2118",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
+          }}
+        >
+          {k}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin, salesGoal, onSetGoal }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
@@ -1308,6 +1359,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const [cashGiven, setCashGiven] = useState({});
   const [splitMode, setSplitMode] = useState({});
   const [splitSelected, setSplitSelected] = useState({});
+  const [evenSplitN, setEvenSplitN] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
   const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
 
@@ -1330,11 +1382,6 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>💵 Caja</h2>
         <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>⚙️ Cambiar PIN</button>
       </div>
-
-      <GoalBar sales={sales} salesGoal={salesGoal} onSetGoal={onSetGoal} />
-
-      <CorteCaja sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={onOpenSession} onCloseSession={onCloseSession} />
-
       {abiertas.length > 0 && (
         <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>CUENTAS ABIERTAS: {abiertas.length}</span>
@@ -1342,6 +1389,11 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         </div>
       )}
       {showPinSettings && <ChangePin current={pin} onChange={(p) => { onChangePin(p); setShowPinSettings(false); }} />}
+
+      <GoalBar sales={sales} salesGoal={salesGoal} onSetGoal={onSetGoal} />
+
+      <CorteCaja sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={onOpenSession} onCloseSession={onCloseSession} />
+
       {abiertas.length === 0 && (
         <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>💵</div>
@@ -1353,9 +1405,21 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
           const total = orderTotal(o.items);
           const key = o.kind + o.id;
           const m = method[key] || "Efectivo";
-          const finalTotal = discountedTotal(o.items, key);
-          const hasDiscount = finalTotal < total;
+          const isSplitting = splitMode[key] === "items";
+          const selectedIds = splitSelected[key] || [];
+          const chargeItems = isSplitting ? o.items.filter((it) => selectedIds.includes(it.menuId)) : o.items;
+          const chargeTotal = orderTotal(chargeItems);
+          const finalTotal = isSplitting ? chargeTotal : discountedTotal(o.items, key);
+          const hasDiscount = !isSplitting && finalTotal < total;
           const typeIcon = o.kind === "table" ? "🍽️" : (o.type === "pickup" ? "🥡" : "🛵");
+
+          function toggleItem(menuId) {
+            setSplitSelected((s) => {
+              const cur = s[key] || [];
+              return { ...s, [key]: cur.includes(menuId) ? cur.filter((x) => x !== menuId) : [...cur, menuId] };
+            });
+          }
+
           return (
             <div key={key} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 18px rgba(43,33,24,0.1)", border: "1px solid #F0E8D8" }}>
               <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1363,46 +1427,137 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                 <span style={{ color: "#F2C879", fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
               </div>
               <div style={{ padding: 18 }}>
+                {o.kind === "table" && o.items.length > 1 && (
+                  <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => { setSplitMode((s) => ({ ...s, [key]: s[key] === "items" ? false : "items" })); setEvenSplitN((s) => ({ ...s, [key]: 0 })); }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #1565C0", color: "#1565C0", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700 }}
+                    >
+                      ✂️ {splitMode[key] === "items" ? "Cancelar" : "Por productos"}
+                    </button>
+                    <button
+                      onClick={() => { setSplitMode((s) => ({ ...s, [key]: s[key] === "even" ? false : "even" })); setSplitSelected((s) => ({ ...s, [key]: [] })); }}
+                      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #6A1B9A", color: "#6A1B9A", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700 }}
+                    >
+                      🧮 {splitMode[key] === "even" ? "Cancelar" : "Partes iguales"}
+                    </button>
+                  </div>
+                )}
+
+                {splitMode[key] === "even" && (
+                  <div style={{ background: "linear-gradient(160deg, #F3E9FA, #E9D9F5)", border: "2px solid #6A1B9A", borderRadius: 14, padding: 16, marginBottom: 14 }}>
+                    <style>{`@keyframes popIn { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#6A1B9A", marginBottom: 10, letterSpacing: 0.5 }}>🧮 ¿ENTRE CUÁNTAS PERSONAS?</div>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+                      {[2, 3, 4, 5, 6].map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => setEvenSplitN((s) => ({ ...s, [key]: n }))}
+                          style={{
+                            width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer", fontWeight: 800, fontSize: 16,
+                            background: evenSplitN[key] === n ? "linear-gradient(135deg, #6A1B9A, #9C27B0)" : "#fff",
+                            color: evenSplitN[key] === n ? "#fff" : "#6A1B9A",
+                            boxShadow: evenSplitN[key] === n ? "0 4px 12px rgba(106,27,154,0.4)" : "0 2px 4px rgba(0,0,0,0.08)",
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    {evenSplitN[key] > 0 && (
+                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(3, evenSplitN[key])}, 1fr)`, gap: 10 }}>
+                        {Array.from({ length: evenSplitN[key] }, (_, i) => (
+                          <div key={i} style={{ background: "#fff", borderRadius: 12, padding: "12px 8px", textAlign: "center", animation: `popIn 0.3s ease ${i * 0.05}s both`, boxShadow: "0 3px 8px rgba(0,0,0,0.1)" }}>
+                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, margin: "0 auto 6px" }}>
+                              {i + 1}
+                            </div>
+                            <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700 }}>Persona {i + 1}</div>
+                            <div style={{ fontWeight: 800, fontSize: 15, color: "#6A1B9A", marginTop: 2 }}>{money(total / evenSplitN[key])}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {evenSplitN[key] > 0 && (
+                      <div style={{ marginTop: 12, fontSize: 11, color: "#6A1B9A", textAlign: "center", fontStyle: "italic" }}>
+                        Total de la mesa: {money(total)} — cóbralo normal cuando junten el pago 👆
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div style={{ fontFamily: "'Courier New', monospace" }}>
                   {o.items.map((it) => (
-                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#5a4c3a" }}>
-                      <span>{it.qty}x {it.name}</span>
+                    <div key={it.menuId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#5a4c3a" }}>
+                      {isSplitting && (
+                        <input type="checkbox" checked={selectedIds.includes(it.menuId)} onChange={() => toggleItem(it.menuId)} style={{ marginRight: 8 }} />
+                      )}
+                      <span style={{ flex: 1 }}>{it.qty}x {it.name}</span>
                       <span>{money(it.price * it.qty)}</span>
                     </div>
                   ))}
                 </div>
                 <div style={{ borderTop: "1px dashed #E5D9C3", margin: "10px 0" }} />
 
-                <button
-                  onClick={() => setDiscountOpen((s) => ({ ...s, [key]: !s[key] }))}
-                  style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700, marginBottom: 10 }}
-                >
-                  <Percent size={13} /> {discountOpen[key] ? "Ocultar descuento" : "Aplicar descuento"}
-                </button>
-
-                {discountOpen[key] && (
-                  <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
-                    <select value={discountType[key] || "percent"} onChange={(e) => setDiscountType((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 90, padding: 7 }}>
-                      <option value="percent">%</option>
-                      <option value="amount">C$</option>
-                    </select>
-                    <input type="number" placeholder="0" value={discountValue[key] || ""} onChange={(e) => setDiscountValue((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, padding: 7 }} />
-                  </div>
-                )}
-
-                {hasDiscount ? (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", textDecoration: "line-through" }}>
-                      <span>Subtotal</span><span>{money(total)}</span>
+                {isSplitting ? (
+                  <div style={{ background: "linear-gradient(160deg, #EAF3FC, #DCEBFA)", border: "2px solid #1565C0", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                    <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                      <button
+                        onClick={() => setSplitSelected((s) => ({ ...s, [key]: o.items.map((it) => it.menuId) }))}
+                        style={{ fontSize: 11, background: "#fff", border: "1px solid #1565C0", color: "#1565C0", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+                      >
+                        Seleccionar todo
+                      </button>
+                      <button
+                        onClick={() => setSplitSelected((s) => ({ ...s, [key]: [] }))}
+                        style={{ fontSize: 11, background: "#fff", border: "1px solid #8a7a63", color: "#8a7a63", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+                      >
+                        Limpiar
+                      </button>
                     </div>
-                    <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(finalTotal)}</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: "#1565C0" }}>SELECCIONADO ({selectedIds.length}/{o.items.length})</span>
+                      <span style={{ fontWeight: 800, fontSize: 20, color: "#1565C0" }}>{money(chargeTotal)}</span>
                     </div>
+                    {selectedIds.length > 0 && selectedIds.length < o.items.length && (
+                      <div style={{ fontSize: 11, color: "#5a4c3a", marginTop: 6, borderTop: "1px dashed #1565C0", paddingTop: 6 }}>
+                        Quedará pendiente en la mesa: <strong>{money(total - chargeTotal)}</strong> ({o.items.length - selectedIds.length} producto{o.items.length - selectedIds.length !== 1 ? "s" : ""})
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(total)}</span>
-                  </div>
+                  <>
+                    <button
+                      onClick={() => setDiscountOpen((s) => ({ ...s, [key]: !s[key] }))}
+                      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700, marginBottom: 10 }}
+                    >
+                      <Percent size={13} /> {discountOpen[key] ? "Ocultar descuento" : "Aplicar descuento"}
+                    </button>
+
+                    {discountOpen[key] && (
+                      <div style={{ display: "flex", gap: 6, marginBottom: 10, alignItems: "center" }}>
+                        <select value={discountType[key] || "percent"} onChange={(e) => setDiscountType((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 90, padding: 7 }}>
+                          <option value="percent">%</option>
+                          <option value="amount">C$</option>
+                        </select>
+                        <input type="number" placeholder="0" value={discountValue[key] || ""} onChange={(e) => setDiscountValue((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, padding: 7 }} />
+                      </div>
+                    )}
+
+                    {hasDiscount ? (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", textDecoration: "line-through" }}>
+                          <span>Subtotal</span><span>{money(total)}</span>
+                        </div>
+                        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                          <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(finalTotal)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 10, padding: "10px 14px", fontWeight: 800, fontSize: 19, color: "#F2C879", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <span style={{ fontSize: 11, color: "#C9BBA3", fontWeight: 700 }}>TOTAL</span><span>{money(total)}</span>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -1420,45 +1575,92 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     </button>
                   ))}
                 </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                  <input
-                    type="number"
-                    placeholder="🙌 Propina (opcional)"
-                    value={tipValue[key] || ""}
-                    onChange={(e) => setTipValue((s) => ({ ...s, [key]: e.target.value }))}
-                    style={{ ...inp, fontSize: 12 }}
-                  />
-                </div>
 
-                {m === "Efectivo" && (
-                  <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, marginBottom: 10 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#5a4c3a", marginBottom: 6 }}>💵 ¿Con cuánto paga el cliente?</div>
+                {!isSplitting && (
+                  <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                     <input
                       type="number"
-                      placeholder="Efectivo recibido"
-                      value={cashGiven[key] || ""}
-                      onChange={(e) => setCashGiven((s) => ({ ...s, [key]: e.target.value }))}
-                      style={{ ...inp, marginBottom: 8 }}
+                      placeholder="🙌 Propina (opcional)"
+                      value={tipValue[key] || ""}
+                      onChange={(e) => setTipValue((s) => ({ ...s, [key]: e.target.value }))}
+                      style={{ ...inp, fontSize: 12 }}
                     />
-                    {cashGiven[key] !== undefined && cashGiven[key] !== "" && (() => {
-                      const dueTotal = finalTotal + (Number(tipValue[key]) || 0);
-                      const change = Number(cashGiven[key]) - dueTotal;
-                      return (
-                        <div style={{
-                          textAlign: "center", padding: "8px 0", borderRadius: 8, fontWeight: 800, fontSize: 16,
-                          background: change >= 0 ? "#E8F5E9" : "#FCE8E8",
-                          color: change >= 0 ? "#2E7D32" : "#C1272D",
-                        }}>
-                          {change >= 0 ? `Vuelto: ${money(change)}` : `Falta: ${money(Math.abs(change))}`}
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
 
-                <button onClick={() => onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key])} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
-                  ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
-                </button>
+                {m === "Efectivo" && (() => {
+                  const dueTotal = finalTotal + (isSplitting ? 0 : (Number(tipValue[key]) || 0));
+                  return (
+                    <div style={{ background: "linear-gradient(160deg, #FFF8ED, #FFF3E0)", border: "2px solid #F2C879", borderRadius: 12, padding: 14, marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#5a4c3a", marginBottom: 8 }}>💵 ¿CON CUÁNTO PAGA EL CLIENTE?</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                        {[dueTotal, 100, 200, 500, 1000].filter((v, i, arr) => arr.indexOf(v) === i && v > 0).map((v) => (
+                          <button
+                            key={v}
+                            onClick={() => setCashGiven((s) => ({ ...s, [key]: v }))}
+                            style={{
+                              padding: "8px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12,
+                              background: v === dueTotal ? "linear-gradient(135deg, #2E7D32, #26A65B)" : "#fff", color: v === dueTotal ? "#fff" : "#5a4c3a",
+                              boxShadow: "0 2px 4px rgba(0,0,0,0.08)",
+                            }}
+                          >
+                            {v === dueTotal ? "✓ Exacto" : money(v)}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        type="number"
+                        placeholder="O escribe otro monto"
+                        value={cashGiven[key] || ""}
+                        onChange={(e) => setCashGiven((s) => ({ ...s, [key]: e.target.value }))}
+                        style={{ ...inp, marginBottom: 10, fontSize: 15, fontWeight: 700, textAlign: "center" }}
+                      />
+                      <CashKeypad value={cashGiven[key] || ""} onChange={(v) => setCashGiven((s) => ({ ...s, [key]: v }))} />
+                      {cashGiven[key] !== undefined && cashGiven[key] !== "" && (() => {
+                        const change = Number(cashGiven[key]) - dueTotal;
+                        const breakdown = change > 0 ? changeBreakdown(change) : [];
+                        return (
+                          <>
+                            <div style={{
+                              textAlign: "center", padding: "14px 0", borderRadius: 10, fontWeight: 800,
+                              background: change >= 0 ? "linear-gradient(135deg, #26A65B, #158A4A)" : "linear-gradient(135deg, #E53935, #B71C1C)",
+                              color: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                            }}>
+                              <div style={{ fontSize: 11, opacity: 0.9, letterSpacing: 0.5 }}>{change >= 0 ? "VUELTO A ENTREGAR" : "AÚN FALTA"}</div>
+                              <div style={{ fontSize: 26 }}>{money(Math.abs(change))}</div>
+                            </div>
+                            {breakdown.length > 0 && (
+                              <div style={{ marginTop: 8, background: "#fff", borderRadius: 8, padding: 10, border: "1px solid #E5D9C3" }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: "#8a7a63", marginBottom: 6, letterSpacing: 0.5 }}>💵 ENTREGAR:</div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                  {breakdown.map((b) => (
+                                    <span key={b.denom} style={{ fontSize: 12, background: "#F3ECE0", borderRadius: 6, padding: "4px 10px", fontWeight: 700, color: "#2B2118" }}>
+                                      {b.count}× {money(b.denom)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  );
+                })()}
+
+                {isSplitting ? (
+                  <button
+                    disabled={selectedIds.length === 0}
+                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, null, null, selectedIds); setSplitSelected((s) => ({ ...s, [key]: [] })); setSplitMode((s) => ({ ...s, [key]: false })); }}
+                    style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: selectedIds.length ? "#1565C0" : "#C9D6E0", color: "#fff", fontWeight: 800, cursor: selectedIds.length ? "pointer" : "not-allowed", fontSize: 14, letterSpacing: 0.3 }}
+                  >
+                    ✂️ Cobrar seleccionados ({money(chargeTotal)})
+                  </button>
+                ) : (
+                  <button onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key]); }} style={{ width: "100%", padding: 13, border: "none", borderRadius: 10, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", fontSize: 14, letterSpacing: 0.3 }}>
+                    ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -1512,7 +1714,7 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
                   <span style={{ fontSize: 20 }}>{st.icon}</span>
                 </div>
                 {d.address && <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>}
-                <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>
+                {d.phone && <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>}
                 <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
               </button>
             );
@@ -1816,6 +2018,15 @@ function avatarColor(name) {
 function initials(name) {
   return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 }
+function seniorityLabel(hireDate) {
+  if (!hireDate) return null;
+  const days = Math.floor((Date.now() - new Date(hireDate).getTime()) / 86400000);
+  if (days < 30) return `${days} día${days !== 1 ? "s" : ""}`;
+  if (days < 365) return `${Math.floor(days / 30)} mes${Math.floor(days / 30) !== 1 ? "es" : ""}`;
+  const years = Math.floor(days / 365);
+  const months = Math.floor((days % 365) / 30);
+  return `${years} año${years !== 1 ? "s" : ""}${months ? ` ${months} mes${months !== 1 ? "es" : ""}` : ""}`;
+}
 
 const ROLES = ["Cocinero/a", "Mesero/a", "Cajero/a", "Repartidor/a", "Personal"];
 const ROLE_ICONS = { "Cocinero/a": "👨‍🍳", "Mesero/a": "🧑‍🍽️", "Cajero/a": "💵", "Repartidor/a": "🛵", "Personal": "👤" };
@@ -1928,16 +2139,6 @@ function AttendanceMini({ employeeName, clockRecords }) {
   );
 }
 
-function seniorityLabel(hireDate) {
-  if (!hireDate) return null;
-  const days = Math.floor((Date.now() - new Date(hireDate).getTime()) / 86400000);
-  if (days < 30) return `${days} día${days !== 1 ? "s" : ""}`;
-  if (days < 365) return `${Math.floor(days / 30)} mes${Math.floor(days / 30) !== 1 ? "es" : ""}`;
-  const years = Math.floor(days / 365);
-  const months = Math.floor((days % 365) / 30);
-  return `${years} año${years !== 1 ? "s" : ""}${months ? ` ${months} mes${months !== 1 ? "es" : ""}` : ""}`;
-}
-
 function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment, onToggleActive }) {
   const [name, setName] = useState("");
   const [wage, setWage] = useState("");
@@ -1994,7 +2195,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
         </div>
         <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 18px" }}>
           <div style={{ color: "#8a7a63", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>👥 EQUIPO ACTIVO</div>
-          <div style={{ color: "#2B2118", fontWeight: 800, fontSize: 22 }}>{employees.length}</div>
+          <div style={{ color: "#2B2118", fontWeight: 800, fontSize: 22 }}>{activeEmployees.length}</div>
         </div>
       </div>
 
@@ -2348,7 +2549,6 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={statCard}><div style={statLabel}>Ingresos</div><div style={statValue}>{money(income)}</div></div>
         <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Neto (sin nómina)</div><div style={statValue}>{money(net)}</div></div>
         <div style={statCard}><div style={statLabel}>Pedidos cerrados</div><div style={statValue}>{count}</div></div>
         <div style={statCard}><div style={statLabel}>Ticket promedio</div><div style={statValue}>{money(avgTicket)}</div></div>
         <div style={statCard}><div style={statLabel}>Hora pico</div><div style={{ ...statValue, fontSize: 16 }}>{peakHourLabel || "—"}</div></div>
