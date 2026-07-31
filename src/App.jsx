@@ -15,37 +15,46 @@ const DEFAULT_PIN = "1234";
 const POLL_MS = 4000;
 const PAYDAY_DAY = 15; // día del mes en que aparece el aviso de pago
 
-const MENU = [
-  { id: "b1", name: "Hamburguesa Clásica", price: 190, cat: "Hamburguesas" },
-  { id: "b2", name: "Kryspi Burguer", price: 200, cat: "Hamburguesas" },
-  { id: "b3", name: "Big Campeona", price: 250, cat: "Hamburguesas" },
-  { id: "f1", name: "Pingüi Frapp", price: 120, cat: "Frappés" },
-  { id: "f2", name: "Fresa Frapp", price: 120, cat: "Frappés" },
-  { id: "f3", name: "Oreo Frapp", price: 120, cat: "Frappés" },
-  { id: "f4", name: "Chocolate Frapp", price: 120, cat: "Frappés" },
-  { id: "c1", name: "Dedos de Pollo (6u)", price: 200, cat: "Chicken Mood" },
-  { id: "c2", name: "Alitas x6", price: 230, cat: "Chicken Mood" },
-  { id: "c3", name: "Alitas x12", price: 450, cat: "Chicken Mood" },
-  { id: "c4", name: "Alitas Fritas", price: 220, price12: 430, cat: "Chicken Mood" },
-  { id: "a1", name: "Hotdog", price: 60, cat: "Antojitos" },
-  { id: "a2", name: "Tacos al Pastor", price: 195, cat: "Antojitos" },
-  { id: "p1", name: "Panini de Pollo", price: 235, cat: "Paninis" },
-  { id: "p2", name: "Panini de Jamón", price: 190, cat: "Paninis" },
-  { id: "e1", name: "Papas Francesas", price: 50, cat: "Extras" },
-  { id: "e2", name: "Papas Cheddar", price: 100, cat: "Extras" },
-  { id: "e3", name: "Salchipapas", price: 160, cat: "Extras" },
-  { id: "s1", name: "Salsa BBQ", price: 30, cat: "Salsas" },
-  { id: "s2", name: "Salsa Buffalo", price: 30, cat: "Salsas" },
-  { id: "s3", name: "Salsa Ranch", price: 30, cat: "Salsas" },
-  { id: "s4", name: "Salsa de la Casa", price: 30, cat: "Salsas" },
-  { id: "d1", name: "Soda", price: 40, cat: "Bebidas" },
-  { id: "d2", name: "Té de Limón", price: 30, cat: "Bebidas" },
-  { id: "d3", name: "Jugo de Naranja", price: 40, cat: "Bebidas" },
-  { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas" },
+// Semilla inicial del menú — a partir de aquí el menú se administra desde la app (botón "Gestionar menú" en Mesas)
+const DEFAULT_MENU = [
+  { id: "b1", name: "Hamburguesa Clásica", price: 190, cat: "Hamburguesas", active: true },
+  { id: "b2", name: "Kryspi Burguer", price: 200, cat: "Hamburguesas", active: true },
+  { id: "b3", name: "Big Campeona", price: 250, cat: "Hamburguesas", active: true },
+  { id: "f1", name: "Pingüi Frapp", price: 120, cat: "Frappés", active: true },
+  { id: "f2", name: "Fresa Frapp", price: 120, cat: "Frappés", active: true },
+  { id: "f3", name: "Oreo Frapp", price: 120, cat: "Frappés", active: true },
+  { id: "f4", name: "Chocolate Frapp", price: 120, cat: "Frappés", active: true },
+  { id: "c1", name: "Dedos de Pollo (6u)", price: 200, cat: "Chicken Mood", active: true },
+  { id: "c2", name: "Alitas x6", price: 230, cat: "Chicken Mood", active: true },
+  { id: "c3", name: "Alitas x12", price: 450, cat: "Chicken Mood", active: true },
+  { id: "c4", name: "Alitas Fritas", price: 220, price12: 430, cat: "Chicken Mood", active: true },
+  { id: "a1", name: "Hotdog", price: 60, cat: "Antojitos", active: true },
+  { id: "a2", name: "Tacos al Pastor", price: 195, cat: "Antojitos", active: true },
+  { id: "p1", name: "Panini de Pollo", price: 235, cat: "Paninis", active: true },
+  { id: "p2", name: "Panini de Jamón", price: 190, cat: "Paninis", active: true },
+  { id: "e1", name: "Papas Francesas", price: 50, cat: "Extras", active: true },
+  { id: "e2", name: "Papas Cheddar", price: 100, cat: "Extras", active: true },
+  { id: "e3", name: "Salchipapas", price: 160, cat: "Extras", active: true },
+  { id: "s1", name: "Salsa BBQ", price: 30, cat: "Salsas", active: true },
+  { id: "s2", name: "Salsa Buffalo", price: 30, cat: "Salsas", active: true },
+  { id: "s3", name: "Salsa Ranch", price: 30, cat: "Salsas", active: true },
+  { id: "s4", name: "Salsa de la Casa", price: 30, cat: "Salsas", active: true },
+  { id: "d1", name: "Soda", price: 40, cat: "Bebidas", active: true },
+  { id: "d2", name: "Té de Limón", price: 30, cat: "Bebidas", active: true },
+  { id: "d3", name: "Jugo de Naranja", price: 40, cat: "Bebidas", active: true },
+  { id: "d4", name: "Hi-C", price: 30, cat: "Bebidas", active: true },
 ];
 
-const CAT_ICONS = { "Hamburguesas": "🍔", "Frappés": "🥤", "Chicken Mood": "🍗", "Antojitos": "🌮", "Paninis": "🥪", "Extras": "🍟", "Salsas": "🥫", "Bebidas": "🧃" };
-const CATS = ["Hamburguesas", "Frappés", "Chicken Mood", "Antojitos", "Paninis", "Extras", "Salsas", "Bebidas"];
+const DEFAULT_CATS = [
+  { name: "Hamburguesas", icon: "🍔" },
+  { name: "Frappés", icon: "🥤" },
+  { name: "Chicken Mood", icon: "🍗" },
+  { name: "Antojitos", icon: "🌮" },
+  { name: "Paninis", icon: "🥪" },
+  { name: "Extras", icon: "🍟" },
+  { name: "Salsas", icon: "🥫" },
+  { name: "Bebidas", icon: "🧃" },
+];
 const WING_SAUCES = [
   { id: "bbq", label: "BBQ" },
   { id: "buffalo", label: "Buffalo" },
@@ -77,6 +86,8 @@ function initialState() {
     cashSessions: [],
     salesGoal: 0,
     pin: DEFAULT_PIN,
+    menuItems: DEFAULT_MENU,
+    menuCats: DEFAULT_CATS,
   };
 }
 function todayStr() {
@@ -93,6 +104,7 @@ export default function App() {
   const [activeTable, setActiveTable] = useState(null);
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [showNewDelivery, setShowNewDelivery] = useState(false);
+  const [menuManagerOpen, setMenuManagerOpen] = useState(false);
   const [cajaUnlocked, setCajaUnlocked] = useState(false);
   const [receiptFor, setReceiptFor] = useState(null);
   const [connStatus, setConnStatus] = useState("Conectando…");
@@ -260,6 +272,8 @@ export default function App() {
   }, [loaded]);
 
   const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], salesGoal = 0, pin } = state;
+  const menuItems = state.menuItems && state.menuItems.length ? state.menuItems : DEFAULT_MENU;
+  const menuCats = state.menuCats && state.menuCats.length ? state.menuCats : DEFAULT_CATS;
 
   useEffect(() => {
     const current = {};
@@ -399,6 +413,21 @@ export default function App() {
         { id: Date.now(), employee: employeeName, time: now.toISOString(), late, minsLate },
       ],
     });
+  }
+  function addMenuItem(item) {
+    persist({ ...state, menuItems: [...menuItems, { id: `m${Date.now()}`, active: true, ...item }] });
+  }
+  function updateMenuItem(id, patch) {
+    persist({ ...state, menuItems: menuItems.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+  }
+  function deleteMenuItem(id) {
+    persist({ ...state, menuItems: menuItems.filter((m) => m.id !== id) });
+  }
+  function addMenuCategory(name, icon) {
+    const clean = (name || "").trim();
+    if (!clean) return;
+    if (menuCats.some((c) => c.name.toLowerCase() === clean.toLowerCase())) return;
+    persist({ ...state, menuCats: [...menuCats, { name: clean, icon: icon || "🍽️" }] });
   }
   function addPromotion(promo) {
     persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
@@ -549,7 +578,7 @@ export default function App() {
       )}
 
       <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
-        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} />}
+        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onManageMenu={() => setMenuManagerOpen(true)} />}
 
         {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} />}
 
@@ -576,7 +605,7 @@ export default function App() {
 
         {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
-        {view === "menutv" && <MenuBoardView promotions={promotions} />}
+        {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} />}
       </div>
 
       {activeTable && (
@@ -585,6 +614,8 @@ export default function App() {
           items={tables.find((t) => t.id === activeTable).items}
           kitchenStatus={tables.find((t) => t.id === activeTable).kitchenStatus}
           promotions={promotions}
+          menuItems={menuItems}
+          menuCats={menuCats}
           onAdd={(item) => addItemToOrder("table", activeTable, item)}
           onQty={(menuId, d) => changeQty("table", activeTable, menuId, d)}
           onNote={(menuId, note) => setNote("table", activeTable, menuId, note)}
@@ -599,6 +630,8 @@ export default function App() {
           items={deliveries.find((d) => d.id === activeDelivery).items}
           kitchenStatus={deliveries.find((d) => d.id === activeDelivery).kitchenStatus}
           promotions={promotions}
+          menuItems={menuItems}
+          menuCats={menuCats}
           onAdd={(item) => addItemToOrder("delivery", activeDelivery, item)}
           onQty={(menuId, d) => changeQty("delivery", activeDelivery, menuId, d)}
           onNote={(menuId, note) => setNote("delivery", activeDelivery, menuId, note)}
@@ -621,6 +654,18 @@ export default function App() {
       )}
 
       {receiptFor && <ReceiptModal sale={receiptFor} onClose={() => setReceiptFor(null)} />}
+
+      {menuManagerOpen && (
+        <MenuManagerModal
+          menuItems={menuItems}
+          menuCats={menuCats}
+          onAddItem={addMenuItem}
+          onUpdateItem={updateMenuItem}
+          onDeleteItem={deleteMenuItem}
+          onAddCategory={addMenuCategory}
+          onClose={() => setMenuManagerOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -671,14 +716,46 @@ function TableElapsed({ occupiedAt }) {
   return <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>⏱ {mins} min ocupada</span>;
 }
 
-function MesasView({ tables, onOpen }) {
+function MesasView({ tables, onOpen, onManageMenu }) {
+  const libres = tables.filter((t) => t.items.length === 0).length;
+  const ocupadas = tables.length - libres;
+  const floorTotal = tables.reduce((sum, t) => sum + orderTotal(t.items), 0);
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🍽️ Piso del restaurante</h2>
-        <span style={{ fontSize: 12, color: "#8a7a63" }}>{tables.length} mesas</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <h2 style={{ fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: 0.2 }}>🍽️ Piso del restaurante</h2>
+          <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 2 }}>{RESTAURANT_NAME}</div>
+        </div>
+        <button
+          onClick={onManageMenu}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", boxShadow: "0 3px 10px rgba(43,33,24,0.25)" }}
+        >
+          🍔 Gestionar menú
+        </button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 16px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 4 }}>MESAS TOTALES</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#2B2118" }}>{tables.length}</div>
+        </div>
+        <div style={{ background: "linear-gradient(135deg, #FF5722, #D84315)", borderRadius: 12, padding: "14px 16px", color: "#fff" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>OCUPADAS</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{ocupadas}</div>
+        </div>
+        <div style={{ background: "linear-gradient(135deg, #26A65B, #158A4A)", borderRadius: 12, padding: "14px 16px", color: "#fff" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>LIBRES</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{libres}</div>
+        </div>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 16px", color: "#F2C879" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>EN MESA AHORA</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{money(floorTotal)}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 16 }}>
         {tables.map((t) => {
           const st = statusStyle(t.kitchenStatus, t.items.length > 0);
           const total = orderTotal(t.items);
@@ -688,16 +765,22 @@ function MesasView({ tables, onOpen }) {
               key={t.id}
               onClick={() => onOpen(t.id)}
               style={{
-                background: st.grad, border: "none", borderRadius: 16, padding: "20px 14px", cursor: "pointer",
-                textAlign: "left", color: st.text, boxShadow: `0 6px 16px ${st.glow}`, position: "relative", overflow: "hidden",
+                background: st.grad, border: "none", borderRadius: 18, padding: "22px 16px", cursor: "pointer",
+                textAlign: "left", color: st.text, boxShadow: `0 8px 20px ${st.glow}`, position: "relative", overflow: "hidden",
+                transition: "transform 0.15s ease",
               }}
             >
-              <div style={{ fontSize: 26, position: "absolute", top: 10, right: 12, opacity: 0.85 }}>{st.icon}</div>
-              <div style={{ fontSize: 26, fontWeight: 800 }}>Mesa {t.id}</div>
-              <div style={{ fontSize: 12, fontWeight: 800, marginTop: 6, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.9 }}>{st.label}</div>
+              <div style={{ position: "absolute", top: -18, right: -18, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
+              <div style={{ fontSize: 24, position: "absolute", top: 12, right: 14, opacity: 0.9 }}>{st.icon}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85, letterSpacing: 1 }}>MESA</div>
+              <div style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.1, marginTop: -2 }}>{t.id}</div>
+              <div style={{
+                fontSize: 11, fontWeight: 800, marginTop: 10, textTransform: "uppercase", letterSpacing: 0.5,
+                display: "inline-block", background: "rgba(0,0,0,0.15)", padding: "3px 10px", borderRadius: 20,
+              }}>{st.label}</div>
               {t.items.length > 0 && (
                 <>
-                  <div style={{ fontSize: 17, marginTop: 10, fontWeight: 800 }}>{money(total)}</div>
+                  <div style={{ fontSize: 19, marginTop: 12, fontWeight: 800 }}>{money(total)}</div>
                   <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{itemCount} ítem{itemCount !== 1 ? "s" : ""}</div>
                   <div style={{ marginTop: 4 }}><TableElapsed occupiedAt={t.occupiedAt} /></div>
                 </>
@@ -705,6 +788,111 @@ function MesasView({ tables, onOpen }) {
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDeleteItem, onAddCategory, onClose }) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [price12, setPrice12] = useState("");
+  const [cat, setCat] = useState(menuCats[0]?.name || "");
+  const [newCatMode, setNewCatMode] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatIcon, setNewCatIcon] = useState("🍽️");
+  const [editingId, setEditingId] = useState(null);
+  const [editPrice, setEditPrice] = useState("");
+
+  function handleAdd() {
+    if (!name.trim() || !price) return;
+    onAddItem({ name: name.trim(), price: Number(price), ...(price12 ? { price12: Number(price12) } : {}), cat });
+    setName(""); setPrice(""); setPrice12("");
+  }
+  function handleAddCat() {
+    if (!newCatName.trim()) return;
+    onAddCategory(newCatName.trim(), newCatIcon);
+    setCat(newCatName.trim());
+    setNewCatName(""); setNewCatMode(false);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 16 }}>
+      <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>🍔 Gestionar menú</h3>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: 18, overflow: "auto" }}>
+          <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 18 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>➕ Agregar platillo nuevo</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              <input placeholder="Nombre del platillo" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
+              <input placeholder="Precio (C$)" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
+              <input placeholder="Precio alterno (opcional)" type="number" value={price12} onChange={(e) => setPrice12(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {!newCatMode ? (
+                <>
+                  <select value={cat} onChange={(e) => setCat(e.target.value)} style={{ ...inp, maxWidth: 200 }}>
+                    {menuCats.map((c) => <option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
+                  </select>
+                  <button onClick={() => setNewCatMode(true)} style={{ fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 700 }}>
+                    + Nueva categoría
+                  </button>
+                  <button onClick={handleAdd} disabled={!name || !price} style={{ marginLeft: "auto", padding: "0 18px", height: 38, border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: name && price ? 1 : 0.5 }}>
+                    Agregar platillo
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input placeholder="Emoji" value={newCatIcon} onChange={(e) => setNewCatIcon(e.target.value)} style={{ ...inp, maxWidth: 60, textAlign: "center" }} />
+                  <input placeholder="Nombre de la categoría (ej: Postres)" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+                  <button onClick={handleAddCat} disabled={!newCatName.trim()} style={{ padding: "0 16px", height: 38, border: "none", borderRadius: 8, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", opacity: newCatName.trim() ? 1 : 0.5 }}>
+                    Crear categoría
+                  </button>
+                  <button onClick={() => setNewCatMode(false)} style={{ padding: "0 12px", height: 38, border: "1px solid #E5D9C3", borderRadius: 8, background: "#fff", cursor: "pointer" }}>
+                    Cancelar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {menuCats.map((c) => {
+            const items = menuItems.filter((m) => m.cat === c.name);
+            if (!items.length) return null;
+            return (
+              <div key={c.name} style={{ marginBottom: 18 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#5a4c3a", marginBottom: 8, letterSpacing: 0.3 }}>{c.icon} {c.name.toUpperCase()}</div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {items.map((m) => (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #F0E8D8", borderRadius: 10, padding: "8px 12px", opacity: m.active === false ? 0.5 : 1 }}>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}{m.price12 ? ` (x12: ${money(m.price12)})` : ""}</span>
+                      {editingId === m.id ? (
+                        <>
+                          <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} style={{ ...inp, maxWidth: 90, padding: 6 }} />
+                          <button onClick={() => { onUpdateItem(m.id, { price: Number(editPrice) }); setEditingId(null); }} style={{ fontSize: 11, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "6px 10px", cursor: "pointer", fontWeight: 700 }}>Guardar</button>
+                        </>
+                      ) : (
+                        <span onClick={() => { setEditingId(m.id); setEditPrice(String(m.price)); }} style={{ fontSize: 13, fontWeight: 800, color: "#C1272D", cursor: "pointer" }} title="Click para editar precio">{money(m.price)} ✏️</span>
+                      )}
+                      <button onClick={() => onUpdateItem(m.id, { active: m.active === false ? true : false })} title={m.active === false ? "Activar" : "Desactivar"} style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontSize: 11, color: "#8a7a63" }}>
+                        {m.active === false ? "Activar" : "Ocultar"}
+                      </button>
+                      <button onClick={() => { if (window.confirm(`¿Eliminar "${m.name}" del menú?`)) onDeleteItem(m.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer" }}><X size={16} /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: 14, borderTop: "1px solid #E5D9C3", background: "#fff" }}>
+          <button onClick={onClose} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #E5D9C3", background: "#fff", fontWeight: 700, cursor: "pointer" }}>Cerrar</button>
+        </div>
       </div>
     </div>
   );
@@ -792,13 +980,15 @@ function WingOptionsModal({ item, onConfirm, onClose }) {
   );
 }
 
-function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onNote, onSend, onClose }) {
-  const allCats = promotions && promotions.length > 0 ? [...CATS, "Promociones"] : CATS;
-  const [cat, setCat] = useState(allCats[0]);
+function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCats, onAdd, onQty, onNote, onSend, onClose }) {
+  const activeItems = menuItems.filter((m) => m.active !== false);
+  const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
+  const allCatNames = promotions && promotions.length > 0 ? [...catsWithItems.map((c) => c.name), "Promociones"] : catsWithItems.map((c) => c.name);
+  const [cat, setCat] = useState(allCatNames[0] || "Promociones");
   const [search, setSearch] = useState("");
   const [wingItem, setWingItem] = useState(null);
   const total = orderTotal(items);
-  const baseList = cat === "Promociones" ? promotions : MENU.filter((m) => m.cat === cat);
+  const baseList = cat === "Promociones" ? promotions : activeItems.filter((m) => m.cat === cat);
   const listForCat = search ? baseList.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : baseList;
   const cartQtyFor = (menuId) => items.filter((it) => it.menuId === menuId || String(it.menuId).startsWith(String(menuId) + "-")).reduce((s, it) => s + it.qty, 0);
 
@@ -820,7 +1010,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
         </div>
         <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
           <div style={{ width: 160, borderRight: "1px solid #E5D9C3", flexShrink: 0, background: "#FBF2E4", padding: 6 }}>
-            {allCats.map((c) => (
+            {allCatNames.map((c) => (
               <button
                 key={c}
                 onClick={() => setCat(c)}
@@ -832,7 +1022,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, onAdd, onQty, onN
                   boxShadow: cat === c ? "0 3px 8px rgba(193,39,45,0.3)" : "none",
                 }}
               >
-                <span style={{ fontSize: 16 }}>{c === "Promociones" ? "🏷️" : CAT_ICONS[c]}</span> {c}
+                <span style={{ fontSize: 16 }}>{c === "Promociones" ? "🏷️" : (menuCats.find((mc) => mc.name === c)?.icon || "🍽️")}</span> {c}
               </button>
             ))}
           </div>
@@ -1894,7 +2084,9 @@ function PromoView({ promotions, onAdd, onDelete }) {
   );
 }
 
-function MenuBoardView({ promotions }) {
+function MenuBoardView({ promotions, menuItems, menuCats }) {
+  const activeItems = menuItems.filter((m) => m.active !== false);
+  const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
   return (
     <div style={{ background: "#2B2118", borderRadius: 16, padding: "28px 24px", color: "#FFF8ED" }}>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
@@ -1918,12 +2110,12 @@ function MenuBoardView({ promotions }) {
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-        {CATS.map((cat) => (
-          <div key={cat}>
+        {catsWithItems.map((c) => (
+          <div key={c.name}>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#F2C879", borderBottom: "2px solid #F2C879", paddingBottom: 4, marginBottom: 8, letterSpacing: 0.5 }}>
-              {CAT_ICONS[cat]} {cat.toUpperCase()}
+              {c.icon} {c.name.toUpperCase()}
             </div>
-            {MENU.filter((m) => m.cat === cat).map((m) => (
+            {activeItems.filter((m) => m.cat === c.name).map((m) => (
               <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 15 }}>
                 <span>{m.name}</span>
                 <span style={{ fontWeight: 700, color: "#F2C879" }}>{money(m.price)}</span>
