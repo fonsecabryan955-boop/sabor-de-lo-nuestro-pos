@@ -13,6 +13,7 @@ const SHIFT_END = "21:00";
 const LATE_GRACE_MIN = 10;
 const DEFAULT_PIN = "1234";
 const POLL_MS = 4000;
+const PAYDAY_DAY = 15; // día del mes en que aparece el aviso de pago
 
 const MENU = [
   { id: "b1", name: "Hamburguesa Clásica", price: 190, cat: "Hamburguesas" },
@@ -405,8 +406,8 @@ export default function App() {
   function deletePromotion(id) {
     persist({ ...state, promotions: promotions.filter((p) => p.id !== id) });
   }
-  function addPayment(employeeName, amount, note) {
-    persist({ ...state, payments: [...payments, { id: Date.now(), employeeName, amount: Number(amount), note: note || "", time: new Date().toISOString() }] });
+  function addPayment(employeeName, amount, note, extra) {
+    persist({ ...state, payments: [...payments, { id: Date.now(), employeeName, amount: Number(amount), note: note || "", time: new Date().toISOString(), ...(extra || {}) }] });
   }
   function deletePayment(id) {
     persist({ ...state, payments: payments.filter((p) => p.id !== id) });
@@ -2031,34 +2032,153 @@ const ROLES = ["Cocinero/a", "Mesero/a", "Cajero/a", "Repartidor/a", "Personal"]
 const ROLE_ICONS = { "Cocinero/a": "👨‍🍳", "Mesero/a": "🧑‍🍽️", "Cajero/a": "💵", "Repartidor/a": "🛵", "Personal": "👤" };
 
 function printPayStub(employee, payment) {
+  const bruto = payment.bruto != null ? payment.bruto : payment.amount;
+  const bono = payment.bono || 0;
+  const deducciones = payment.deducciones || 0;
+  const days = payment.days || null;
+  const neto = payment.amount;
+  const payDate = new Date(payment.time);
+
   const html = `
     <html><head><title>Recibo de Pago</title><style>
-      body { font-family: 'Courier New', monospace; font-size: 13px; padding: 20px; color: #2B2118; }
-      h1 { font-size: 15px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
-      .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ccc; }
-      .big { font-size: 20px; font-weight: bold; text-align: center; margin: 14px 0; background: #F2C879; padding: 10px; border-radius: 8px; }
-      hr { border: none; border-top: 2px dashed #333; margin: 12px 0; }
-      @page { margin: 12mm; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 26px; color: #2B2118; }
+      .header { text-align: center; margin-bottom: 2px; }
+      .logo { font-size: 36px; }
+      .name { font-size: 18px; font-weight: 800; color: #C1272D; margin-top: 4px; }
+      .sub { text-align: center; font-size: 11px; color: #666; letter-spacing: 1px; margin-bottom: 18px; }
+      .title { text-align: center; background: #2B2118; color: #F2C879; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
+      .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #ddd; font-size: 13px; }
+      .row strong { font-weight: 800; }
+      .section-title { font-weight: 800; font-size: 11px; text-transform: uppercase; color: #8a7a63; margin: 18px 0 4px; letter-spacing: 0.5px; }
+      .neg { color: #C1272D; font-weight: 700; }
+      .big { font-size: 22px; font-weight: 800; text-align: center; margin: 18px 0; background: #F2C879; padding: 16px; border-radius: 10px; letter-spacing: 0.5px; }
+      .sign { margin-top: 55px; display: flex; justify-content: space-between; gap: 24px; }
+      .sign div { flex: 1; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; color: #5a4c3a; }
+      hr { border: none; border-top: 2px dashed #333; margin: 14px 0; }
+      @page { margin: 14mm; }
     </style></head><body>
-      <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
-      <div class="sub">RECIBO DE PAGO · MASATEPE, MASAYA</div>
-      <hr/>
+      <div class="header">
+        <div class="logo">🍔🍗</div>
+        <div class="name">${RESTAURANT_NAME}</div>
+      </div>
+      <div class="sub">MASATEPE · MASAYA · NICARAGUA</div>
+      <div class="title">RECIBO DE PAGO A EMPLEADO</div>
+
       <div class="row"><span>Empleado</span><strong>${employee.name}</strong></div>
       <div class="row"><span>Puesto</span><span>${employee.role || "Personal"}</span></div>
+      ${employee.phone ? `<div class="row"><span>Teléfono</span><span>${employee.phone}</span></div>` : ""}
+      <div class="row"><span>Fecha de pago</span><span>${payDate.toLocaleDateString("es-NI", { day: "numeric", month: "long", year: "numeric" })}</span></div>
+
+      <div class="section-title">Detalle del pago</div>
+      ${days ? `<div class="row"><span>Días trabajados</span><span>${days}</span></div>` : ""}
       <div class="row"><span>Pago por día</span><span>${money(employee.dailyWage)}</span></div>
-      <div class="row"><span>Fecha de pago</span><span>${new Date(payment.time).toLocaleString("es-NI")}</span></div>
-      <div class="row"><span>Concepto</span><span>${payment.note || "Pago de días trabajados"}</span></div>
-      <div class="big">${money(payment.amount)}</div>
-      <hr/>
-      <div style="text-align:center;font-size:11px;margin-top:20px;">Firma del empleado: _____________________</div>
-      <div style="text-align:center;font-size:10px;color:#888;margin-top:20px;">Generado ${new Date().toLocaleString("es-NI")}</div>
+      ${days ? `<div class="row"><span>Subtotal (${days} × ${money(employee.dailyWage)})</span><span>${money(days * employee.dailyWage)}</span></div>` : ""}
+      ${bono > 0 ? `<div class="row"><span>Bono / Comisión</span><span>+${money(bono)}</span></div>` : ""}
+      <div class="row"><strong>Total bruto</strong><strong>${money(bruto)}</strong></div>
+
+      ${deducciones > 0 ? `<div class="section-title">Deducciones</div><div class="row"><span>INSS / Otras deducciones</span><span class="neg">-${money(deducciones)}</span></div>` : ""}
+
+      ${payment.note ? `<div class="section-title">Concepto</div><div class="row"><span>${payment.note}</span><span></span></div>` : ""}
+
+      <div class="big">NETO A PAGAR: ${money(neto)}</div>
+
+      <div class="sign">
+        <div>Firma del empleado</div>
+        <div>Firma del empleador</div>
+      </div>
+
+      <div style="text-align:center;font-size:10px;color:#888;margin-top:26px;">Generado el ${new Date().toLocaleString("es-NI")}</div>
     </body></html>`;
-  const w = window.open("", "_blank", "width=360,height=560");
+  const w = window.open("", "_blank", "width=400,height=680");
   w.document.write(html);
   w.document.close();
   w.focus();
   w.print();
+}
+
+function PaydayBanner({ employees, payments, clockRecords }) {
+  const now = new Date();
+  if (now.getDate() !== PAYDAY_DAY) return null;
+
+  const activeEmployees = employees.filter((e) => e.active !== false);
+  function owedFor(emp) {
+    const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().sort((a, b) => new Date(a.time) - new Date(b.time));
+    const last = empPayments[empPayments.length - 1];
+    const cutoff = last ? new Date(last.time) : null;
+    const empClock = clockRecords.filter((r) => r.employee === emp.name);
+    const pendingDays = cutoff ? empClock.filter((r) => new Date(r.time) > cutoff).length : empClock.length;
+    return pendingDays * (emp.dailyWage || 0);
+  }
+  const pending = activeEmployees.map((e) => ({ emp: e, owed: owedFor(e) })).filter((x) => x.owed > 0);
+  const total = pending.reduce((s, x) => s + x.owed, 0);
+
+  return (
+    <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 14, padding: 18, marginBottom: 20, color: "#fff", boxShadow: "0 6px 18px rgba(193,39,45,0.35)" }}>
+      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>📅 ¡Hoy es día de pago! (quincena del {PAYDAY_DAY})</div>
+      {pending.length === 0 ? (
+        <div style={{ fontSize: 13 }}>Todos los empleados activos están al día ✅</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, marginBottom: 10 }}>
+            {pending.length} empleado{pending.length !== 1 ? "s" : ""} con pago pendiente · Total: <strong>{money(total)}</strong>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {pending.map((x) => (
+              <span key={x.emp.id} style={{ background: "rgba(255,255,255,0.22)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 700 }}>
+                {x.emp.name}: {money(x.owed)}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PaymentForm({ employee, pendingDays, onPay }) {
+  const [days, setDays] = useState(pendingDays || 0);
+  const [bono, setBono] = useState("");
+  const [deducciones, setDeducciones] = useState("");
+  const [note, setNote] = useState("");
+  const bruto = (Number(days) || 0) * (employee.dailyWage || 0) + (Number(bono) || 0);
+  const neto = bruto - (Number(deducciones) || 0);
+
+  return (
+    <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, marginTop: 12, marginBottom: 12 }}>
+      <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 10 }}>💵 Registrar pago detallado</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        <div>
+          <label style={{ ...lbl, marginTop: 0 }}>Días trabajados</label>
+          <input type="number" value={days} onChange={(e) => setDays(e.target.value)} style={{ ...inp, maxWidth: 100 }} />
+        </div>
+        <div>
+          <label style={{ ...lbl, marginTop: 0 }}>Bono (opcional)</label>
+          <input type="number" placeholder="0" value={bono} onChange={(e) => setBono(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
+        </div>
+        <div>
+          <label style={{ ...lbl, marginTop: 0 }}>Deducciones (INSS, otros)</label>
+          <input type="number" placeholder="0" value={deducciones} onChange={(e) => setDeducciones(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
+        </div>
+      </div>
+      <input placeholder="Nota (ej: quincena 1-15 julio)" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...inp, marginBottom: 10 }} />
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", marginBottom: 4 }}>
+        <span>Total bruto</span><span>{money(bruto)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 17, marginBottom: 12 }}>
+        <span>Neto a pagar</span><span>{money(neto)}</span>
+      </div>
+      <button
+        disabled={neto <= 0}
+        onClick={() => {
+          onPay({ amount: neto, note, days: Number(days) || 0, bruto, bono: Number(bono) || 0, deducciones: Number(deducciones) || 0 });
+          setBono(""); setDeducciones(""); setNote("");
+        }}
+        style={{ width: "100%", padding: 12, border: "none", borderRadius: 8, background: neto > 0 ? "#2E7D32" : "#C9D6E0", color: "#fff", fontWeight: 800, cursor: neto > 0 ? "pointer" : "not-allowed", fontSize: 14 }}
+      >
+        💵 Registrar pago ({money(neto)})
+      </button>
+    </div>
+  );
 }
 
 function printPayrollSummary(employees, payments, clockRecords) {
@@ -2174,6 +2294,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal y Nómina</h2>
+      <PaydayBanner employees={employees} payments={payments} clockRecords={clockRecords} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <p style={{ fontSize: 12, color: "#8a7a63", margin: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
         {employees.length > 0 && (
@@ -2291,24 +2412,17 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                   >
                     {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
                   </button>
-                  {st.owed > 0 && (
-                    <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: 12, margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                      <div style={{ fontSize: 12 }}>
-                        <strong>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
-                        {st.lastPayment && <div style={{ color: "#8a7a63" }}>Último pago: {new Date(st.lastPayment.time).toLocaleDateString("es-NI")}</div>}
-                      </div>
-                      <button
-                        onClick={() => onAddPayment(emp.name, st.owed, payNote[key] || "Pago de días trabajados")}
-                        style={{ padding: "10px 18px", border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13 }}
-                      >
-                        💵 Pagar {money(st.owed)}
-                      </button>
+                  {st.pendingDays > 0 && (
+                    <div style={{ fontSize: 12, color: "#8a7a63", margin: "10px 0 0" }}>
+                      <strong style={{ color: "#2B2118" }}>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
+                      {st.lastPayment && <span> · Último pago: {new Date(st.lastPayment.time).toLocaleDateString("es-NI")}</span>}
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                    <input placeholder="Nota (ej: adelanto, bono)" value={payNote[key] || ""} onChange={(e) => setPayNote((s) => ({ ...s, [key]: e.target.value }))} style={{ ...inp, maxWidth: 180 }} />
-                    <PayCustomButton onPay={(amt) => onAddPayment(emp.name, amt, payNote[key] || "")} />
-                  </div>
+                  <PaymentForm
+                    employee={emp}
+                    pendingDays={st.pendingDays}
+                    onPay={(data) => onAddPayment(emp.name, data.amount, data.note, { bruto: data.bruto, bono: data.bono, deducciones: data.deducciones, days: data.days })}
+                  />
                   <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
                   {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
                   {st.empPayments.map((p) => (
