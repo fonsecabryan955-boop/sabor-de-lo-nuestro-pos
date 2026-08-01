@@ -3162,7 +3162,7 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
             key={r}
             onClick={() => setRole(r)}
             style={{
-              padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
+              padding: "6px 12px", borderRadius: 20, cursor: "pointer", fontWeight: 700, fontSize: 12,
               background: role === r ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#fff",
               color: role === r ? "#fff" : "#5a4c3a", border: role === r ? "none" : "1px solid #E5D9C3",
             }}
