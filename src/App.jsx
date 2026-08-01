@@ -275,11 +275,23 @@ export default function App() {
     }
   }, [loaded]);
 
-  const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], salesGoal = 0, pin } = state;
-  const menuItems = state.menuItems && state.menuItems.length ? state.menuItems : DEFAULT_MENU;
-  const menuCats = state.menuCats && state.menuCats.length ? state.menuCats : DEFAULT_CATS;
-  const inventory = state.inventory || [];
-  const inventoryLog = state.inventoryLog || [];
+  const tables = Array.isArray(state.tables) ? state.tables : emptyTables();
+  const deliveries = Array.isArray(state.deliveries) ? state.deliveries : [];
+  const sales = Array.isArray(state.sales) ? state.sales : [];
+  const expenses = Array.isArray(state.expenses) ? state.expenses : [];
+  const employees = Array.isArray(state.employees) ? state.employees : [];
+  const clockRecords = Array.isArray(state.clockRecords) ? state.clockRecords : [];
+  const promotions = Array.isArray(state.promotions) ? state.promotions : [];
+  const salesLog = Array.isArray(state.salesLog) ? state.salesLog : [];
+  const expensesLog = Array.isArray(state.expensesLog) ? state.expensesLog : [];
+  const payments = Array.isArray(state.payments) ? state.payments : [];
+  const cashSessions = Array.isArray(state.cashSessions) ? state.cashSessions : [];
+  const salesGoal = state.salesGoal || 0;
+  const pin = state.pin || DEFAULT_PIN;
+  const menuItems = Array.isArray(state.menuItems) && state.menuItems.length ? state.menuItems : DEFAULT_MENU;
+  const menuCats = Array.isArray(state.menuCats) && state.menuCats.length ? state.menuCats : DEFAULT_CATS;
+  const inventory = Array.isArray(state.inventory) ? state.inventory : [];
+  const inventoryLog = Array.isArray(state.inventoryLog) ? state.inventoryLog : [];
 
   useEffect(() => {
     const current = {};
@@ -1255,90 +1267,167 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
     }
   }
 
+  const CHAR = "#1A1410";
+  const CHAR2 = "#2B2118";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const GOLD = "#F2C879";
+  const CREAM = "#FFF8ED";
+  const PAPER = "#FBF2E4";
+  const ASH = "#8a7a63";
+
   return (
     <>
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 680, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: 19, fontWeight: 800 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
-        </div>
-        <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
-          <div style={{ width: 160, borderRight: "1px solid #E5D9C3", flexShrink: 0, background: "#FBF2E4", padding: 6 }}>
-            {allCatNames.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCat(c)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "12px 12px", borderRadius: 10, marginBottom: 4,
-                  border: "none", cursor: "pointer", fontSize: 13, fontWeight: 700,
-                  background: cat === c ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "transparent",
-                  color: cat === c ? "#fff" : (c === "Promociones" ? "#C1272D" : "#5a4c3a"),
-                  boxShadow: cat === c ? "0 3px 8px rgba(193,39,45,0.3)" : "none",
-                }}
-              >
-                <span style={{ fontSize: 16 }}>{c === "Promociones" ? "🏷️" : (menuCats.find((mc) => mc.name === c)?.icon || "🍽️")}</span> {c}
-              </button>
-            ))}
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+      @keyframes soModalIn { from { opacity: 0; transform: scale(0.94) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+      @keyframes soBadgePop { 0% { transform: scale(0); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
+      .so-card:active { transform: scale(0.97); }
+    `}</style>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,7,4,0.66)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <div style={{
+        fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
+        background: CREAM, borderRadius: 22, width: "100%", maxWidth: 720, maxHeight: "92vh",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+        boxShadow: "0 30px 70px rgba(0,0,0,0.5)", animation: "soModalIn 0.28s cubic-bezier(.16,1,.3,1)",
+      }}>
+        {/* Header */}
+        <div style={{ background: `linear-gradient(135deg, ${CHAR} 0%, #241c14 55%, ${CHAR2} 100%)`, padding: "20px 24px 16px", position: "relative" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3, color: AMBER, opacity: 0.9, marginBottom: 4 }}>
+                {kitchenStatus ? "ACTUALIZANDO PEDIDO" : "ARMANDO PEDIDO"}
+              </div>
+              <h3 style={{ margin: 0, fontFamily: "'Anton', sans-serif", fontWeight: 400, fontSize: 30, letterSpacing: 0.5, lineHeight: 1, color: CREAM, textTransform: "uppercase" }}>
+                {title}
+              </h3>
+            </div>
+            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 10, color: CREAM, cursor: "pointer", padding: 8, flexShrink: 0 }}>
+              <X size={20} />
+            </button>
           </div>
-          <div style={{ flex: 1, padding: 14, overflow: "auto" }}>
+        </div>
+        <div style={{ height: 3, background: `linear-gradient(90deg, ${EMBER}, ${AMBER}, ${GOLD})` }} />
+
+        <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
+          <div style={{ width: 172, borderRight: "1px solid #EEDFC2", flexShrink: 0, background: PAPER, padding: 10 }}>
+            {allCatNames.map((c) => {
+              const active = cat === c;
+              return (
+                <button
+                  key={c}
+                  onClick={() => setCat(c)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 14, marginBottom: 6,
+                    border: "none", cursor: "pointer",
+                    background: active ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "transparent",
+                    boxShadow: active ? "0 6px 14px rgba(193,39,45,0.32)" : "none",
+                  }}
+                >
+                  <span style={{
+                    width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0,
+                    background: active ? "rgba(255,255,255,0.22)" : "#fff",
+                    boxShadow: active ? "none" : "0 1px 3px rgba(0,0,0,0.08)",
+                  }}>
+                    {c === "Promociones" ? "🏷️" : (menuCats.find((mc) => mc.name === c)?.icon || "🍽️")}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: 0.2, textTransform: "uppercase", color: active ? "#fff" : (c === "Promociones" ? EMBER : "#5a4c3a") }}>
+                    {c}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ flex: 1, padding: 16, overflow: "auto" }}>
             <input
               placeholder="🔍 Buscar producto..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #E5D9C3", fontSize: 13, boxSizing: "border-box", marginBottom: 12 }}
+              style={{ width: "100%", padding: "12px 16px", borderRadius: 999, border: "1px solid #EAD9B8", fontSize: 13, boxSizing: "border-box", marginBottom: 14, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", fontFamily: "inherit" }}
             />
             {cat === "Promociones" && listForCat.length === 0 && !search && (
-              <p style={{ fontSize: 13, color: "#8a7a63" }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
+              <p style={{ fontSize: 13, color: ASH }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
             )}
             {search && listForCat.length === 0 && (
-              <p style={{ fontSize: 13, color: "#8a7a63" }}>Sin resultados para "{search}".</p>
+              <p style={{ fontSize: 13, color: ASH }}>Sin resultados para "{search}".</p>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
               {listForCat.map((m) => {
                 const inCart = cartQtyFor(m.id);
                 return (
                   <button
                     key={m.id}
+                    className="so-card"
                     onClick={() => handleItemClick(m)}
                     style={{
-                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6, padding: "14px 14px", borderRadius: 12,
-                      border: "none", cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative",
-                      background: cat === "Promociones" ? "linear-gradient(135deg, #FFF3EC, #FFE4D3)" : "#fff",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: "18px 14px 34px", borderRadius: 16,
+                      border: "1px solid rgba(0,0,0,0.04)", cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative", overflow: "hidden",
+                      background: cat === "Promociones" ? "linear-gradient(160deg, #FFF3EC, #FFE4D3)" : "#fff",
+                      boxShadow: "0 4px 14px rgba(43,33,24,0.10)", transition: "transform 0.12s ease",
                     }}
                   >
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${EMBER}, ${AMBER})` }} />
                     {inCart > 0 && (
-                      <span style={{ position: "absolute", top: 8, right: 8, background: "#2E7D32", color: "#fff", borderRadius: 20, width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800 }}>
+                      <span style={{
+                        position: "absolute", top: 10, left: 10, background: "#2E7D32", color: "#fff", borderRadius: "50%",
+                        width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+                        animation: "soBadgePop 0.25s ease", boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                      }}>
                         {inCart}
                       </span>
                     )}
-                    <span style={{ fontWeight: 700, color: "#2B2118" }}>{m.name}</span>
-                    <span style={{ fontWeight: 800, color: "#C1272D", fontSize: 15 }}>{money(m.price)}</span>
+                    <span style={{ fontWeight: 800, color: CHAR2, fontSize: 14.5, lineHeight: 1.25, marginTop: inCart > 0 ? 14 : 0 }}>{m.name}</span>
+                    <span style={{
+                      position: "absolute", bottom: 10, right: 10, transform: "rotate(-5deg)",
+                      background: cat === "Promociones" ? `linear-gradient(135deg, ${AMBER}, ${GOLD})` : `linear-gradient(135deg, ${EMBER}, #8f1c21)`,
+                      color: "#fff", fontFamily: "'Anton', sans-serif", fontWeight: 400, fontSize: 14, padding: "4px 11px", borderRadius: 8,
+                      boxShadow: "0 3px 8px rgba(0,0,0,0.25)", letterSpacing: 0.3,
+                    }}>
+                      {money(m.price)}
+                    </span>
                   </button>
                 );
               })}
             </div>
           </div>
         </div>
-        <div style={{ borderTop: "1px solid #E5D9C3", padding: 14, maxHeight: 200, overflow: "auto", background: "#FBF2E4" }}>
-          {items.length === 0 && <p style={{ fontSize: 13, color: "#8a7a63" }}>Sin productos agregados todavía.</p>}
+
+        <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 10, background: PAPER }}>
+          <div style={{ flex: 1, borderTop: "2px dashed #E0CFA8" }} />
+          <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 12, letterSpacing: 2, color: ASH }}>🧾 TU PEDIDO</span>
+          <div style={{ flex: 1, borderTop: "2px dashed #E0CFA8" }} />
+        </div>
+        <div style={{ padding: 14, maxHeight: 190, overflow: "auto", background: PAPER }}>
+          {items.length === 0 && <p style={{ fontSize: 13, color: ASH, textAlign: "center" }}>Sin productos agregados todavía.</p>}
           {items.map((it) => (
-            <div key={it.menuId} style={{ marginBottom: 8, background: "#fff", borderRadius: 10, padding: 10 }}>
+            <div key={it.menuId} style={{ marginBottom: 8, background: "#fff", borderRadius: 12, padding: 10, border: "1px solid #F0E8D8", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{it.name}</span>
-                <button onClick={() => onQty(it.menuId, -1)} style={iconBtn}><Minus size={14} /></button>
-                <span style={{ minWidth: 18, textAlign: "center", fontSize: 13, fontWeight: 700 }}>{it.qty}</span>
-                <button onClick={() => onQty(it.menuId, 1)} style={iconBtn}><Plus size={14} /></button>
-                <span style={{ minWidth: 70, textAlign: "right", fontSize: 13, fontWeight: 800, color: "#C1272D" }}>{money(it.price * it.qty)}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: CHAR2 }}>{it.name}</span>
+                <button onClick={() => onQty(it.menuId, -1)} style={{ width: 26, height: 26, borderRadius: "50%", border: "none", background: CHAR2, color: CREAM, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Minus size={13} /></button>
+                <span style={{ minWidth: 18, textAlign: "center", fontSize: 13, fontWeight: 800 }}>{it.qty}</span>
+                <button onClick={() => onQty(it.menuId, 1)} style={{ width: 26, height: 26, borderRadius: "50%", border: "none", background: CHAR2, color: CREAM, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={13} /></button>
+                <span style={{ minWidth: 74, textAlign: "right", fontFamily: "'Anton', sans-serif", fontSize: 15, color: EMBER }}>{money(it.price * it.qty)}</span>
               </div>
-              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "6px 8px", borderRadius: 6, border: "1px solid #E5D9C3", boxSizing: "border-box" }} />
+              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1px solid #E5D9C3", boxSizing: "border-box", fontFamily: "inherit" }} />
             </div>
           ))}
         </div>
-        <div style={{ padding: 16, borderTop: "1px solid #E5D9C3", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: "#fff" }}>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>Total: {money(total)}</div>
-          <button onClick={onSend} disabled={!items.length} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 10, border: "none", cursor: items.length ? "pointer" : "not-allowed", background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, opacity: items.length ? 1 : 0.5, fontSize: 14 }}>
+        <div style={{ padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: `linear-gradient(135deg, ${CHAR}, ${CHAR2})` }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: AMBER, opacity: 0.85, marginBottom: 2 }}>TOTAL A PAGAR</div>
+            <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 28, color: CREAM, lineHeight: 1 }}>{money(total)}</div>
+          </div>
+          <button
+            onClick={onSend}
+            disabled={!items.length}
+            style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "14px 24px", borderRadius: 14, border: "none",
+              cursor: items.length ? "pointer" : "not-allowed",
+              background: items.length ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.15)",
+              color: "#fff", fontWeight: 800, fontSize: 14,
+              boxShadow: items.length ? "0 8px 20px rgba(193,39,45,0.4)" : "none",
+            }}
+          >
             <Send size={16} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
           </button>
         </div>
