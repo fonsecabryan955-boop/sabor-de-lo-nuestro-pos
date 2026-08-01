@@ -2319,7 +2319,15 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
   const delivery = activos.filter((d) => d.type !== "pickup");
   const pickup = activos.filter((d) => d.type === "pickup");
 
-  function Section({ title, icon, list }) {
+  function sendDispatchWhatsapp(d, e) {
+    e.stopPropagation();
+    const digits = (d.phone || "").replace(/[^0-9]/g, "");
+    const msg = `¡Hola ${d.customer}! 🛵 Tu pedido de ${RESTAURANT_NAME} ya va en camino. ¡Que lo disfrutes! 🍔`;
+    const url = digits ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank");
+  }
+
+  function Section({ title, icon, list, showDispatch }) {
     return (
       <div style={{ marginBottom: 24 }}>
         <h3 style={{ fontSize: 14, fontWeight: 800, color: "#8a7a63", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>{icon} {title} ({list.length})</h3>
@@ -2327,6 +2335,7 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
           {list.map((d) => {
             const st = statusStyle(d.kitchenStatus, d.items.length > 0);
+            const canDispatch = showDispatch && d.kitchenStatus === "listo" && d.phone;
             return (
               <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -2336,6 +2345,14 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
                 {d.address && <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>}
                 {d.phone && <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>}
                 <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
+                {canDispatch && (
+                  <div
+                    onClick={(e) => sendDispatchWhatsapp(d, e)}
+                    style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#25D366", color: "#fff", fontWeight: 800, fontSize: 12, padding: "8px 10px", borderRadius: 8, cursor: "pointer" }}
+                  >
+                    📱 Avisar por WhatsApp
+                  </div>
+                )}
               </button>
             );
           })}
@@ -2360,7 +2377,7 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
       )}
       {activos.length > 0 && (
         <>
-          <Section title="Delivery" icon="🛵" list={delivery} />
+          <Section title="Delivery" icon="🛵" list={delivery} showDispatch />
           <Section title="Para llevar" icon="🥡" list={pickup} />
         </>
       )}
