@@ -13,7 +13,7 @@ const SHIFT_END = "21:00";
 const LATE_GRACE_MIN = 10;
 const DEFAULT_PIN = "1234";
 const POLL_MS = 4000;
-const PAYDAY_DAY = 15; // día del mes en que aparece el aviso de pago
+const PAYDAY_DAYS = [15, 30]; // días del mes en que aparece el aviso de pago (quincenal)
 
 // Semilla inicial del menú — a partir de aquí el menú se administra desde la app (botón "Gestionar menú" en Mesas)
 const DEFAULT_MENU = [
@@ -55,6 +55,8 @@ const DEFAULT_CATS = [
   { name: "Salsas", icon: "🥫" },
   { name: "Bebidas", icon: "🧃" },
 ];
+
+const INVENTORY_UNITS = ["unidad", "lb", "kg", "g", "litro", "ml", "paquete"];
 const WING_SAUCES = [
   { id: "bbq", label: "BBQ" },
   { id: "buffalo", label: "Buffalo" },
@@ -88,6 +90,8 @@ function initialState() {
     pin: DEFAULT_PIN,
     menuItems: DEFAULT_MENU,
     menuCats: DEFAULT_CATS,
+    inventory: [],
+    inventoryLog: [],
   };
 }
 function todayStr() {
@@ -274,6 +278,8 @@ export default function App() {
   const { tables, deliveries, sales = [], expenses = [], employees = [], clockRecords = [], promotions = [], salesLog = [], expensesLog = [], payments = [], cashSessions = [], salesGoal = 0, pin } = state;
   const menuItems = state.menuItems && state.menuItems.length ? state.menuItems : DEFAULT_MENU;
   const menuCats = state.menuCats && state.menuCats.length ? state.menuCats : DEFAULT_CATS;
+  const inventory = state.inventory || [];
+  const inventoryLog = state.inventoryLog || [];
 
   useEffect(() => {
     const current = {};
@@ -363,11 +369,13 @@ export default function App() {
       if (!chargedItems.length) return;
       const { subtotal, discountAmount, total } = computeTotal(chargedItems);
       const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
+      const invResult = deductInventoryForSale(chargedItems);
       const next = {
         ...state,
         sales: [...sales, sale],
         salesLog: [...salesLog, sale],
         tables: tables.map((x) => (x.id === id ? (remainingItems.length ? { ...x, items: remainingItems } : { ...x, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null, occupiedAt: null }) : x)),
+        ...(invResult || {}),
       };
       persist(next);
       if (!remainingItems.length) setActiveTable(null);
@@ -377,11 +385,13 @@ export default function App() {
       if (!d.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(d.items);
       const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
+      const invResult = deductInventoryForSale(d.items);
       const next = {
         ...state,
         sales: [...sales, sale],
         salesLog: [...salesLog, sale],
         deliveries: deliveries.map((x) => (x.id === id ? { ...x, kitchenStatus: "entregado" } : x)),
+        ...(invResult || {}),
       };
       persist(next);
       setActiveDelivery(null);
@@ -398,6 +408,12 @@ export default function App() {
   }
   function toggleEmployeeActive(id) {
     persist({ ...state, employees: employees.map((e) => (e.id === id ? { ...e, active: !e.active } : e)) });
+  }
+  function deleteEmployee(id) {
+    persist({ ...state, employees: employees.filter((e) => e.id !== id) });
+  }
+  function updateEmployee(id, patch) {
+    persist({ ...state, employees: employees.map((e) => (e.id === id ? { ...e, ...patch } : e)) });
   }
   function clockIn(employeeName) {
     const now = new Date();
@@ -428,6 +444,48 @@ export default function App() {
     if (!clean) return;
     if (menuCats.some((c) => c.name.toLowerCase() === clean.toLowerCase())) return;
     persist({ ...state, menuCats: [...menuCats, { name: clean, icon: icon || "🍽️" }] });
+  }
+  function addInventoryItem(item) {
+    persist({ ...state, inventory: [...inventory, { id: `inv${Date.now()}`, stock: 0, minStock: 0, ...item }] });
+  }
+  function updateInventoryItem(id, patch) {
+    persist({ ...state, inventory: inventory.map((i) => (i.id === id ? { ...i, ...patch } : i)) });
+  }
+  function deleteInventoryItem(id) {
+    persist({ ...state, inventory: inventory.filter((i) => i.id !== id) });
+  }
+  function adjustStock(id, qty, type, note) {
+    const item = inventory.find((i) => i.id === id);
+    if (!item) return;
+    const delta = type === "salida" ? -Math.abs(qty) : Math.abs(qty);
+    const logEntry = { id: Date.now(), itemId: id, itemName: item.name, type, qty: Math.abs(qty), note: note || "", time: new Date().toISOString() };
+    persist({
+      ...state,
+      inventory: inventory.map((i) => (i.id === id ? { ...i, stock: Math.max(0, (i.stock || 0) + delta) } : i)),
+      inventoryLog: [...inventoryLog, logEntry],
+    });
+  }
+  function setItemRecipe(menuItemId, recipe) {
+    persist({ ...state, menuItems: menuItems.map((m) => (m.id === menuItemId ? { ...m, recipe } : m)) });
+  }
+  function deductInventoryForSale(items) {
+    let nextInventory = inventory;
+    const newLogs = [];
+    items.forEach((soldItem) => {
+      const menuDef = menuItems.find((m) => m.id === soldItem.menuId || soldItem.menuId.startsWith(String(m.id) + "-"));
+      if (!menuDef || !menuDef.recipe || !menuDef.recipe.length) return;
+      menuDef.recipe.forEach((r) => {
+        const invItem = nextInventory.find((i) => i.id === r.invId);
+        if (!invItem) return;
+        const consumed = r.qty * soldItem.qty;
+        nextInventory = nextInventory.map((i) => (i.id === r.invId ? { ...i, stock: Math.max(0, (i.stock || 0) - consumed) } : i));
+        newLogs.push({ id: Date.now() + Math.random(), itemId: r.invId, itemName: invItem.name, type: "venta", qty: consumed, note: `Venta: ${soldItem.name}`, time: new Date().toISOString() });
+      });
+    });
+    if (newLogs.length) {
+      return { inventory: nextInventory, inventoryLog: [...inventoryLog, ...newLogs] };
+    }
+    return null;
   }
   function addPromotion(promo) {
     persist({ ...state, promotions: [...promotions, { id: Date.now(), ...promo }] });
@@ -488,6 +546,7 @@ export default function App() {
     { id: "promos", label: "Promos", icon: Tag },
     { id: "clientes", label: "Clientes", icon: Users },
     { id: "empleados", label: "Empleados", icon: UserCheck },
+    { id: "inventario", label: "Inventario", icon: ClipboardList },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
     { id: "historial", label: "Historial", icon: Archive },
     { id: "menutv", label: "Menú TV", icon: Tv },
@@ -598,10 +657,23 @@ export default function App() {
         {view === "clientes" && <ClientesView salesLog={salesLog} />}
 
         {view === "empleados" && (
-          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} onToggleActive={toggleEmployeeActive} />
+          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} onToggleActive={toggleEmployeeActive} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />
         )}
 
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
+        {view === "inventario" && (
+          <InventoryView
+            inventory={inventory}
+            inventoryLog={inventoryLog}
+            menuItems={menuItems}
+            onAdd={addInventoryItem}
+            onUpdate={updateInventoryItem}
+            onDelete={deleteInventoryItem}
+            onAdjust={adjustStock}
+            onSetRecipe={setItemRecipe}
+          />
+        )}
+
+        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
 
         {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
@@ -894,6 +966,189 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
           <button onClick={onClose} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #E5D9C3", background: "#fff", fontWeight: 700, cursor: "pointer" }}>Cerrar</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StockBar({ stock, minStock }) {
+  const low = minStock > 0 && stock <= minStock;
+  const pct = minStock > 0 ? Math.min(100, Math.round((stock / (minStock * 2 || 1)) * 100)) : 100;
+  return (
+    <div style={{ background: "#F0E8D8", borderRadius: 6, height: 8, overflow: "hidden", marginTop: 4 }}>
+      <div style={{ width: `${pct}%`, height: "100%", background: low ? "linear-gradient(90deg, #E53935, #C1272D)" : "linear-gradient(90deg, #26A65B, #158A4A)", borderRadius: 6 }} />
+    </div>
+  );
+}
+
+function StockAdjustForm({ item, onAdjust }) {
+  const [qty, setQty] = useState("");
+  const [note, setNote] = useState("");
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+      <input type="number" placeholder="Cantidad" value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...inp, maxWidth: 100, padding: 7 }} />
+      <input placeholder="Nota (ej: compra, merma)" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7 }} />
+      <button
+        disabled={!qty}
+        onClick={() => { onAdjust(item.id, Number(qty), "entrada", note); setQty(""); setNote(""); }}
+        style={{ fontSize: 12, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: qty ? 1 : 0.5 }}
+      >
+        + Entrada
+      </button>
+      <button
+        disabled={!qty}
+        onClick={() => { onAdjust(item.id, Number(qty), "salida", note); setQty(""); setNote(""); }}
+        style={{ fontSize: 12, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: qty ? 1 : 0.5 }}
+      >
+        − Salida
+      </button>
+    </div>
+  );
+}
+
+function InventoryView({ inventory, inventoryLog, menuItems, onAdd, onUpdate, onDelete, onAdjust, onSetRecipe }) {
+  const [name, setName] = useState("");
+  const [unit, setUnit] = useState(INVENTORY_UNITS[0]);
+  const [stock, setStock] = useState("");
+  const [minStock, setMinStock] = useState("");
+  const [recipeFor, setRecipeFor] = useState(null);
+  const [showLog, setShowLog] = useState(false);
+
+  const lowStock = inventory.filter((i) => i.minStock > 0 && i.stock <= i.minStock);
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📦 Inventario de insumos</h2>
+      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
+        Llevá el control de tus insumos y ligalos a los platillos para que el stock se descuente solo con cada venta.
+      </p>
+
+      {lowStock.length > 0 && (
+        <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 14, padding: 16, marginBottom: 20, color: "#fff", boxShadow: "0 6px 18px rgba(193,39,45,0.3)" }}>
+          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>⚠️ Stock bajo — hay que comprar pronto</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {lowStock.map((i) => (
+              <span key={i.id} style={{ background: "rgba(255,255,255,0.22)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 700 }}>
+                {i.name}: {i.stock} {i.unit} (mín. {i.minStock})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>➕ Agregar insumo nuevo</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input placeholder="Nombre (ej: Pechuga de pollo)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+          <select value={unit} onChange={(e) => setUnit(e.target.value)} style={{ ...inp, maxWidth: 110 }}>
+            {INVENTORY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+          <input placeholder="Stock inicial" type="number" value={stock} onChange={(e) => setStock(e.target.value)} style={{ ...inp, maxWidth: 130 }} />
+          <input placeholder="Stock mínimo (alerta)" type="number" value={minStock} onChange={(e) => setMinStock(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
+          <button
+            disabled={!name}
+            onClick={() => { onAdd({ name: name.trim(), unit, stock: Number(stock) || 0, minStock: Number(minStock) || 0 }); setName(""); setStock(""); setMinStock(""); }}
+            style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}
+          >
+            Agregar
+          </button>
+        </div>
+      </div>
+
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginBottom: 10 }}>Insumos ({inventory.length})</h3>
+      {inventory.length === 0 && <p style={{ color: "#8a7a63" }}>Todavía no agregás ningún insumo.</p>}
+      <div style={{ display: "grid", gap: 10 }}>
+        {inventory.map((item) => {
+          const low = item.minStock > 0 && item.stock <= item.minStock;
+          const linkedItems = menuItems.filter((m) => (m.recipe || []).some((r) => r.invId === item.id));
+          return (
+            <div key={item.id} style={{ background: "#fff", border: low ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <div style={{ fontWeight: 800, fontSize: 14 }}>{item.name}</div>
+                  <div style={{ fontSize: 11, color: "#8a7a63" }}>Mínimo: {item.minStock} {item.unit}{linkedItems.length > 0 ? ` · ligado a ${linkedItems.length} platillo${linkedItems.length !== 1 ? "s" : ""}` : ""}</div>
+                  <StockBar stock={item.stock} minStock={item.minStock} />
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: low ? "#C1272D" : "#2B2118" }}>{item.stock} {item.unit}</div>
+                  {low && <div style={{ fontSize: 10, color: "#C1272D", fontWeight: 700 }}>⚠️ Stock bajo</div>}
+                </div>
+              </div>
+              <StockAdjustForm item={item} onAdjust={onAdjust} />
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button onClick={() => setRecipeFor(recipeFor === item.id ? null : item.id)} style={{ fontSize: 11, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#5a4c3a", fontWeight: 700 }}>
+                  🔗 Ligar a platillos
+                </button>
+                <button onClick={() => { if (window.confirm(`¿Eliminar "${item.name}" del inventario?`)) onDelete(item.id); }} style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#C1272D", fontWeight: 700 }}>
+                  Eliminar insumo
+                </button>
+              </div>
+              {recipeFor === item.id && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Platillos que usan este insumo:</div>
+                  {menuItems.map((m) => {
+                    const line = (m.recipe || []).find((r) => r.invId === item.id);
+                    return (
+                      <MenuRecipeLine key={m.id} menuItem={m} inventoryItem={item} qty={line?.qty || ""} onSetRecipe={onSetRecipe} />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {inventoryLog.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <button onClick={() => setShowLog((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 14px", cursor: "pointer", color: "#8a7a63", fontWeight: 700 }}>
+            📜 {showLog ? "Ocultar" : "Ver"} historial de movimientos ({inventoryLog.length})
+          </button>
+          {showLog && (
+            <div style={{ marginTop: 10, background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "4px 14px", maxHeight: 300, overflowY: "auto" }}>
+              {inventoryLog.slice().reverse().map((l) => (
+                <div key={l.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
+                  <span>
+                    {l.type === "entrada" ? "🟢" : l.type === "venta" ? "🛒" : "🔴"} <strong>{l.itemName}</strong>
+                    {l.note ? <span style={{ color: "#8a7a63" }}> — {l.note}</span> : ""}
+                  </span>
+                  <span style={{ fontWeight: 700, color: l.type === "entrada" ? "#2E7D32" : "#C1272D" }}>
+                    {l.type === "entrada" ? "+" : "-"}{l.qty} · {new Date(l.time).toLocaleDateString("es-NI")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuRecipeLine({ menuItem, inventoryItem, qty, onSetRecipe }) {
+  const [val, setVal] = useState(qty);
+  const linked = qty !== "";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12 }}>
+      <span style={{ flex: 1 }}>{linked ? "✅" : "⬜"} {menuItem.name}</span>
+      <input
+        type="number"
+        placeholder="cant."
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        style={{ ...inp, maxWidth: 70, padding: 5 }}
+      />
+      <button
+        onClick={() => {
+          const recipe = menuItem.recipe || [];
+          const next = val
+            ? (recipe.some((r) => r.invId === inventoryItem.id) ? recipe.map((r) => (r.invId === inventoryItem.id ? { ...r, qty: Number(val) } : r)) : [...recipe, { invId: inventoryItem.id, qty: Number(val) }])
+            : recipe.filter((r) => r.invId !== inventoryItem.id);
+          onSetRecipe(menuItem.id, next);
+        }}
+        style={{ fontSize: 11, background: "#2B2118", color: "#F2C879", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+      >
+        Guardar
+      </button>
     </div>
   );
 }
@@ -1551,6 +1806,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const [splitSelected, setSplitSelected] = useState({});
   const [evenSplitN, setEvenSplitN] = useState({});
   const [showPinSettings, setShowPinSettings] = useState(false);
+  const [accountTab, setAccountTab] = useState("todas");
   const grandTotal = abiertas.reduce((sum, o) => sum + orderTotal(o.items), 0);
 
   function getDiscount(key) {
@@ -1566,16 +1822,42 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
     return Math.max(0, sub - amt);
   }
 
+  const mesasAbiertas = abiertas.filter((o) => o.kind === "table").length;
+  const deliveryAbiertos = abiertas.filter((o) => o.kind === "delivery").length;
+
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>💵 Caja</h2>
-        <button onClick={() => setShowPinSettings((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>⚙️ Cambiar PIN</button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <h2 style={{ fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: 0.2 }}>💵 Caja</h2>
+          <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 2 }}>{RESTAURANT_NAME}</div>
+        </div>
+        <button
+          onClick={() => setShowPinSettings((s) => !s)}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", boxShadow: "0 3px 10px rgba(43,33,24,0.25)" }}
+        >
+          ⚙️ Cambiar PIN
+        </button>
       </div>
+
       {abiertas.length > 0 && (
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "12px 18px", margin: "12px 0 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ color: "#F2C879", fontWeight: 700, fontSize: 13, letterSpacing: 0.5 }}>CUENTAS ABIERTAS: {abiertas.length}</span>
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(grandTotal)}</span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+          <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 4 }}>CUENTAS ABIERTAS</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#2B2118" }}>{abiertas.length}</div>
+          </div>
+          <div style={{ background: "linear-gradient(135deg, #C1531F, #C1272D)", borderRadius: 12, padding: "14px 16px", color: "#fff" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>🍽️ MESAS</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{mesasAbiertas}</div>
+          </div>
+          <div style={{ background: "linear-gradient(135deg, #1565C0, #0D47A1)", borderRadius: 12, padding: "14px 16px", color: "#fff" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>🛵 DELIVERY</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{deliveryAbiertos}</div>
+          </div>
+          <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 16px", color: "#F2C879" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>TOTAL A COBRAR</div>
+            <div style={{ fontSize: 22, fontWeight: 800 }}>{money(grandTotal)}</div>
+          </div>
         </div>
       )}
       {showPinSettings && <ChangePin current={pin} onChange={(p) => { onChangePin(p); setShowPinSettings(false); }} />}
@@ -1590,8 +1872,46 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
           <p>No hay cuentas abiertas.</p>
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-        {abiertas.map((o) => {
+
+      {abiertas.length > 0 && (() => {
+        const mesasList = abiertas.filter((o) => o.kind === "table");
+        const deliveryList = abiertas.filter((o) => o.kind === "delivery" && o.type !== "pickup");
+        const pickupList = abiertas.filter((o) => o.kind === "delivery" && o.type === "pickup");
+        const tabs = [
+          { id: "todas", label: "Todas", icon: "📋", list: abiertas },
+          { id: "mesas", label: "Mesas", icon: "🍽️", list: mesasList },
+          { id: "delivery", label: "Delivery", icon: "🛵", list: deliveryList },
+          { id: "pickup", label: "Para llevar", icon: "🥡", list: pickupList },
+        ].filter((t) => t.id === "todas" || t.list.length > 0);
+        const activeList = (tabs.find((t) => t.id === accountTab) || tabs[0]).list;
+
+        return (
+          <>
+            <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
+              {tabs.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setAccountTab(t.id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontWeight: 800, fontSize: 13,
+                    background: accountTab === t.id ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#fff",
+                    color: accountTab === t.id ? "#fff" : "#5a4c3a",
+                    boxShadow: accountTab === t.id ? "0 4px 12px rgba(193,39,45,0.3)" : "0 1px 4px rgba(0,0,0,0.06)",
+                    border: accountTab === t.id ? "none" : "1px solid #E5D9C3",
+                  }}
+                >
+                  {t.icon} {t.label}
+                  <span style={{
+                    background: accountTab === t.id ? "rgba(255,255,255,0.25)" : "#F3ECE0",
+                    color: accountTab === t.id ? "#fff" : "#5a4c3a",
+                    borderRadius: 20, padding: "1px 8px", fontSize: 11,
+                  }}>{t.list.length}</span>
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18 }}>
+              {activeList.map((o) => {
           const total = orderTotal(o.items);
           const key = o.kind + o.id;
           const m = method[key] || "Efectivo";
@@ -1611,10 +1931,11 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
           }
 
           return (
-            <div key={key} style={{ background: "#fff", borderRadius: 16, overflow: "hidden", boxShadow: "0 6px 18px rgba(43,33,24,0.1)", border: "1px solid #F0E8D8" }}>
-              <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div key={key} style={{ background: "#fff", borderRadius: 18, overflow: "hidden", boxShadow: "0 10px 24px rgba(43,33,24,0.12)", border: "1px solid #F0E8D8", gridColumn: o.items.length > 6 ? "span 2" : "span 1" }}>
+              <div style={{ height: 4, background: o.kind === "table" ? "linear-gradient(90deg, #C1531F, #C1272D)" : "linear-gradient(90deg, #1565C0, #0D47A1)" }} />
+              <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ color: "#fff", fontWeight: 800, fontSize: 15 }}>{typeIcon} {o.label}</span>
-                <span style={{ color: "#F2C879", fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
+                <span style={{ color: "#F2C879", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, background: "rgba(242,200,121,0.12)", padding: "3px 10px", borderRadius: 20 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
               </div>
               <div style={{ padding: 18 }}>
                 {o.kind === "table" && o.items.length > 1 && (
@@ -1675,9 +1996,16 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                   </div>
                 )}
 
-                <div style={{ fontFamily: "'Courier New', monospace" }}>
+                <div style={{
+                  fontFamily: "'Courier New', monospace",
+                  columnCount: o.items.length > 6 ? 2 : 1,
+                  columnGap: 18,
+                  maxHeight: o.items.length > 16 ? 280 : "none",
+                  overflowY: o.items.length > 16 ? "auto" : "visible",
+                  paddingRight: o.items.length > 6 ? 6 : 0,
+                }}>
                   {o.items.map((it) => (
-                    <div key={it.menuId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#5a4c3a" }}>
+                    <div key={it.menuId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, padding: "4px 0", color: "#5a4c3a", breakInside: "avoid" }}>
                       {isSplitting && (
                         <input type="checkbox" checked={selectedIds.includes(it.menuId)} onChange={() => toggleItem(it.menuId)} style={{ marginRight: 8 }} />
                       )}
@@ -1750,20 +2078,30 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                   </>
                 )}
 
-                <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                  {["Efectivo", "Tarjeta"].map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => setMethod((s) => ({ ...s, [key]: opt }))}
-                      style={{
-                        flex: 1, padding: 11, borderRadius: 10, cursor: "pointer", fontWeight: 700, fontSize: 13,
-                        border: m === opt ? "none" : "1px solid #E5D9C3",
-                        background: m === opt ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#fff", color: m === opt ? "#fff" : "#5a4c3a",
-                      }}
-                    >
-                      <Wallet size={14} style={{ verticalAlign: -2, marginRight: 4 }} />{opt}
-                    </button>
-                  ))}
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 8 }}>MÉTODO DE PAGO</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {[
+                      { id: "Efectivo", icon: "💵", desc: "Pago en billetes/monedas" },
+                      { id: "Tarjeta", icon: "💳", desc: "Débito o crédito" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setMethod((s) => ({ ...s, [key]: opt.id }))}
+                        style={{
+                          flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "14px 10px", borderRadius: 12, cursor: "pointer",
+                          border: m === opt.id ? "2px solid #C1272D" : "1px solid #E5D9C3",
+                          background: m === opt.id ? "linear-gradient(160deg, #FFF3EC, #FFE4D3)" : "#fff",
+                          boxShadow: m === opt.id ? "0 4px 12px rgba(193,39,45,0.15)" : "none",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <span style={{ fontSize: 22 }}>{opt.icon}</span>
+                        <span style={{ fontWeight: 800, fontSize: 13, color: m === opt.id ? "#C1272D" : "#2B2118" }}>{opt.id}</span>
+                        <span style={{ fontSize: 10, color: "#8a7a63" }}>{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {!isSplitting && (
@@ -1855,7 +2193,10 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
             </div>
           );
         })}
-      </div>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -2131,6 +2472,11 @@ function MenuBoardView({ promotions, menuItems, menuCats }) {
 function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [quincenaMonth, setQuincenaMonth] = useState(() => {
+    const d = new Date();
+    const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0, 7);
+  });
 
   const inRange = (isoTime) => {
     const t = isoTime.slice(0, 10);
@@ -2144,12 +2490,69 @@ function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense })
   const totalIncome = filteredSales.reduce((sum, s) => sum + s.total, 0);
   const totalSpent = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
+  const [qYear, qMonth] = quincenaMonth.split("-").map(Number);
+  const lastDay = new Date(qYear, qMonth, 0).getDate();
+  function sumInDayRange(list, dayStart, dayEnd, key) {
+    return list
+      .filter((x) => {
+        const t = new Date(x.time);
+        if (t.getFullYear() !== qYear || t.getMonth() !== qMonth - 1) return false;
+        const day = t.getDate();
+        return day >= dayStart && day <= dayEnd;
+      })
+      .reduce((sum, x) => sum + Number(key === "sale" ? x.total : x.amount), 0);
+  }
+  const q1Sold = sumInDayRange(salesLog, 1, 15, "sale");
+  const q1Spent = sumInDayRange(expensesLog, 1, 15, "exp");
+  const q2Sold = sumInDayRange(salesLog, 16, lastDay, "sale");
+  const q2Spent = sumInDayRange(expensesLog, 16, lastDay, "exp");
+  const monthLabel = new Date(qYear, qMonth - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
+
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>🗄️ Historial permanente</h2>
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
         Este registro nunca se borra, aunque uses los botones de "Borrar" en Reportes — queda como respaldo completo de todo lo vendido y gastado.
       </p>
+
+      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <div style={{ fontWeight: 800, fontSize: 14 }}>📆 Control quincenal — {monthLabel}</div>
+          <input type="month" value={quincenaMonth} onChange={(e) => setQuincenaMonth(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+          <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: 16, color: "#fff" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 8 }}>QUINCENA 1 (día 1 al 15)</div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+              <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q1Sold)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+              <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q1Spent)}</span>
+            </div>
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>Neto</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: q1Sold - q1Spent >= 0 ? "#00E676" : "#FF5252" }}>{money(q1Sold - q1Spent)}</span>
+            </div>
+          </div>
+          <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: 16, color: "#fff" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 8 }}>QUINCENA 2 (día 16 al {lastDay})</div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
+              <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q2Sold)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+              <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q2Spent)}</span>
+            </div>
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>Neto</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: q2Sold - q2Spent >= 0 ? "#00E676" : "#FF5252" }}>{money(q2Sold - q2Spent)}</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+          <span style={{ color: "#5a4c3a", fontWeight: 700 }}>Total del mes ({monthLabel})</span>
+          <span style={{ fontWeight: 800, color: "#2B2118" }}>{money(q1Sold + q2Sold)} vendido · -{money(q1Spent + q2Spent)} gastado</span>
+        </div>
+      </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 16 }}>
         <label style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63" }}>Desde</label>
@@ -2290,7 +2693,13 @@ function printPayStub(employee, payment) {
 
 function PaydayBanner({ employees, payments, clockRecords }) {
   const now = new Date();
-  if (now.getDate() !== PAYDAY_DAY) return null;
+  const today = now.getDate();
+  const lastDayOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  // Segundo pago: día 30, o el último día del mes si tiene menos de 30 días (ej. febrero)
+  const isSecondPayday = today === 30 || (today === lastDayOfThisMonth && lastDayOfThisMonth < 30);
+  const isFirstPayday = today === 15;
+  if (!isFirstPayday && !isSecondPayday) return null;
+  const quincenaLabel = isFirstPayday ? "Quincena 1 (día 1 al 15)" : "Quincena 2 (día 16 al fin de mes)";
 
   const activeEmployees = employees.filter((e) => e.active !== false);
   function owedFor(emp) {
@@ -2306,7 +2715,8 @@ function PaydayBanner({ employees, payments, clockRecords }) {
 
   return (
     <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 14, padding: 18, marginBottom: 20, color: "#fff", boxShadow: "0 6px 18px rgba(193,39,45,0.35)" }}>
-      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>📅 ¡Hoy es día de pago! (quincena del {PAYDAY_DAY})</div>
+      <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 2 }}>📅 ¡Hoy es día de pago!</div>
+      <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.9, marginBottom: 8, letterSpacing: 0.3 }}>{quincenaLabel.toUpperCase()}</div>
       {pending.length === 0 ? (
         <div style={{ fontSize: 13 }}>Todos los empleados activos están al día ✅</div>
       ) : (
@@ -2329,10 +2739,11 @@ function PaydayBanner({ employees, payments, clockRecords }) {
 
 function PaymentForm({ employee, pendingDays, onPay }) {
   const [days, setDays] = useState(pendingDays || 0);
+  const [pago, setPago] = useState(String((pendingDays || 0) * (employee.dailyWage || 0) || employee.dailyWage || ""));
   const [bono, setBono] = useState("");
   const [deducciones, setDeducciones] = useState("");
   const [note, setNote] = useState("");
-  const bruto = (Number(days) || 0) * (employee.dailyWage || 0) + (Number(bono) || 0);
+  const bruto = (Number(pago) || 0) + (Number(bono) || 0);
   const neto = bruto - (Number(deducciones) || 0);
 
   return (
@@ -2341,8 +2752,25 @@ function PaymentForm({ employee, pendingDays, onPay }) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
           <label style={{ ...lbl, marginTop: 0 }}>Días trabajados</label>
-          <input type="number" value={days} onChange={(e) => setDays(e.target.value)} style={{ ...inp, maxWidth: 100 }} />
+          <input
+            type="number"
+            value={days}
+            onChange={(e) => {
+              setDays(e.target.value);
+              setPago(String((Number(e.target.value) || 0) * (employee.dailyWage || 0)));
+            }}
+            style={{ ...inp, maxWidth: 100 }}
+          />
         </div>
+        <div>
+          <label style={{ ...lbl, marginTop: 0 }}>💰 Pago / Sueldo (C$)</label>
+          <input type="number" value={pago} onChange={(e) => setPago(e.target.value)} style={{ ...inp, maxWidth: 130, fontWeight: 800, border: "1px solid #2E7D32" }} />
+        </div>
+      </div>
+      <div style={{ fontSize: 10, color: "#8a7a63", marginTop: -4, marginBottom: 10 }}>
+        Sugerido: {days || 0} día{days !== 1 ? "s" : ""} × {money(employee.dailyWage)}/día. Podés cambiar el monto libremente.
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
           <label style={{ ...lbl, marginTop: 0 }}>Bono (opcional)</label>
           <input type="number" placeholder="0" value={bono} onChange={(e) => setBono(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
@@ -2353,11 +2781,21 @@ function PaymentForm({ employee, pendingDays, onPay }) {
         </div>
       </div>
       <input placeholder="Nota (ej: quincena 1-15 julio)" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...inp, marginBottom: 10 }} />
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", marginBottom: 4 }}>
-        <span>Total bruto</span><span>{money(bruto)}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", marginBottom: 2 }}>
+        <span>Pago (sueldo)</span><span>{money(Number(pago) || 0)}</span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 17, marginBottom: 12 }}>
-        <span>Neto a pagar</span><span>{money(neto)}</span>
+      {Number(bono) > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#2E7D32", marginBottom: 2 }}>
+          <span>+ Bono</span><span>{money(Number(bono))}</span>
+        </div>
+      )}
+      {Number(deducciones) > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#C1272D", marginBottom: 2 }}>
+          <span>− Deducciones</span><span>{money(Number(deducciones))}</span>
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 18, marginTop: 8, marginBottom: 12, borderTop: "1px dashed #E5D9C3", paddingTop: 8 }}>
+        <span>Neto a pagar</span><span style={{ color: "#2E7D32" }}>{money(neto)}</span>
       </div>
       <button
         disabled={neto <= 0}
@@ -2374,10 +2812,23 @@ function PaymentForm({ employee, pendingDays, onPay }) {
 }
 
 function printPayrollSummary(employees, payments, clockRecords) {
-  const monthKey = new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  const monthKey = now.toISOString().slice(0, 7);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  function paidInRange(empName, dayStart, dayEnd) {
+    return payments
+      .filter((p) => p.employeeName === empName && p.time.slice(0, 7) === monthKey)
+      .filter((p) => {
+        const day = new Date(p.time).getDate();
+        return day >= dayStart && day <= dayEnd;
+      })
+      .reduce((s, p) => s + p.amount, 0);
+  }
+
   const rows = employees.map((emp) => {
-    const empPayments = payments.filter((p) => p.employeeName === emp.name);
-    const monthPaid = empPayments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((s, p) => s + p.amount, 0);
+    const q1Paid = paidInRange(emp.name, 1, 15);
+    const q2Paid = paidInRange(emp.name, 16, lastDay);
     const empClock = clockRecords.filter((r) => r.employee === emp.name);
     const lateCount = empClock.filter((r) => r.late).length;
     const punctuality = empClock.length > 0 ? Math.round(((empClock.length - lateCount) / empClock.length) * 100) : 100;
@@ -2385,32 +2836,34 @@ function printPayrollSummary(employees, payments, clockRecords) {
       <td>${emp.name}</td>
       <td>${emp.role || "Personal"}</td>
       <td style="text-align:right">${money(emp.dailyWage)}</td>
-      <td style="text-align:center">${empClock.length}</td>
       <td style="text-align:center">${punctuality}%</td>
-      <td style="text-align:right">${money(monthPaid)}</td>
+      <td style="text-align:right">${money(q1Paid)}</td>
+      <td style="text-align:right">${money(q2Paid)}</td>
+      <td style="text-align:right"><strong>${money(q1Paid + q2Paid)}</strong></td>
     </tr>`;
   }).join("");
-  const totalMonth = employees.reduce((sum, emp) => sum + payments.filter((p) => p.employeeName === emp.name && p.time.slice(0, 7) === monthKey).reduce((s, p) => s + p.amount, 0), 0);
+  const totalQ1 = employees.reduce((sum, emp) => sum + paidInRange(emp.name, 1, 15), 0);
+  const totalQ2 = employees.reduce((sum, emp) => sum + paidInRange(emp.name, 16, lastDay), 0);
 
   const html = `
     <html><head><title>Reporte de Nómina</title><style>
-      body { font-family: 'Courier New', monospace; font-size: 12px; padding: 18px; color: #2B2118; }
-      h1 { font-size: 16px; text-align: center; margin-bottom: 2px; }
-      .sub { text-align: center; font-size: 11px; color: #555; margin-bottom: 16px; }
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; padding: 20px; color: #2B2118; }
+      h1 { font-size: 17px; text-align: center; margin-bottom: 2px; color: #C1272D; }
+      .sub { text-align: center; font-size: 11px; color: #666; letter-spacing: 1px; margin-bottom: 18px; }
       table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      td, th { padding: 6px 4px; border-bottom: 1px solid #ddd; text-align: left; }
-      th { font-size: 10px; text-transform: uppercase; color: #555; }
-      .total td { border: none; font-weight: bold; font-size: 14px; padding-top: 12px; }
-      hr { border: none; border-top: 2px dashed #333; margin: 12px 0; }
+      td, th { padding: 8px 6px; border-bottom: 1px solid #eee; text-align: left; }
+      th { font-size: 10px; text-transform: uppercase; color: #8a7a63; background: #FBF2E4; }
+      .total td { border: none; font-weight: 800; font-size: 14px; padding-top: 14px; background: #F2C879; }
+      hr { border: none; border-top: 2px dashed #333; margin: 14px 0; }
       @page { margin: 12mm; }
     </style></head><body>
       <h1>🍔🍗 ${RESTAURANT_NAME}</h1>
-      <div class="sub">REPORTE DE NÓMINA · ${new Date().toLocaleDateString("es-NI", { month: "long", year: "numeric" }).toUpperCase()}</div>
+      <div class="sub">REPORTE DE NÓMINA QUINCENAL · ${now.toLocaleDateString("es-NI", { month: "long", year: "numeric" }).toUpperCase()}</div>
       <hr/>
       <table>
-        <tr><th>Empleado</th><th>Puesto</th><th style="text-align:right">Pago/día</th><th style="text-align:center">Entradas</th><th style="text-align:center">Puntualidad</th><th style="text-align:right">Pagado (mes)</th></tr>
+        <tr><th>Empleado</th><th>Puesto</th><th style="text-align:right">Pago/día</th><th style="text-align:center">Puntualidad</th><th style="text-align:right">Quincena 1 (1-15)</th><th style="text-align:right">Quincena 2 (16-${lastDay})</th><th style="text-align:right">Total mes</th></tr>
         ${rows}
-        <tr class="total"><td colspan="5">TOTAL NÓMINA DEL MES</td><td style="text-align:right">${money(totalMonth)}</td></tr>
+        <tr class="total"><td colspan="4">TOTALES</td><td style="text-align:right">${money(totalQ1)}</td><td style="text-align:right">${money(totalQ2)}</td><td style="text-align:right">${money(totalQ1 + totalQ2)}</td></tr>
       </table>
       <hr/>
       <div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">Generado ${new Date().toLocaleString("es-NI")}</div>
@@ -2450,7 +2903,7 @@ function AttendanceMini({ employeeName, clockRecords }) {
   );
 }
 
-function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment, onToggleActive }) {
+function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment, onToggleActive, onDeleteEmployee, onUpdateEmployee }) {
   const [name, setName] = useState("");
   const [wage, setWage] = useState("");
   const [role, setRole] = useState(ROLES[0]);
@@ -2459,6 +2912,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState("");
   const [expanded, setExpanded] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
   const [payNote, setPayNote] = useState({});
   const today = todayStr();
   const monthKey = new Date().toISOString().slice(0, 7);
@@ -2597,38 +3051,73 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
               </button>
               {isOpen && (
                 <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
-                  <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
-                  <button
-                    onClick={() => onToggleActive(emp.id)}
-                    style={{ marginTop: 10, fontSize: 12, background: "none", border: `1px solid ${isInactive ? "#2E7D32" : "#C1272D"}`, color: isInactive ? "#2E7D32" : "#C1272D", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
-                  >
-                    {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
-                  </button>
-                  {st.pendingDays > 0 && (
+                  {editingEmployee === emp.id ? (
+                    <EmployeeEditForm
+                      employee={emp}
+                      onSave={(patch) => { onUpdateEmployee(emp.id, patch); setEditingEmployee(null); }}
+                      onCancel={() => setEditingEmployee(null)}
+                    />
+                  ) : (
+                    <>
+                      <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                        <button
+                          onClick={() => setEditingEmployee(emp.id)}
+                          style={{ fontSize: 12, background: "none", border: "1px solid #1565C0", color: "#1565C0", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          ✏️ Editar datos
+                        </button>
+                        <button
+                          onClick={() => onToggleActive(emp.id)}
+                          style={{ fontSize: 12, background: "none", border: `1px solid ${isInactive ? "#2E7D32" : "#C1272D"}`, color: isInactive ? "#2E7D32" : "#C1272D", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
+                        </button>
+                        <button
+                          onClick={() => { if (window.confirm(`¿Eliminar a "${emp.name}" por completo? Esto borra al empleado (no su historial de pagos ya registrado) y no se puede deshacer.`)) onDeleteEmployee(emp.id); }}
+                          style={{ fontSize: 12, background: "none", border: "1px solid #8a7a63", color: "#8a7a63", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          🗑️ Eliminar empleado
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {!editingEmployee && st.pendingDays > 0 && (
                     <div style={{ fontSize: 12, color: "#8a7a63", margin: "10px 0 0" }}>
                       <strong style={{ color: "#2B2118" }}>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
                       {st.lastPayment && <span> · Último pago: {new Date(st.lastPayment.time).toLocaleDateString("es-NI")}</span>}
                     </div>
                   )}
-                  <PaymentForm
-                    employee={emp}
-                    pendingDays={st.pendingDays}
-                    onPay={(data) => onAddPayment(emp.name, data.amount, data.note, { bruto: data.bruto, bono: data.bono, deducciones: data.deducciones, days: data.days })}
-                  />
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
-                  {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
-                  {st.empPayments.map((p) => (
-                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
-                        <div style={{ fontSize: 10, color: "#C9BBA3" }}>{new Date(p.time).toLocaleString("es-NI")}</div>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <button onClick={() => printPayStub(emp, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
-                        <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
-                      </div>
-                    </div>
-                  ))}
+                  {!editingEmployee && (
+                    <>
+                      <PaymentForm
+                        employee={emp}
+                        pendingDays={st.pendingDays}
+                        onPay={(data) => onAddPayment(emp.name, data.amount, data.note, { bruto: data.bruto, bono: data.bono, deducciones: data.deducciones, days: data.days })}
+                      />
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
+                      {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
+                      {st.empPayments.map((p) => (
+                        <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <button onClick={() => printPayStub(emp, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
+                              <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 10, color: "#C9BBA3", marginTop: 2 }}>{new Date(p.time).toLocaleString("es-NI")}</div>
+                          {(p.days || p.bono || p.deducciones) && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
+                              {p.days ? <span style={{ fontSize: 10, background: "#F3ECE0", color: "#5a4c3a", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>📅 {p.days} día{p.days !== 1 ? "s" : ""} × {money(emp.dailyWage)}</span> : null}
+                              {p.bono > 0 ? <span style={{ fontSize: 10, background: "#E8F5E9", color: "#2E7D32", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>🎁 Bono {money(p.bono)}</span> : null}
+                              {p.deducciones > 0 ? <span style={{ fontSize: 10, background: "#FCE8E8", color: "#C1272D", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>➖ Deducción {money(p.deducciones)}</span> : null}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -2649,6 +3138,66 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+function EmployeeEditForm({ employee, onSave, onCancel }) {
+  const [name, setName] = useState(employee.name);
+  const [role, setRole] = useState(employee.role || ROLES[0]);
+  const [phone, setPhone] = useState(employee.phone || "");
+  const [wage, setWage] = useState(String(employee.dailyWage || ""));
+
+  return (
+    <div style={{ background: "linear-gradient(160deg, #FFF8ED, #FFF3E0)", border: "2px solid #F2C879", borderRadius: 12, padding: 16, marginTop: 4 }}>
+      <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 12, color: "#2B2118" }}>✏️ Editar datos del empleado</div>
+
+      <label style={{ ...lbl, marginTop: 0 }}>Nombre completo</label>
+      <input value={name} onChange={(e) => setName(e.target.value)} style={inp} />
+
+      <label style={lbl}>Puesto</label>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {ROLES.map((r) => (
+          <button
+            key={r}
+            onClick={() => setRole(r)}
+            style={{
+              padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
+              background: role === r ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#fff",
+              color: role === r ? "#fff" : "#5a4c3a", border: role === r ? "none" : "1px solid #E5D9C3",
+            }}
+          >
+            {ROLE_ICONS[r]} {r}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <label style={lbl}>Teléfono</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inp} placeholder="Opcional" />
+        </div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <label style={lbl}>Pago por día (C$)</label>
+          <input type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={inp} />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+        <button
+          onClick={onCancel}
+          style={{ flex: 1, padding: 11, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer", fontWeight: 700, color: "#5a4c3a" }}
+        >
+          Cancelar
+        </button>
+        <button
+          disabled={!name.trim()}
+          onClick={() => onSave({ name: name.trim(), role, phone, dailyWage: Number(wage) || 0 })}
+          style={{ flex: 1, padding: 11, borderRadius: 8, border: "none", background: "#2E7D32", color: "#fff", cursor: "pointer", fontWeight: 800, opacity: name.trim() ? 1 : 0.5 }}
+        >
+          💾 Guardar cambios
+        </button>
+      </div>
     </div>
   );
 }
@@ -2713,7 +3262,7 @@ function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insum
   w.print();
 }
 
-function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
+function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const tz = d.getTimezoneOffset() * 60000;
@@ -2724,6 +3273,7 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
   const isToday = dayStr === todayStr();
 
   const todaySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
+  const dayPermanentSales = (salesLog || sales).filter((s) => new Date(s.time).toDateString() === dayStr);
   const todayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
   const todayPayments = (payments || []).filter((p) => new Date(p.time).toDateString() === dayStr);
   const income = todaySales.reduce((sum, s) => sum + s.total, 0);
@@ -2755,6 +3305,34 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
   const prevMonthKey = prevMonthDate.toISOString().slice(0, 7);
   const prevMonthIncome = sales.filter((s) => s.time.slice(0, 7) === prevMonthKey).reduce((sum, s) => sum + s.total, 0);
   const monthChangePct = prevMonthIncome > 0 ? Math.round(((monthIncome - prevMonthIncome) / prevMonthIncome) * 100) : null;
+
+  const lastDayOfMonth = new Date(Number(yy), Number(mm), 0).getDate();
+  function sumInDayRange(list, dayStart, dayEnd, key) {
+    return (list || [])
+      .filter((x) => {
+        const t = new Date(x.time);
+        if (t.getFullYear() !== Number(yy) || t.getMonth() !== Number(mm) - 1) return false;
+        const day = t.getDate();
+        return day >= dayStart && day <= dayEnd;
+      })
+      .reduce((sum, x) => sum + Number(key === "sale" ? x.total : x.amount), 0);
+  }
+  const q1Sold = sumInDayRange(salesLog || sales, 1, 15, "sale");
+  const q1Spent = sumInDayRange(expensesLog || expenses, 1, 15, "exp");
+  const q2Sold = sumInDayRange(salesLog || sales, 16, lastDayOfMonth, "sale");
+  const q2Spent = sumInDayRange(expensesLog || expenses, 16, lastDayOfMonth, "exp");
+  function payrollInDayRange(dayStart, dayEnd) {
+    return (payments || [])
+      .filter((p) => {
+        const t = new Date(p.time);
+        if (t.getFullYear() !== Number(yy) || t.getMonth() !== Number(mm) - 1) return false;
+        const day = t.getDate();
+        return day >= dayStart && day <= dayEnd;
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+  }
+  const q1Payroll = payrollInDayRange(1, 15);
+  const q2Payroll = payrollInDayRange(16, lastDayOfMonth);
 
   const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
@@ -2911,6 +3489,37 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
         <div style={statCard}><div style={statLabel}>Ventas del mes</div><div style={statValue}>{monthSales.length}</div></div>
       </div>
 
+      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(242,200,121,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#F2C879", letterSpacing: 0.5, marginBottom: 14 }}>📆 CONTROL QUINCENAL — {monthLabel.toUpperCase()}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+          {[{ label: `QUINCENA 1 (1 al 15)`, sold: q1Sold, spent: q1Spent, payroll: q1Payroll }, { label: `QUINCENA 2 (16 al ${lastDayOfMonth})`, sold: q2Sold, spent: q2Spent, payroll: q2Payroll }].map((q) => (
+            <div key={q.label} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 14, border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#C9BBA3", letterSpacing: 0.5, marginBottom: 10 }}>{q.label}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 4 }}>
+                <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q.sold)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 4 }}>
+                <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q.spent)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 8 }}>
+                <span style={{ opacity: 0.8 }}>Nómina pagada</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q.payroll)}</span>
+              </div>
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#C9BBA3" }}>Ganancia real</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: q.sold - q.spent - q.payroll >= 0 ? "#00E676" : "#FF5252" }}>{money(q.sold - q.spent - q.payroll)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: "12px 16px", marginBottom: 22, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <span style={{ fontSize: 12, color: "#5a4c3a", fontWeight: 700 }}>💰 Ganancia real del mes completo (suma de ambas quincenas)</span>
+        <span style={{ fontWeight: 800, fontSize: 18, color: (q1Sold + q2Sold - q1Spent - q2Spent - q1Payroll - q2Payroll) >= 0 ? "#2E7D32" : "#C1272D" }}>
+          {money(q1Sold + q2Sold - q1Spent - q2Spent - q1Payroll - q2Payroll)}
+        </span>
+      </div>
+
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Registrar gasto</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         {["Insumos", "Otro"].map((c) => (
@@ -2966,31 +3575,33 @@ function ReportesView({ sales, expenses, payments, onAddExpense, onDeleteSale, o
       ))}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
-        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Historial de cobros</h3>
-        {(todaySales.length > 0 || todayExpenses.length > 0) && (
-          <button
-            onClick={() => { if (window.confirm("¿Borrar todas las ventas y gastos de este día? Esto no se puede deshacer.")) onClearDay(dayStr); }}
-            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
-          >
-            Borrar día completo
-          </button>
-        )}
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>🧾 Consumo por pedido — Historial de cobros</h3>
+        <span style={{ fontSize: 10, color: "#2E7D32", background: "#E8F5E9", padding: "3px 10px", borderRadius: 20, fontWeight: 700 }}>🔒 Permanente — nunca se borra</span>
       </div>
-      {todaySales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
-      {todaySales.slice().reverse().map((s) => (
-        <div key={s.id} style={{ padding: "10px 0", borderBottom: "1px solid #E5D9C3" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
-            <span style={{ fontWeight: 700 }}>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontWeight: 700 }}>{money(s.total)}</span>
-              <button onClick={() => { if (window.confirm("¿Borrar esta venta?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+      {dayPermanentSales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
+      <div style={{ display: "grid", gap: 12 }}>
+        {dayPermanentSales.slice().reverse().map((s) => (
+          <div key={s.id} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ background: "#FBF2E4", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+              <div>
+                <span style={{ fontWeight: 800, fontSize: 13 }}>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref}</span>
+                <span style={{ fontSize: 11, color: "#8a7a63", marginLeft: 8 }}>{new Date(s.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontWeight: 800, fontSize: 15, color: "#C1272D" }}>{money(s.total)}</span>
+              </div>
+            </div>
+            <div style={{ padding: "8px 14px" }}>
+              {s.items.map((it) => (
+                <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: "#5a4c3a" }}>
+                  <span><strong style={{ color: "#2B2118" }}>{it.qty}x</strong> {it.name}{it.notes ? <span style={{ color: "#C1531F", fontStyle: "italic" }}> — {it.notes}</span> : ""}</span>
+                  <span>{money(it.price * it.qty)}</span>
+                </div>
+              ))}
             </div>
           </div>
-          <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 4, paddingLeft: 4 }}>
-            {s.items.map((it) => `${it.qty} ${it.name}`).join(" · ")}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
