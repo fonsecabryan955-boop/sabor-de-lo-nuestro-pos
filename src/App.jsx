@@ -466,11 +466,12 @@ export default function App() {
   function deleteInventoryItem(id) {
     persist({ ...state, inventory: inventory.filter((i) => i.id !== id) });
   }
-  function adjustStock(id, qty, type, note) {
+  function adjustStock(id, qty, type, note, effectiveDate) {
     const item = inventory.find((i) => i.id === id);
     if (!item) return;
     const delta = type === "salida" ? -Math.abs(qty) : Math.abs(qty);
-    const logEntry = { id: Date.now(), itemId: id, itemName: item.name, type, qty: Math.abs(qty), note: note || "", time: new Date().toISOString() };
+    const time = effectiveDate ? new Date(effectiveDate + "T12:00:00").toISOString() : new Date().toISOString();
+    const logEntry = { id: Date.now(), itemId: id, itemName: item.name, type, qty: Math.abs(qty), note: note || "", time };
     persist({
       ...state,
       inventory: inventory.map((i) => (i.id === id ? { ...i, stock: Math.max(0, (i.stock || 0) + delta) } : i)),
@@ -995,20 +996,28 @@ function StockBar({ stock, minStock }) {
 function StockAdjustForm({ item, onAdjust }) {
   const [qty, setQty] = useState("");
   const [note, setNote] = useState("");
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0, 10);
+  });
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
       <input type="number" placeholder="Cantidad" value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...inp, maxWidth: 100, padding: 7 }} />
       <input placeholder="Nota (ej: compra, merma)" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7 }} />
+      <div>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title="Fecha a la que corresponde este movimiento" style={{ ...inp, maxWidth: 145, padding: 7 }} />
+      </div>
       <button
         disabled={!qty}
-        onClick={() => { onAdjust(item.id, Number(qty), "entrada", note); setQty(""); setNote(""); }}
+        onClick={() => { onAdjust(item.id, Number(qty), "entrada", note, date); setQty(""); setNote(""); }}
         style={{ fontSize: 12, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: qty ? 1 : 0.5 }}
       >
         + Entrada
       </button>
       <button
         disabled={!qty}
-        onClick={() => { onAdjust(item.id, Number(qty), "salida", note); setQty(""); setNote(""); }}
+        onClick={() => { onAdjust(item.id, Number(qty), "salida", note, date); setQty(""); setNote(""); }}
         style={{ fontSize: 12, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: qty ? 1 : 0.5 }}
       >
         − Salida
@@ -1267,50 +1276,51 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
     }
   }
 
-  const CHAR = "#1A1410";
-  const CHAR2 = "#2B2118";
-  const EMBER = "#C1272D";
-  const AMBER = "#E8A33D";
-  const GOLD = "#F2C879";
-  const CREAM = "#FFF8ED";
-  const PAPER = "#FBF2E4";
-  const ASH = "#8a7a63";
+  // Paleta cálida y refinada
+  const CREAM = "#FBF3E7";
+  const CREAM_DEEP = "#F5E6D5";
+  const CARD = "#FFFDF9";
+  const TERRACOTTA = "#B85C38";
+  const TERRACOTTA_DEEP = "#8C4530";
+  const ESPRESSO = "#4A3728";
+  const GOLD = "#C9A66B";
+  const MUTED = "#9A8776";
+  const LINE = "#E9DCC8";
 
   return (
     <>
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-      @keyframes soModalIn { from { opacity: 0; transform: scale(0.94) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-      @keyframes soBadgePop { 0% { transform: scale(0); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
-      .so-card:active { transform: scale(0.97); }
+      @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap');
+      @keyframes soModalIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+      .so-elite:active { transform: scale(0.985); }
     `}</style>
-    <div style={{ position: "fixed", inset: 0, background: "rgba(10,7,4,0.66)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(58,42,28,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <div style={{
-        fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
-        background: CREAM, borderRadius: 22, width: "100%", maxWidth: 720, maxHeight: "92vh",
+        fontFamily: "'Work Sans', Arial, sans-serif",
+        background: CREAM, borderRadius: 20, width: "100%", maxWidth: 720, maxHeight: "92vh",
         display: "flex", flexDirection: "column", overflow: "hidden",
-        boxShadow: "0 30px 70px rgba(0,0,0,0.5)", animation: "soModalIn 0.28s cubic-bezier(.16,1,.3,1)",
+        boxShadow: "0 24px 60px rgba(74,55,40,0.28)", animation: "soModalIn 0.32s cubic-bezier(.2,.9,.3,1)",
+        border: `1px solid ${LINE}`,
       }}>
         {/* Header */}
-        <div style={{ background: `linear-gradient(135deg, ${CHAR} 0%, #241c14 55%, ${CHAR2} 100%)`, padding: "20px 24px 16px", position: "relative" }}>
+        <div style={{ background: `linear-gradient(160deg, ${CREAM_DEEP}, ${CREAM})`, padding: "24px 28px 18px", borderBottom: `1px solid ${LINE}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3, color: AMBER, opacity: 0.9, marginBottom: 4 }}>
-                {kitchenStatus ? "ACTUALIZANDO PEDIDO" : "ARMANDO PEDIDO"}
+              <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 3, color: GOLD, textTransform: "uppercase", marginBottom: 6 }}>
+                {kitchenStatus ? "Actualizando pedido" : "Armando pedido"}
               </div>
-              <h3 style={{ margin: 0, fontFamily: "'Anton', sans-serif", fontWeight: 400, fontSize: 30, letterSpacing: 0.5, lineHeight: 1, color: CREAM, textTransform: "uppercase" }}>
+              <h3 style={{ margin: 0, fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 30, letterSpacing: 0.2, lineHeight: 1.05, color: ESPRESSO }}>
                 {title}
               </h3>
             </div>
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,0.12)", border: "none", borderRadius: 10, color: CREAM, cursor: "pointer", padding: 8, flexShrink: 0 }}>
-              <X size={20} />
+            <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: "50%", color: ESPRESSO, cursor: "pointer", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <X size={17} />
             </button>
           </div>
         </div>
-        <div style={{ height: 3, background: `linear-gradient(90deg, ${EMBER}, ${AMBER}, ${GOLD})` }} />
 
         <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
-          <div style={{ width: 172, borderRight: "1px solid #EEDFC2", flexShrink: 0, background: PAPER, padding: 10 }}>
+          <div style={{ width: 176, borderRight: `1px solid ${LINE}`, flexShrink: 0, background: CREAM, padding: "14px 10px" }}>
             {allCatNames.map((c) => {
               const active = cat === c;
               return (
@@ -1318,71 +1328,62 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
                   key={c}
                   onClick={() => setCat(c)}
                   style={{
-                    display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "8px 10px", borderRadius: 14, marginBottom: 6,
-                    border: "none", cursor: "pointer",
-                    background: active ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "transparent",
-                    boxShadow: active ? "0 6px 14px rgba(193,39,45,0.32)" : "none",
+                    display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: "10px 12px", borderRadius: 10, marginBottom: 4,
+                    border: "none", borderLeft: active ? `3px solid ${TERRACOTTA}` : "3px solid transparent", cursor: "pointer",
+                    background: active ? "rgba(184,92,56,0.09)" : "transparent",
+                    transition: "background 0.15s ease",
                   }}
                 >
-                  <span style={{
-                    width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0,
-                    background: active ? "rgba(255,255,255,0.22)" : "#fff",
-                    boxShadow: active ? "none" : "0 1px 3px rgba(0,0,0,0.08)",
-                  }}>
+                  <span style={{ fontSize: 15, flexShrink: 0, opacity: active ? 1 : 0.7 }}>
                     {c === "Promociones" ? "🏷️" : (menuCats.find((mc) => mc.name === c)?.icon || "🍽️")}
                   </span>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: 0.2, textTransform: "uppercase", color: active ? "#fff" : (c === "Promociones" ? EMBER : "#5a4c3a") }}>
+                  <span style={{ fontSize: 12.5, fontWeight: active ? 700 : 500, letterSpacing: 0.2, color: active ? TERRACOTTA_DEEP : MUTED }}>
                     {c}
                   </span>
                 </button>
               );
             })}
           </div>
-          <div style={{ flex: 1, padding: 16, overflow: "auto" }}>
+          <div style={{ flex: 1, padding: 20, overflow: "auto" }}>
             <input
-              placeholder="🔍 Buscar producto..."
+              placeholder="Buscar producto..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", padding: "12px 16px", borderRadius: 999, border: "1px solid #EAD9B8", fontSize: 13, boxSizing: "border-box", marginBottom: 14, background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", fontFamily: "inherit" }}
+              style={{ width: "100%", padding: "11px 16px", borderRadius: 10, border: `1px solid ${LINE}`, fontSize: 13, boxSizing: "border-box", marginBottom: 16, background: CARD, fontFamily: "inherit", color: ESPRESSO }}
             />
             {cat === "Promociones" && listForCat.length === 0 && !search && (
-              <p style={{ fontSize: 13, color: ASH }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
+              <p style={{ fontSize: 13, color: MUTED }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
             )}
             {search && listForCat.length === 0 && (
-              <p style={{ fontSize: 13, color: ASH }}>Sin resultados para "{search}".</p>
+              <p style={{ fontSize: 13, color: MUTED }}>Sin resultados para "{search}".</p>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: 12 }}>
               {listForCat.map((m) => {
                 const inCart = cartQtyFor(m.id);
                 return (
                   <button
                     key={m.id}
-                    className="so-card"
+                    className="so-elite"
                     onClick={() => handleItemClick(m)}
                     style={{
-                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: "18px 14px 34px", borderRadius: 16,
-                      border: "1px solid rgba(0,0,0,0.04)", cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative", overflow: "hidden",
-                      background: cat === "Promociones" ? "linear-gradient(160deg, #FFF3EC, #FFE4D3)" : "#fff",
-                      boxShadow: "0 4px 14px rgba(43,33,24,0.10)", transition: "transform 0.12s ease",
+                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: "16px 16px", borderRadius: 14,
+                      border: `1px solid ${inCart > 0 ? "rgba(184,92,56,0.35)" : LINE}`, cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative",
+                      background: cat === "Promociones" ? "linear-gradient(160deg, #FBEEE2, #F5DCC4)" : CARD,
+                      boxShadow: "0 2px 10px rgba(74,55,40,0.06)", transition: "border-color 0.15s ease, transform 0.12s ease",
                     }}
                   >
-                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${EMBER}, ${AMBER})` }} />
                     {inCart > 0 && (
                       <span style={{
-                        position: "absolute", top: 10, left: 10, background: "#2E7D32", color: "#fff", borderRadius: "50%",
-                        width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
-                        animation: "soBadgePop 0.25s ease", boxShadow: "0 2px 6px rgba(0,0,0,0.25)",
+                        position: "absolute", top: 12, right: 12, color: TERRACOTTA, border: `1px solid ${TERRACOTTA}`, borderRadius: "50%",
+                        width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 700,
+                        background: CARD,
                       }}>
                         {inCart}
                       </span>
                     )}
-                    <span style={{ fontWeight: 800, color: CHAR2, fontSize: 14.5, lineHeight: 1.25, marginTop: inCart > 0 ? 14 : 0 }}>{m.name}</span>
-                    <span style={{
-                      position: "absolute", bottom: 10, right: 10, transform: "rotate(-5deg)",
-                      background: cat === "Promociones" ? `linear-gradient(135deg, ${AMBER}, ${GOLD})` : `linear-gradient(135deg, ${EMBER}, #8f1c21)`,
-                      color: "#fff", fontFamily: "'Anton', sans-serif", fontWeight: 400, fontSize: 14, padding: "4px 11px", borderRadius: 8,
-                      boxShadow: "0 3px 8px rgba(0,0,0,0.25)", letterSpacing: 0.3,
-                    }}>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, color: ESPRESSO, fontSize: 15.5, lineHeight: 1.3, paddingRight: inCart > 0 ? 22 : 0 }}>{m.name}</span>
+                    <span style={{ width: 22, height: 1, background: GOLD, opacity: 0.6 }} />
+                    <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontWeight: 500, color: TERRACOTTA, fontSize: 15 }}>
                       {money(m.price)}
                     </span>
                   </button>
@@ -1392,43 +1393,43 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
           </div>
         </div>
 
-        <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 10, background: PAPER }}>
-          <div style={{ flex: 1, borderTop: "2px dashed #E0CFA8" }} />
-          <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 12, letterSpacing: 2, color: ASH }}>🧾 TU PEDIDO</span>
-          <div style={{ flex: 1, borderTop: "2px dashed #E0CFA8" }} />
+        <div style={{ padding: "14px 24px 0", display: "flex", alignItems: "center", gap: 12, background: CREAM }}>
+          <div style={{ flex: 1, borderTop: `1px solid ${LINE}` }} />
+          <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 13, letterSpacing: 0.5, color: MUTED }}>Tu pedido</span>
+          <div style={{ flex: 1, borderTop: `1px solid ${LINE}` }} />
         </div>
-        <div style={{ padding: 14, maxHeight: 190, overflow: "auto", background: PAPER }}>
-          {items.length === 0 && <p style={{ fontSize: 13, color: ASH, textAlign: "center" }}>Sin productos agregados todavía.</p>}
+        <div style={{ padding: 16, maxHeight: 190, overflow: "auto", background: CREAM }}>
+          {items.length === 0 && <p style={{ fontSize: 13, color: MUTED, textAlign: "center" }}>Sin productos agregados todavía.</p>}
           {items.map((it) => (
-            <div key={it.menuId} style={{ marginBottom: 8, background: "#fff", borderRadius: 12, padding: 10, border: "1px solid #F0E8D8", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: CHAR2 }}>{it.name}</span>
-                <button onClick={() => onQty(it.menuId, -1)} style={{ width: 26, height: 26, borderRadius: "50%", border: "none", background: CHAR2, color: CREAM, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Minus size={13} /></button>
-                <span style={{ minWidth: 18, textAlign: "center", fontSize: 13, fontWeight: 800 }}>{it.qty}</span>
-                <button onClick={() => onQty(it.menuId, 1)} style={{ width: 26, height: 26, borderRadius: "50%", border: "none", background: CHAR2, color: CREAM, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={13} /></button>
-                <span style={{ minWidth: 74, textAlign: "right", fontFamily: "'Anton', sans-serif", fontSize: 15, color: EMBER }}>{money(it.price * it.qty)}</span>
+            <div key={it.menuId} style={{ marginBottom: 8, background: CARD, borderRadius: 12, padding: "11px 12px", border: `1px solid ${LINE}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: ESPRESSO }}>{it.name}</span>
+                <button onClick={() => onQty(it.menuId, -1)} style={{ width: 24, height: 24, borderRadius: "50%", border: `1px solid ${TERRACOTTA}`, background: "transparent", color: TERRACOTTA, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Minus size={12} /></button>
+                <span style={{ minWidth: 16, textAlign: "center", fontSize: 13, fontWeight: 700, color: ESPRESSO }}>{it.qty}</span>
+                <button onClick={() => onQty(it.menuId, 1)} style={{ width: 24, height: 24, borderRadius: "50%", border: `1px solid ${TERRACOTTA}`, background: "transparent", color: TERRACOTTA, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={12} /></button>
+                <span style={{ minWidth: 72, textAlign: "right", fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 15, color: TERRACOTTA }}>{money(it.price * it.qty)}</span>
               </div>
-              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 6, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, border: "1px solid #E5D9C3", boxSizing: "border-box", fontFamily: "inherit" }} />
+              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 7, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, border: `1px solid ${LINE}`, boxSizing: "border-box", fontFamily: "inherit", background: CREAM }} />
             </div>
           ))}
         </div>
-        <div style={{ padding: "18px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: `linear-gradient(135deg, ${CHAR}, ${CHAR2})` }}>
+        <div style={{ padding: "20px 26px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: `linear-gradient(160deg, ${CREAM_DEEP}, #EFD9C4)`, borderTop: `1px solid ${LINE}` }}>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: AMBER, opacity: 0.85, marginBottom: 2 }}>TOTAL A PAGAR</div>
-            <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 28, color: CREAM, lineHeight: 1 }}>{money(total)}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 2, color: MUTED, textTransform: "uppercase", marginBottom: 2 }}>Total a pagar</div>
+            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 28, color: ESPRESSO, lineHeight: 1 }}>{money(total)}</div>
           </div>
           <button
             onClick={onSend}
             disabled={!items.length}
             style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "14px 24px", borderRadius: 14, border: "none",
+              display: "flex", alignItems: "center", gap: 8, padding: "13px 26px", borderRadius: 12, border: "none",
               cursor: items.length ? "pointer" : "not-allowed",
-              background: items.length ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.15)",
-              color: "#fff", fontWeight: 800, fontSize: 14,
-              boxShadow: items.length ? "0 8px 20px rgba(193,39,45,0.4)" : "none",
+              background: items.length ? TERRACOTTA : "rgba(74,55,40,0.15)",
+              color: "#fff", fontWeight: 600, fontSize: 14, fontFamily: "'Work Sans', sans-serif",
+              boxShadow: items.length ? "0 8px 20px rgba(140,69,48,0.28)" : "none",
             }}
           >
-            <Send size={16} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
+            <Send size={15} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
           </button>
         </div>
       </div>
@@ -1495,17 +1496,23 @@ function CocinaView({ tables, deliveries, onAdvance }) {
   return (
     <div style={{ background: "radial-gradient(circle at top, #2d2418, #16110c)", borderRadius: 20, padding: "22px 20px", margin: "-4px", boxShadow: "0 10px 30px rgba(0,0,0,0.35)" }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
         @keyframes cardIn { from { transform: scale(0.94) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        @keyframes liveDot { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,230,118,0.5); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(0,230,118,0); } }
       `}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: "#F2C879", letterSpacing: 0.5 }}>👨‍🍳 PANTALLA DE COCINA</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#00E676", animation: "liveDot 1.6s infinite" }} />
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#00E676" }}>EN VIVO</span>
+          </div>
+          <h2 style={{ fontFamily: "'Anton', sans-serif", fontSize: 28, margin: 0, color: "#F2C879", letterSpacing: 0.5, textTransform: "uppercase" }}>Pantalla de Cocina</h2>
           <div style={{ fontSize: 11, color: "#9a8a6f", letterSpacing: 1 }}>{RESTAURANT_NAME.toUpperCase()}</div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", fontFamily: "'Courier New', monospace" }}>{now.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</div>
-          <div style={{ fontSize: 11, color: "#9a8a6f" }}>{now.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}</div>
+          <div style={{ fontSize: 30, fontWeight: 800, color: "#fff", fontFamily: "'Anton', sans-serif", textShadow: "0 0 20px rgba(242,200,121,0.35)" }}>{now.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</div>
+          <div style={{ fontSize: 11, color: "#9a8a6f", textTransform: "capitalize" }}>{now.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}</div>
         </div>
       </div>
 
@@ -1518,23 +1525,27 @@ function CocinaView({ tables, deliveries, onAdvance }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 18, alignItems: "start" }}>
         {columns.map((col) => (
-          <div key={col.key} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 16, border: `1px solid ${col.accent}33`, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `2px solid ${col.accent}` }}>
-              <span style={{ fontWeight: 800, fontSize: 14, letterSpacing: 1.5, color: col.accent }}>{col.emoji} {col.title}</span>
-              <span style={{ background: col.accent, color: "#1a1410", borderRadius: 20, padding: "2px 12px", fontSize: 13, fontWeight: 800 }}>{col.items.length}</span>
+          <div key={col.key} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 18, border: `1px solid ${col.accent}33`, overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: `2px solid ${col.accent}`, background: `${col.accent}14` }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'Anton', sans-serif", fontSize: 16, letterSpacing: 1.2, color: col.accent }}>
+                <span style={{ width: 26, height: 26, borderRadius: "50%", background: col.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{col.emoji}</span>
+                {col.title}
+              </span>
+              <span style={{ background: col.accent, color: "#1a1410", borderRadius: 20, padding: "2px 13px", fontSize: 13, fontFamily: "'Anton', sans-serif" }}>{col.items.length}</span>
             </div>
             <div style={{ padding: 12, minHeight: 100, display: "flex", flexDirection: "column", gap: 12 }}>
-              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#5a4c3a", textAlign: "center", padding: "20px 0" }}>— vacío —</div>}
+              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#5a4c3a", textAlign: "center", padding: "20px 0", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>— vacío —</div>}
               {col.items.map((o) => (
                 <div
                   key={o.kind + o.id}
                   style={{
-                    background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 14, padding: 16, color: "#F5ECD9",
-                    animation: "cardIn 0.3s ease", border: `1px solid ${col.accent}55`, borderLeft: `4px solid ${col.accent}`,
+                    background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: 16, color: "#F5ECD9",
+                    animation: "cardIn 0.3s ease", border: `1px solid ${col.accent}55`, borderLeft: `5px solid ${col.accent}`,
+                    fontFamily: "'Plus Jakarta Sans', Arial, sans-serif", boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <strong style={{ fontSize: 17, letterSpacing: 0.3 }}>{o.label}</strong>
+                    <strong style={{ fontFamily: "'Anton', sans-serif", fontSize: 19, letterSpacing: 0.3, fontWeight: 400 }}>{o.label}</strong>
                     <ElapsedBadge sentAt={o.kitchenSentAt} />
                   </div>
                   <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 14, lineHeight: 1.6, color: "#E4D8C0" }}>
@@ -1548,7 +1559,7 @@ function CocinaView({ tables, deliveries, onAdvance }) {
                   {col.action && (
                     <button
                       onClick={() => onAdvance(o.kind, o.id, col.action)}
-                      style={{ width: "100%", padding: "11px 0", border: "none", borderRadius: 10, background: col.accent, color: "#1a1410", fontWeight: 800, fontSize: 13, cursor: "pointer", letterSpacing: 0.3 }}
+                      style={{ width: "100%", padding: "12px 0", border: "none", borderRadius: 12, background: col.accent, color: "#1a1410", fontFamily: "'Anton', sans-serif", fontSize: 14, cursor: "pointer", letterSpacing: 0.3, boxShadow: `0 6px 14px ${col.accent}55` }}
                     >
                       {col.actionLabel} →
                     </button>
@@ -2534,42 +2545,70 @@ function PromoView({ promotions, onAdd, onDelete }) {
 function MenuBoardView({ promotions, menuItems, menuCats }) {
   const activeItems = menuItems.filter((m) => m.active !== false);
   const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const GOLD = "#F2C879";
+  const tickerMsgs = ["🍔 HECHO AL MOMENTO", "🌶️ PÍDELO PICANTE", "🚚 DELIVERY DISPONIBLE", "📍 MASATEPE, MASAYA", "⭐ SABOR CASERO DE VERDAD"];
+
   return (
-    <div style={{ background: "#2B2118", borderRadius: 16, padding: "28px 24px", color: "#FFF8ED" }}>
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div style={{ fontSize: 40 }}>🍔🍗</div>
-        <div style={{ fontSize: 26, fontWeight: 800, color: "#F2C879" }}>{RESTAURANT_NAME}</div>
-        <div style={{ fontSize: 13, color: "#C9BBA3", letterSpacing: 1 }}>MASATEPE · MASAYA · NICARAGUA</div>
+    <div style={{ background: "radial-gradient(circle at top, #2d2418, #16110c)", borderRadius: 20, padding: "30px 26px 0", overflow: "hidden" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        @keyframes mbGlow { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @keyframes mbTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+      `}</style>
+
+      <div style={{ textAlign: "center", marginBottom: 26, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+        <div style={{ fontSize: 46, marginBottom: 4 }}>🍔🍗</div>
+        <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 40, color: GOLD, letterSpacing: 1, lineHeight: 1, textTransform: "uppercase" }}>{RESTAURANT_NAME}</div>
+        <div style={{ fontSize: 13, color: "#C9BBA3", letterSpacing: 3, marginTop: 8, fontWeight: 700 }}>MASATEPE · MASAYA · NICARAGUA</div>
+        <div style={{ height: 4, width: 140, margin: "14px auto 0", background: `linear-gradient(90deg, ${EMBER}, ${AMBER}, ${GOLD})`, borderRadius: 4 }} />
       </div>
 
       {promotions && promotions.length > 0 && (
-        <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 12, padding: "14px 18px", marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 8, letterSpacing: 1 }}>🏷️ PROMOCIONES DE HOY</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+        <div style={{ background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, borderRadius: 16, padding: "16px 20px", marginBottom: 26, boxShadow: "0 10px 26px rgba(193,39,45,0.35)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fff", animation: "mbGlow 1.4s infinite" }} />
+            <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 18, color: "#fff", letterSpacing: 1.5 }}>PROMOS DE HOY</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
             {promotions.map((p) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "8px 12px" }}>
-                <span style={{ fontWeight: 700, color: "#fff" }}>{p.name}</span>
-                <span style={{ fontWeight: 800, color: "#fff" }}>{money(p.price)}</span>
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.16)", borderRadius: 10, padding: "10px 14px" }}>
+                <span style={{ fontWeight: 700, color: "#fff", fontSize: 15, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>{p.name}</span>
+                <span style={{ fontFamily: "'Anton', sans-serif", color: "#fff", fontSize: 20 }}>{money(p.price)}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-        {catsWithItems.map((c) => (
-          <div key={c.name}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#F2C879", borderBottom: "2px solid #F2C879", paddingBottom: 4, marginBottom: 8, letterSpacing: 0.5 }}>
-              {c.icon} {c.name.toUpperCase()}
-            </div>
-            {activeItems.filter((m) => m.cat === c.name).map((m) => (
-              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 15 }}>
-                <span>{m.name}</span>
-                <span style={{ fontWeight: 700, color: "#F2C879" }}>{money(m.price)}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18, paddingBottom: 26 }}>
+        {catsWithItems.map((c) => {
+          const accent = avatarColor(c.name);
+          return (
+            <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 18, padding: "18px 20px", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <span style={{ width: 34, height: 34, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>{c.icon}</span>
+                <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 19, color: "#F5ECD9", letterSpacing: 1, textTransform: "uppercase" }}>{c.name}</span>
               </div>
-            ))}
-          </div>
-        ))}
+              {activeItems.filter((m) => m.cat === c.name).map((m) => (
+                <div key={m.id} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "6px 0", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+                  <span style={{ fontWeight: 600, fontSize: 15, color: "#E4D8C0", whiteSpace: "nowrap" }}>{m.name}</span>
+                  <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.3)", marginBottom: 4 }} />
+                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 16, color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "12px 0", overflow: "hidden", marginLeft: -26, marginRight: -26 }}>
+        <div style={{ display: "flex", width: "max-content", animation: "mbTicker 22s linear infinite" }}>
+          {[...tickerMsgs, ...tickerMsgs].map((msg, i) => (
+            <span key={i} style={{ fontFamily: "'Anton', sans-serif", fontSize: 15, color: GOLD, letterSpacing: 2, padding: "0 34px", whiteSpace: "nowrap" }}>{msg}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -3409,7 +3448,16 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
   const prevMonthDate = new Date(Number(yy), Number(mm) - 2, 1);
   const prevMonthKey = prevMonthDate.toISOString().slice(0, 7);
-  const prevMonthIncome = sales.filter((s) => s.time.slice(0, 7) === prevMonthKey).reduce((sum, s) => sum + s.total, 0);
+  const prevMonthLabel = prevMonthDate.toLocaleDateString("es-NI", { month: "long", year: "numeric" });
+  const prevSalesSrc = salesLog || sales;
+  const prevExpensesSrc = expensesLog || expenses;
+  const prevMonthSales = prevSalesSrc.filter((s) => s.time.slice(0, 7) === prevMonthKey);
+  const prevMonthExpensesList = prevExpensesSrc.filter((e) => e.time.slice(0, 7) === prevMonthKey);
+  const prevMonthIncome = prevMonthSales.reduce((sum, s) => sum + s.total, 0);
+  const prevMonthSpent = prevMonthExpensesList.reduce((sum, e) => sum + Number(e.amount), 0);
+  const prevMonthInsumos = prevMonthExpensesList.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
+  const prevMonthPayroll = (payments || []).filter((p) => p.time.slice(0, 7) === prevMonthKey).reduce((sum, p) => sum + p.amount, 0);
+  const prevMonthRealProfit = prevMonthIncome - prevMonthSpent - prevMonthPayroll;
   const monthChangePct = prevMonthIncome > 0 ? Math.round(((monthIncome - prevMonthIncome) / prevMonthIncome) * 100) : null;
 
   const lastDayOfMonth = new Date(Number(yy), Number(mm), 0).getDate();
@@ -3579,10 +3627,45 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
           </button>
         )}
       </div>
-      {monthChangePct !== null && (
-        <div style={{ fontSize: 12, margin: "6px 0 10px", color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D", fontWeight: 700 }}>
-          {monthChangePct >= 0 ? "📈" : "📉"} {monthChangePct >= 0 ? "+" : ""}{monthChangePct}% vs. mes anterior ({money(prevMonthIncome)})
+      {prevMonthIncome > 0 || prevMonthSpent > 0 ? (
+        <div style={{ background: "linear-gradient(160deg, #fff, #FBF2E4)", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, margin: "10px 0 14px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#5a4c3a", letterSpacing: 0.3, textTransform: "capitalize" }}>📊 Comparado con {prevMonthLabel}</span>
+            {monthChangePct !== null && (
+              <span style={{
+                fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+                background: monthChangePct >= 0 ? "#E8F5E9" : "#FCE8E8",
+                color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D",
+              }}>
+                {monthChangePct >= 0 ? "📈 +" : "📉 "}{monthChangePct}% en ventas
+              </span>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>VENDIDO</div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>{money(prevMonthIncome)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>INSUMOS</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#C1272D" }}>{money(prevMonthInsumos)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>NÓMINA</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#C1272D" }}>{money(prevMonthPayroll)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>GANANCIA REAL</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: prevMonthRealProfit >= 0 ? "#2E7D32" : "#C1272D" }}>{money(prevMonthRealProfit)}</div>
+            </div>
+          </div>
         </div>
+      ) : (
+        monthChangePct !== null && (
+          <div style={{ fontSize: 12, margin: "6px 0 10px", color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D", fontWeight: 700 }}>
+            {monthChangePct >= 0 ? "📈" : "📉"} {monthChangePct >= 0 ? "+" : ""}{monthChangePct}% vs. mes anterior ({money(prevMonthIncome)})
+          </div>
+        )
       )}
       <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, margin: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 12, color: "#5a4c3a" }}>💎 Ganancia neta real del mes (ventas − insumos − otros gastos − nómina){monthIncome > 0 ? ` · costo insumos: ${monthFoodCostPct}%` : ""}</div>
