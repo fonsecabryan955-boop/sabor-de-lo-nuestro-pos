@@ -649,10 +649,10 @@ export default function App() {
         </>
       )}
 
-      <div style={{ padding: 20, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={kiosk && view === "menutv" ? { padding: 0, height: "100vh", width: "100vw", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onManageMenu={() => setMenuManagerOpen(true)} />}
 
-        {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} />}
+        {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} kiosk={kiosk} />}
 
         {view === "caja" &&
           (cajaUnlocked ? (
@@ -690,7 +690,7 @@ export default function App() {
 
         {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
-        {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} />}
+        {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} />}
       </div>
 
       {activeTable && (
@@ -1264,6 +1264,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
   const [search, setSearch] = useState("");
   const [wingItem, setWingItem] = useState(null);
   const total = orderTotal(items);
+  const itemCount = items.reduce((s, it) => s + it.qty, 0);
   const baseList = cat === "Promociones" ? promotions : activeItems.filter((m) => m.cat === cat);
   const listForCat = search ? baseList.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : baseList;
   const cartQtyFor = (menuId) => items.filter((it) => it.menuId === menuId || String(it.menuId).startsWith(String(menuId) + "-")).reduce((s, it) => s + it.qty, 0);
@@ -1297,30 +1298,30 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
     <div style={{ position: "fixed", inset: 0, background: "rgba(58,42,28,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
       <div style={{
         fontFamily: "'Work Sans', Arial, sans-serif",
-        background: CREAM, borderRadius: 20, width: "100%", maxWidth: 720, maxHeight: "92vh",
+        background: CREAM, borderRadius: 20, width: "100%", maxWidth: 980, height: "88vh",
         display: "flex", flexDirection: "column", overflow: "hidden",
         boxShadow: "0 24px 60px rgba(74,55,40,0.28)", animation: "soModalIn 0.32s cubic-bezier(.2,.9,.3,1)",
         border: `1px solid ${LINE}`,
       }}>
         {/* Header */}
-        <div style={{ background: `linear-gradient(160deg, ${CREAM_DEEP}, ${CREAM})`, padding: "24px 28px 18px", borderBottom: `1px solid ${LINE}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
-              <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 3, color: GOLD, textTransform: "uppercase", marginBottom: 6 }}>
-                {kitchenStatus ? "Actualizando pedido" : "Armando pedido"}
-              </div>
-              <h3 style={{ margin: 0, fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 30, letterSpacing: 0.2, lineHeight: 1.05, color: ESPRESSO }}>
-                {title}
-              </h3>
+        <div style={{ background: `linear-gradient(160deg, ${CREAM_DEEP}, ${CREAM})`, padding: "20px 28px", borderBottom: `1px solid ${LINE}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 3, color: GOLD, textTransform: "uppercase", marginBottom: 4 }}>
+              {kitchenStatus ? "Actualizando pedido" : "Armando pedido"}
             </div>
-            <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: "50%", color: ESPRESSO, cursor: "pointer", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <X size={17} />
-            </button>
+            <h3 style={{ margin: 0, fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 26, letterSpacing: 0.2, lineHeight: 1, color: ESPRESSO }}>
+              {title}
+            </h3>
           </div>
+          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: "50%", color: ESPRESSO, cursor: "pointer", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <X size={17} />
+          </button>
         </div>
 
-        <div style={{ display: "flex", overflow: "auto", flex: 1 }}>
-          <div style={{ width: 176, borderRight: `1px solid ${LINE}`, flexShrink: 0, background: CREAM, padding: "14px 10px" }}>
+        {/* Cuerpo: 3 columnas — categorías | productos | pedido (siempre visible) */}
+        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+          {/* Columna 1: categorías */}
+          <div style={{ width: 168, borderRight: `1px solid ${LINE}`, flexShrink: 0, background: CREAM, padding: "14px 10px", overflow: "auto" }}>
             {allCatNames.map((c) => {
               const active = cat === c;
               return (
@@ -1344,6 +1345,8 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
               );
             })}
           </div>
+
+          {/* Columna 2: productos */}
           <div style={{ flex: 1, padding: 20, overflow: "auto" }}>
             <input
               placeholder="Buscar producto..."
@@ -1357,7 +1360,7 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
             {search && listForCat.length === 0 && (
               <p style={{ fontSize: 13, color: MUTED }}>Sin resultados para "{search}".</p>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(195px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(175px, 1fr))", gap: 12 }}>
               {listForCat.map((m) => {
                 const inCart = cartQtyFor(m.id);
                 return (
@@ -1374,9 +1377,8 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
                   >
                     {inCart > 0 && (
                       <span style={{
-                        position: "absolute", top: 12, right: 12, color: TERRACOTTA, border: `1px solid ${TERRACOTTA}`, borderRadius: "50%",
+                        position: "absolute", top: 12, right: 12, color: "#fff", background: TERRACOTTA, borderRadius: "50%",
                         width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 700,
-                        background: CARD,
                       }}>
                         {inCart}
                       </span>
@@ -1391,46 +1393,56 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
               })}
             </div>
           </div>
-        </div>
 
-        <div style={{ padding: "14px 24px 0", display: "flex", alignItems: "center", gap: 12, background: CREAM }}>
-          <div style={{ flex: 1, borderTop: `1px solid ${LINE}` }} />
-          <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 13, letterSpacing: 0.5, color: MUTED }}>Tu pedido</span>
-          <div style={{ flex: 1, borderTop: `1px solid ${LINE}` }} />
-        </div>
-        <div style={{ padding: 16, maxHeight: 190, overflow: "auto", background: CREAM }}>
-          {items.length === 0 && <p style={{ fontSize: 13, color: MUTED, textAlign: "center" }}>Sin productos agregados todavía.</p>}
-          {items.map((it) => (
-            <div key={it.menuId} style={{ marginBottom: 8, background: CARD, borderRadius: 12, padding: "11px 12px", border: `1px solid ${LINE}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ flex: 1, fontSize: 13.5, fontWeight: 500, color: ESPRESSO }}>{it.name}</span>
-                <button onClick={() => onQty(it.menuId, -1)} style={{ width: 24, height: 24, borderRadius: "50%", border: `1px solid ${TERRACOTTA}`, background: "transparent", color: TERRACOTTA, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Minus size={12} /></button>
-                <span style={{ minWidth: 16, textAlign: "center", fontSize: 13, fontWeight: 700, color: ESPRESSO }}>{it.qty}</span>
-                <button onClick={() => onQty(it.menuId, 1)} style={{ width: 24, height: 24, borderRadius: "50%", border: `1px solid ${TERRACOTTA}`, background: "transparent", color: TERRACOTTA, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={12} /></button>
-                <span style={{ minWidth: 72, textAlign: "right", fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 15, color: TERRACOTTA }}>{money(it.price * it.qty)}</span>
+          {/* Columna 3: pedido — siempre visible, como una terminal de punto de venta */}
+          <div style={{ width: 300, flexShrink: 0, borderLeft: `1px solid ${LINE}`, background: CARD, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "18px 20px 14px", borderBottom: `1px solid ${LINE}` }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 2, color: MUTED, textTransform: "uppercase" }}>Pedido actual</div>
+              <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 15, color: ESPRESSO, marginTop: 2 }}>
+                {itemCount} ítem{itemCount !== 1 ? "s" : ""}
               </div>
-              <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 7, width: "100%", fontSize: 12, padding: "7px 10px", borderRadius: 8, border: `1px solid ${LINE}`, boxSizing: "border-box", fontFamily: "inherit", background: CREAM }} />
             </div>
-          ))}
-        </div>
-        <div style={{ padding: "20px 26px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, background: `linear-gradient(160deg, ${CREAM_DEEP}, #EFD9C4)`, borderTop: `1px solid ${LINE}` }}>
-          <div>
-            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 2, color: MUTED, textTransform: "uppercase", marginBottom: 2 }}>Total a pagar</div>
-            <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 28, color: ESPRESSO, lineHeight: 1 }}>{money(total)}</div>
+            <div style={{ flex: 1, overflow: "auto", padding: 14 }}>
+              {items.length === 0 && (
+                <div style={{ textAlign: "center", padding: "40px 10px", color: MUTED, fontSize: 13 }}>
+                  Tocá un producto <br />para agregarlo aquí.
+                </div>
+              )}
+              {items.map((it) => (
+                <div key={it.menuId} style={{ marginBottom: 8, background: CREAM, borderRadius: 12, padding: "11px 12px", border: `1px solid ${LINE}` }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: ESPRESSO, lineHeight: 1.3 }}>{it.name}</span>
+                    <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 14, color: TERRACOTTA, whiteSpace: "nowrap" }}>{money(it.price * it.qty)}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                    <button onClick={() => onQty(it.menuId, -1)} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${TERRACOTTA}`, background: "transparent", color: TERRACOTTA, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Minus size={11} /></button>
+                    <span style={{ minWidth: 14, textAlign: "center", fontSize: 12.5, fontWeight: 700, color: ESPRESSO }}>{it.qty}</span>
+                    <button onClick={() => onQty(it.menuId, 1)} style={{ width: 22, height: 22, borderRadius: "50%", border: `1px solid ${TERRACOTTA}`, background: "transparent", color: TERRACOTTA, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={11} /></button>
+                  </div>
+                  <input placeholder="Nota (ej: sin cebolla)" value={it.notes} onChange={(e) => onNote(it.menuId, e.target.value)} style={{ marginTop: 7, width: "100%", fontSize: 11.5, padding: "6px 9px", borderRadius: 7, border: `1px solid ${LINE}`, boxSizing: "border-box", fontFamily: "inherit", background: CARD }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ padding: "16px 20px", borderTop: `1px solid ${LINE}`, background: `linear-gradient(160deg, ${CREAM_DEEP}, #EFD9C4)`, flexShrink: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 1.5, color: MUTED, textTransform: "uppercase" }}>Total</span>
+                <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: 24, color: ESPRESSO }}>{money(total)}</span>
+              </div>
+              <button
+                onClick={onSend}
+                disabled={!items.length}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "13px 0", borderRadius: 12, border: "none",
+                  cursor: items.length ? "pointer" : "not-allowed",
+                  background: items.length ? TERRACOTTA : "rgba(74,55,40,0.15)",
+                  color: "#fff", fontWeight: 600, fontSize: 14, fontFamily: "'Work Sans', sans-serif",
+                  boxShadow: items.length ? "0 8px 20px rgba(140,69,48,0.28)" : "none",
+                }}
+              >
+                <Send size={15} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onSend}
-            disabled={!items.length}
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "13px 26px", borderRadius: 12, border: "none",
-              cursor: items.length ? "pointer" : "not-allowed",
-              background: items.length ? TERRACOTTA : "rgba(74,55,40,0.15)",
-              color: "#fff", fontWeight: 600, fontSize: 14, fontFamily: "'Work Sans', sans-serif",
-              boxShadow: items.length ? "0 8px 20px rgba(140,69,48,0.28)" : "none",
-            }}
-          >
-            <Send size={15} /> {kitchenStatus ? "Actualizar cocina" : "Enviar a cocina"}
-          </button>
         </div>
       </div>
     </div>
@@ -2542,7 +2554,7 @@ function PromoView({ promotions, onAdd, onDelete }) {
   );
 }
 
-function MenuBoardView({ promotions, menuItems, menuCats }) {
+function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const activeItems = menuItems.filter((m) => m.active !== false);
   const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
   const EMBER = "#C1272D";
@@ -2551,62 +2563,73 @@ function MenuBoardView({ promotions, menuItems, menuCats }) {
   const tickerMsgs = ["🍔 HECHO AL MOMENTO", "🌶️ PÍDELO PICANTE", "🚚 DELIVERY DISPONIBLE", "📍 MASATEPE, MASAYA", "⭐ SABOR CASERO DE VERDAD"];
 
   return (
-    <div style={{ background: "radial-gradient(circle at top, #2d2418, #16110c)", borderRadius: 20, padding: "30px 26px 0", overflow: "hidden" }}>
+    <div style={{
+      background: "radial-gradient(circle at top, #2d2418, #16110c)",
+      borderRadius: kiosk ? 0 : 20,
+      height: kiosk ? "100%" : "auto",
+      width: "100%",
+      display: "flex", flexDirection: "column",
+      overflow: "hidden",
+      boxSizing: "border-box",
+      padding: "clamp(14px, 2vh, 30px) clamp(16px, 2.5vw, 30px) 0",
+    }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes mbGlow { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
         @keyframes mbTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
       `}</style>
 
-      <div style={{ textAlign: "center", marginBottom: 26, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
-        <div style={{ fontSize: 46, marginBottom: 4 }}>🍔🍗</div>
-        <div style={{ fontFamily: "'Anton', sans-serif", fontSize: 40, color: GOLD, letterSpacing: 1, lineHeight: 1, textTransform: "uppercase" }}>{RESTAURANT_NAME}</div>
-        <div style={{ fontSize: 13, color: "#C9BBA3", letterSpacing: 3, marginTop: 8, fontWeight: 700 }}>MASATEPE · MASAYA · NICARAGUA</div>
-        <div style={{ height: 4, width: 140, margin: "14px auto 0", background: `linear-gradient(90deg, ${EMBER}, ${AMBER}, ${GOLD})`, borderRadius: 4 }} />
+      <div style={{ textAlign: "center", marginBottom: "clamp(10px, 2vh, 26px)", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif", flexShrink: 0 }}>
+        <div style={{ fontSize: "clamp(22px, 3.4vw, 46px)", marginBottom: 2, lineHeight: 1 }}>🍔🍗</div>
+        <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(20px, 3vw, 40px)", color: GOLD, letterSpacing: 1, lineHeight: 1.1, textTransform: "uppercase" }}>{RESTAURANT_NAME}</div>
+        <div style={{ fontSize: "clamp(9px, 1vw, 13px)", color: "#C9BBA3", letterSpacing: 3, marginTop: "clamp(4px, 0.8vh, 8px)", fontWeight: 700 }}>MASATEPE · MASAYA · NICARAGUA</div>
+        <div style={{ height: 4, width: "clamp(80px, 8vw, 140px)", margin: "clamp(8px, 1.2vh, 14px) auto 0", background: `linear-gradient(90deg, ${EMBER}, ${AMBER}, ${GOLD})`, borderRadius: 4 }} />
       </div>
 
       {promotions && promotions.length > 0 && (
-        <div style={{ background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, borderRadius: 16, padding: "16px 20px", marginBottom: 26, boxShadow: "0 10px 26px rgba(193,39,45,0.35)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fff", animation: "mbGlow 1.4s infinite" }} />
-            <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 18, color: "#fff", letterSpacing: 1.5 }}>PROMOS DE HOY</span>
+        <div style={{ background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, borderRadius: 16, padding: "clamp(10px, 1.6vh, 16px) clamp(14px, 2vw, 20px)", marginBottom: "clamp(10px, 2vh, 26px)", boxShadow: "0 10px 26px rgba(193,39,45,0.35)", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "clamp(6px, 1vh, 10px)" }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#fff", animation: "mbGlow 1.4s infinite", flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(13px, 1.5vw, 18px)", color: "#fff", letterSpacing: 1.5 }}>PROMOS DE HOY</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
             {promotions.map((p) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.16)", borderRadius: 10, padding: "10px 14px" }}>
-                <span style={{ fontWeight: 700, color: "#fff", fontSize: 15, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>{p.name}</span>
-                <span style={{ fontFamily: "'Anton', sans-serif", color: "#fff", fontSize: 20 }}>{money(p.price)}</span>
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.16)", borderRadius: 10, padding: "8px 14px" }}>
+                <span style={{ fontWeight: 700, color: "#fff", fontSize: "clamp(12px, 1.1vw, 15px)", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>{p.name}</span>
+                <span style={{ fontFamily: "'Anton', sans-serif", color: "#fff", fontSize: "clamp(15px, 1.5vw, 20px)" }}>{money(p.price)}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18, paddingBottom: 26 }}>
-        {catsWithItems.map((c) => {
-          const accent = avatarColor(c.name);
-          return (
-            <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 18, padding: "18px 20px", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <span style={{ width: 34, height: 34, borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>{c.icon}</span>
-                <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 19, color: "#F5ECD9", letterSpacing: 1, textTransform: "uppercase" }}>{c.name}</span>
-              </div>
-              {activeItems.filter((m) => m.cat === c.name).map((m) => (
-                <div key={m.id} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "6px 0", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
-                  <span style={{ fontWeight: 600, fontSize: 15, color: "#E4D8C0", whiteSpace: "nowrap" }}>{m.name}</span>
-                  <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.3)", marginBottom: 4 }} />
-                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 16, color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", paddingBottom: "clamp(10px, 2vh, 20px)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "clamp(10px, 1.4vw, 18px)" }}>
+          {catsWithItems.map((c) => {
+            const accent = avatarColor(c.name);
+            return (
+              <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: "clamp(12px, 1.6vh, 18px) clamp(14px, 1.8vw, 20px)", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "clamp(8px, 1.2vh, 12px)" }}>
+                  <span style={{ width: "clamp(26px, 2.4vw, 34px)", height: "clamp(26px, 2.4vw, 34px)", borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(13px, 1.3vw, 17px)", flexShrink: 0 }}>{c.icon}</span>
+                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(14px, 1.4vw, 19px)", color: "#F5ECD9", letterSpacing: 1, textTransform: "uppercase" }}>{c.name}</span>
                 </div>
-              ))}
-            </div>
-          );
-        })}
+                {activeItems.filter((m) => m.cat === c.name).map((m) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "clamp(3px, 0.6vh, 6px) 0", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+                    <span style={{ fontWeight: 600, fontSize: "clamp(11px, 1vw, 15px)", color: "#E4D8C0", whiteSpace: "nowrap" }}>{m.name}</span>
+                    <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.3)", marginBottom: 4 }} />
+                    <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(12px, 1.1vw, 16px)", color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "12px 0", overflow: "hidden", marginLeft: -26, marginRight: -26 }}>
+      <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "clamp(6px, 1vh, 12px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", width: "max-content", animation: "mbTicker 22s linear infinite" }}>
           {[...tickerMsgs, ...tickerMsgs].map((msg, i) => (
-            <span key={i} style={{ fontFamily: "'Anton', sans-serif", fontSize: 15, color: GOLD, letterSpacing: 2, padding: "0 34px", whiteSpace: "nowrap" }}>{msg}</span>
+            <span key={i} style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(11px, 1vw, 15px)", color: GOLD, letterSpacing: 2, padding: "0 clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>{msg}</span>
           ))}
         </div>
       </div>
