@@ -574,7 +574,7 @@ export default function App() {
   return (
     <div style={{
       fontFamily: "Arial, sans-serif", background: "#FFF8ED", color: "#2B2118",
-      ...(view === "menutv" ? { height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" } : { minHeight: "100vh" }),
+      ...(view === "menutv" ? { position: "fixed", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" } : { minHeight: "100vh" }),
     }}>
       {readyToast && (
         <div
@@ -2565,6 +2565,22 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const GOLD = "#F2C879";
   const tickerMsgs = ["🍔 HECHO AL MOMENTO", "🌶️ PÍDELO PICANTE", "🚚 DELIVERY DISPONIBLE", "📍 MASATEPE, MASAYA", "⭐ SABOR CASERO DE VERDAD"];
 
+  // Páginas de categorías: en una TV no hay forma de hacer scroll, así que en vez de
+  // amontonar todo, se muestran unas pocas categorías a la vez y van rotando solas.
+  const CATS_PER_PAGE = 4;
+  const pages = [];
+  for (let i = 0; i < catsWithItems.length; i += CATS_PER_PAGE) {
+    pages.push(catsWithItems.slice(i, i + CATS_PER_PAGE));
+  }
+  if (pages.length === 0) pages.push([]);
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    if (pages.length <= 1) return;
+    const iv = setInterval(() => setPage((p) => (p + 1) % pages.length), 9000);
+    return () => clearInterval(iv);
+  }, [pages.length]);
+  const currentCats = pages[Math.min(page, pages.length - 1)] || [];
+
   return (
     <div style={{
       background: "radial-gradient(circle at top, #2d2418, #16110c)",
@@ -2606,9 +2622,9 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", paddingBottom: "clamp(10px, 2vh, 20px)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "clamp(10px, 1.4vw, 18px)" }}>
-          {catsWithItems.map((c) => {
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "clamp(8px, 1.4vh, 14px)", display: "flex", alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(currentCats.length, 2) || 1}, 1fr)`, gap: "clamp(10px, 1.4vw, 18px)", width: "100%" }}>
+          {currentCats.map((c) => {
             const accent = avatarColor(c.name);
             return (
               <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: "clamp(12px, 1.6vh, 18px) clamp(14px, 1.8vw, 20px)", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)" }}>
@@ -2628,6 +2644,14 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
           })}
         </div>
       </div>
+
+      {pages.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, paddingBottom: "clamp(6px, 1vh, 10px)", flexShrink: 0 }}>
+          {pages.map((_, i) => (
+            <span key={i} style={{ width: i === page ? 20 : 7, height: 7, borderRadius: 4, background: i === page ? GOLD : "rgba(242,200,121,0.3)", transition: "all 0.3s ease" }} />
+          ))}
+        </div>
+      )}
 
       <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "clamp(6px, 1vh, 12px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
         <div style={{ display: "flex", width: "max-content", animation: "mbTicker 22s linear infinite" }}>
