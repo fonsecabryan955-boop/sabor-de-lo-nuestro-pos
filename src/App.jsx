@@ -572,7 +572,10 @@ export default function App() {
   }
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", background: "#FFF8ED", minHeight: "100vh", color: "#2B2118" }}>
+    <div style={{
+      fontFamily: "Arial, sans-serif", background: "#FFF8ED", color: "#2B2118",
+      ...(view === "menutv" ? { height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" } : { minHeight: "100vh" }),
+    }}>
       {readyToast && (
         <div
           onClick={() => setReadyToast(null)}
@@ -607,11 +610,11 @@ export default function App() {
         <>
           <div style={{
             background: connError ? "#C1272D" : "#2E7D32", color: "#fff", fontSize: 12, fontWeight: 700,
-            padding: "6px 14px", textAlign: "center",
+            padding: "6px 14px", textAlign: "center", flexShrink: 0,
           }}>
             {connError ? `⚠️ ${connStatus}: ${connError}` : `✅ ${connStatus}${lastSync ? " · última sync " + lastSync.toLocaleTimeString("es-NI") : ""}`}
           </div>
-          <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, flexShrink: 0 }}>
             <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
               🍔🍗 {RESTAURANT_NAME}
             </h1>
@@ -649,7 +652,7 @@ export default function App() {
         </>
       )}
 
-      <div style={kiosk && view === "menutv" ? { padding: 0, height: "100vh", width: "100vw", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={view === "menutv" ? { padding: 0, flex: 1, minHeight: 0, width: "100%", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto" }}>
         {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onManageMenu={() => setMenuManagerOpen(true)} />}
 
         {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} kiosk={kiosk} />}
@@ -688,7 +691,7 @@ export default function App() {
 
         {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
 
-        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
+        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
         {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} />}
       </div>
@@ -2565,8 +2568,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   return (
     <div style={{
       background: "radial-gradient(circle at top, #2d2418, #16110c)",
-      borderRadius: kiosk ? 0 : 20,
-      height: kiosk ? "100%" : "auto",
+      borderRadius: kiosk ? 0 : 16,
+      height: "100%",
       width: "100%",
       display: "flex", flexDirection: "column",
       overflow: "hidden",
@@ -2637,7 +2640,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   );
 }
 
-function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense }) {
+function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDeleteExpense }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [quincenaMonth, setQuincenaMonth] = useState(() => {
@@ -2661,20 +2664,32 @@ function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense })
   const [qYear, qMonth] = quincenaMonth.split("-").map(Number);
   const lastDay = new Date(qYear, qMonth, 0).getDate();
   function sumInDayRange(list, dayStart, dayEnd, key) {
-    return list
+    return (list || [])
       .filter((x) => {
         const t = new Date(x.time);
         if (t.getFullYear() !== qYear || t.getMonth() !== qMonth - 1) return false;
         const day = t.getDate();
         return day >= dayStart && day <= dayEnd;
       })
-      .reduce((sum, x) => sum + Number(key === "sale" ? x.total : x.amount), 0);
+      .reduce((sum, x) => sum + Number(key === "sale" ? x.total : (key === "pay" ? x.amount : x.amount)), 0);
   }
   const q1Sold = sumInDayRange(salesLog, 1, 15, "sale");
   const q1Spent = sumInDayRange(expensesLog, 1, 15, "exp");
+  const q1Payroll = sumInDayRange(payments, 1, 15, "pay");
   const q2Sold = sumInDayRange(salesLog, 16, lastDay, "sale");
   const q2Spent = sumInDayRange(expensesLog, 16, lastDay, "exp");
+  const q2Payroll = sumInDayRange(payments, 16, lastDay, "pay");
   const monthLabel = new Date(qYear, qMonth - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
+
+  const monthSalesAll = salesLog.filter((s) => { const t = new Date(s.time); return t.getFullYear() === qYear && t.getMonth() === qMonth - 1; });
+  const monthExpensesAll = expensesLog.filter((e) => { const t = new Date(e.time); return t.getFullYear() === qYear && t.getMonth() === qMonth - 1; });
+  const monthIncomeAll = q1Sold + q2Sold;
+  const monthSpentAll = q1Spent + q2Spent;
+  const monthInsumosAll = monthExpensesAll.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthOtrosAll = monthSpentAll - monthInsumosAll;
+  const monthPayrollAll = q1Payroll + q2Payroll;
+  const monthRealProfitAll = monthIncomeAll - monthSpentAll - monthPayrollAll;
+  const monthFoodCostPctAll = monthIncomeAll > 0 ? Math.round((monthInsumosAll / monthIncomeAll) * 100) : 0;
 
   return (
     <div>
@@ -2694,12 +2709,15 @@ function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense })
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q1Sold)}</span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q1Spent)}</span>
             </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+              <span style={{ opacity: 0.8 }}>Nómina</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q1Payroll)}</span>
+            </div>
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>Neto</span>
-              <span style={{ fontSize: 17, fontWeight: 800, color: q1Sold - q1Spent >= 0 ? "#00E676" : "#FF5252" }}>{money(q1Sold - q1Spent)}</span>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>Ganancia real</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: q1Sold - q1Spent - q1Payroll >= 0 ? "#00E676" : "#FF5252" }}>{money(q1Sold - q1Spent - q1Payroll)}</span>
             </div>
           </div>
           <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: 16, color: "#fff" }}>
@@ -2707,18 +2725,40 @@ function HistorialView({ salesLog, expensesLog, onDeleteSale, onDeleteExpense })
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q2Sold)}</span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q2Spent)}</span>
             </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+              <span style={{ opacity: 0.8 }}>Nómina</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q2Payroll)}</span>
+            </div>
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, fontWeight: 700 }}>Neto</span>
-              <span style={{ fontSize: 17, fontWeight: 800, color: q2Sold - q2Spent >= 0 ? "#00E676" : "#FF5252" }}>{money(q2Sold - q2Spent)}</span>
+              <span style={{ fontSize: 12, fontWeight: 700 }}>Ganancia real</span>
+              <span style={{ fontSize: 17, fontWeight: 800, color: q2Sold - q2Spent - q2Payroll >= 0 ? "#00E676" : "#FF5252" }}>{money(q2Sold - q2Spent - q2Payroll)}</span>
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 12, background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+        <div style={{ marginTop: 12, background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13, flexWrap: "wrap", gap: 6 }}>
           <span style={{ color: "#5a4c3a", fontWeight: 700 }}>Total del mes ({monthLabel})</span>
-          <span style={{ fontWeight: 800, color: "#2B2118" }}>{money(q1Sold + q2Sold)} vendido · -{money(q1Spent + q2Spent)} gastado</span>
+          <span style={{ fontWeight: 800, color: "#2B2118" }}>{money(q1Sold + q2Sold)} vendido · -{money(q1Spent + q2Spent)} gastado · -{money(q1Payroll + q2Payroll)} nómina</span>
+        </div>
+      </div>
+
+      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 20, color: "#fff" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 BALANCE DETALLADO DEL MES — {monthLabel.toUpperCase()}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
+          <div><div style={{ color: "#C9BBA3" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(monthIncomeAll)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthInsumosAll)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthOtrosAll)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthPayrollAll)}</div></div>
+        </div>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>= Ganancia real del mes</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: monthRealProfitAll >= 0 ? "#00E676" : "#FF5252" }}>{money(monthRealProfitAll)}</span>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 10, fontSize: 11, color: "#C9BBA3" }}>
+          <span>🧾 {monthSalesAll.length} venta{monthSalesAll.length !== 1 ? "s" : ""}</span>
+          <span>🎟️ Ticket promedio: {money(monthSalesAll.length > 0 ? monthIncomeAll / monthSalesAll.length : 0)}</span>
+          {monthIncomeAll > 0 && <span>🍗 Costo insumos: {monthFoodCostPctAll}% {monthFoodCostPctAll > 35 ? "⚠️" : "✅"}</span>}
         </div>
       </div>
 
@@ -3639,6 +3679,21 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         </div>
       )}
 
+      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#fff" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL DEL MES — {monthLabel.toUpperCase()}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
+          <div><div style={{ color: "#C9BBA3" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(monthIncome)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthInsumos)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthSpent - monthInsumos)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthPayroll)}</div></div>
+        </div>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, fontWeight: 700 }}>= Te queda realmente este mes</span>
+          <span style={{ fontSize: 22, fontWeight: 800, color: monthRealProfit >= 0 ? "#00E676" : "#FF5252" }}>{money(monthRealProfit)}</span>
+        </div>
+        {monthIncome > 0 && <div style={{ fontSize: 11, color: "#C9BBA3", marginTop: 8 }}>🍗 Costo de insumos: {monthFoodCostPct}% de las ventas {monthFoodCostPct > 35 ? "⚠️ (alto, ideal 30-35%)" : "✅"}</div>}
+      </div>
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Balance del mes — {monthLabel}</h3>
         {(monthSales.length > 0 || monthExpenses.length > 0) && (
@@ -3690,15 +3745,13 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
           </div>
         )
       )}
-      <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, margin: "10px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <div style={{ fontSize: 12, color: "#5a4c3a" }}>💎 Ganancia neta real del mes (ventas − insumos − otros gastos − nómina){monthIncome > 0 ? ` · costo insumos: ${monthFoodCostPct}%` : ""}</div>
-        <div style={{ fontWeight: 800, fontSize: 20, color: monthRealProfit >= 0 ? "#2E7D32" : "#C1272D" }}>{money(monthRealProfit)}</div>
-      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
         <div style={statCard}><div style={statLabel}>Insumos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthInsumos)}</div></div>
         <div style={statCard}><div style={statLabel}>Nómina del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthPayroll)}</div></div>
         <div style={statCard}><div style={statLabel}>Ventas del mes</div><div style={statValue}>{monthSales.length}</div></div>
+        <div style={statCard}><div style={statLabel}>Ticket promedio (mes)</div><div style={statValue}>{money(monthSales.length > 0 ? monthIncome / monthSales.length : 0)}</div></div>
+        <div style={statCard}><div style={statLabel}>Días con ventas</div><div style={statValue}>{new Set(monthSales.map((s) => s.time.slice(0, 10))).size}</div></div>
       </div>
 
       <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(242,200,121,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
