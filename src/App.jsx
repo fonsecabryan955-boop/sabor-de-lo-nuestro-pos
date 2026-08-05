@@ -2565,14 +2565,25 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const GOLD = "#F2C879";
   const tickerMsgs = ["🍔 HECHO AL MOMENTO", "🌶️ PÍDELO PICANTE", "🚚 DELIVERY DISPONIBLE", "📍 MASATEPE, MASAYA", "⭐ SABOR CASERO DE VERDAD"];
 
-  // Páginas de categorías: en una TV no hay forma de hacer scroll, así que en vez de
-  // amontonar todo, se muestran unas pocas categorías a la vez y van rotando solas.
-  const CATS_PER_PAGE = 4;
+  const MAX_CATS_PER_PAGE = 4;
+  const ITEMS_BUDGET_PER_PAGE = 13;
   const pages = [];
-  for (let i = 0; i < catsWithItems.length; i += CATS_PER_PAGE) {
-    pages.push(catsWithItems.slice(i, i + CATS_PER_PAGE));
-  }
+  let currentPage = [];
+  let currentCount = 0;
+  catsWithItems.forEach((c) => {
+    const itemCount = activeItems.filter((m) => m.cat === c.name).length;
+    const wouldOverflow = currentPage.length > 0 && (currentPage.length >= MAX_CATS_PER_PAGE || currentCount + itemCount > ITEMS_BUDGET_PER_PAGE);
+    if (wouldOverflow) {
+      pages.push(currentPage);
+      currentPage = [];
+      currentCount = 0;
+    }
+    currentPage.push(c);
+    currentCount += itemCount;
+  });
+  if (currentPage.length) pages.push(currentPage);
   if (pages.length === 0) pages.push([]);
+
   const [page, setPage] = useState(0);
   useEffect(() => {
     if (pages.length <= 1) return;
@@ -2580,6 +2591,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
     return () => clearInterval(iv);
   }, [pages.length]);
   const currentCats = pages[Math.min(page, pages.length - 1)] || [];
+  const cols = Math.min(currentCats.length, 2) || 1;
+  const rows = Math.max(1, Math.ceil(currentCats.length / cols));
 
   return (
     <div style={{
@@ -2621,6 +2634,51 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
           </div>
         </div>
       )}
+
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "clamp(8px, 1.4vh, 14px)", display: "flex" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: "clamp(10px, 1.4vw, 18px)", width: "100%", height: "100%" }}>
+          {currentCats.map((c) => {
+            const accent = avatarColor(c.name);
+            const catItemCount = activeItems.filter((m) => m.cat === c.name).length;
+            return (
+              <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: "clamp(10px, 1.4vh, 16px) clamp(14px, 1.8vw, 20px)", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "clamp(6px, 1vh, 10px)", flexShrink: 0 }}>
+                  <span style={{ width: "clamp(24px, 2.2vw, 32px)", height: "clamp(24px, 2.2vw, 32px)", borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(12px, 1.2vw, 16px)", flexShrink: 0 }}>{c.icon}</span>
+                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(13px, 1.3vw, 18px)", color: "#F5ECD9", letterSpacing: 1, textTransform: "uppercase" }}>{c.name}</span>
+                </div>
+                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: catItemCount <= 5 ? "flex-start" : "space-evenly" }}>
+                  {activeItems.filter((m) => m.cat === c.name).map((m) => (
+                    <div key={m.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+                      <span style={{ fontWeight: 600, fontSize: "clamp(10px, 0.95vw, 14px)", color: "#E4D8C0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+                      <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.3)", marginBottom: 4 }} />
+                      <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(11px, 1.05vw, 15px)", color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {pages.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, paddingBottom: "clamp(6px, 1vh, 10px)", flexShrink: 0 }}>
+          {pages.map((_, i) => (
+            <span key={i} style={{ width: i === page ? 20 : 7, height: 7, borderRadius: 4, background: i === page ? GOLD : "rgba(242,200,121,0.3)", transition: "all 0.3s ease" }} />
+          ))}
+        </div>
+      )}
+
+      <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "clamp(6px, 1vh, 12px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", width: "max-content", animation: "mbTicker 22s linear infinite" }}>
+          {[...tickerMsgs, ...tickerMsgs].map((msg, i) => (
+            <span key={i} style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(11px, 1vw, 15px)", color: GOLD, letterSpacing: 2, padding: "0 clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>{msg}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "clamp(8px, 1.4vh, 14px)", display: "flex", alignItems: "center" }}>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(currentCats.length, 2) || 1}, 1fr)`, gap: "clamp(10px, 1.4vw, 18px)", width: "100%" }}>
