@@ -1928,7 +1928,6 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const CARD = "#1E1611";
   const CARD2 = "#251C15";
   const GOLD = "#F2C879";
-  const GOLD_DEEP = "#C99A45";
   const EMBER = "#C1272D";
   const AMBER = "#E8A33D";
   const CREAM = "#F5ECD9";
@@ -1957,7 +1956,6 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600&display=swap');
         @keyframes cajaFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes cajaGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(242,200,121,0.35); } 50% { box-shadow: 0 0 0 6px rgba(242,200,121,0); } }
         @keyframes cajaShine { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         @keyframes cajaPulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
         .caja-card { animation: cajaFadeUp 0.35s ease; transition: transform 0.15s ease, box-shadow 0.15s ease; }
@@ -1977,7 +1975,6 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         .caja-chip:hover { transform: translateY(-1px); filter: brightness(1.08); }
       `}</style>
 
-      {/* HERO */}
       <div style={{
         background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`,
         borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
@@ -2593,8 +2590,6 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const GOLD = "#F2C879";
   const tickerMsgs = ["🍔 HECHO AL MOMENTO", "🌶️ PÍDELO PICANTE", "🚚 DELIVERY DISPONIBLE", "📍 MASATEPE, MASAYA", "⭐ SABOR CASERO DE VERDAD"];
 
-  // Ahora cada "diapositiva" es UNA sola categoría completa — así nunca se corta,
-  // sin importar cuántas categorías o productos tengas.
   const SLIDE_SECONDS = 8;
   const [slide, setSlide] = useState(0);
   useEffect(() => {
@@ -2690,94 +2685,6 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
     </div>
   );
 }
-
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "clamp(8px, 1.4vh, 14px)", display: "flex" }}>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)`, gap: "clamp(10px, 1.4vw, 18px)", width: "100%", height: "100%" }}>
-          {currentCats.map((c) => {
-            const accent = avatarColor(c.name);
-            const catItemCount = activeItems.filter((m) => m.cat === c.name).length;
-            return (
-              <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: "clamp(10px, 1.4vh, 16px) clamp(14px, 1.8vw, 20px)", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "clamp(6px, 1vh, 10px)", flexShrink: 0 }}>
-                  <span style={{ width: "clamp(24px, 2.2vw, 32px)", height: "clamp(24px, 2.2vw, 32px)", borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(12px, 1.2vw, 16px)", flexShrink: 0 }}>{c.icon}</span>
-                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(13px, 1.3vw, 18px)", color: "#F5ECD9", letterSpacing: 1, textTransform: "uppercase" }}>{c.name}</span>
-                </div>
-                <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: catItemCount <= 5 ? "flex-start" : "space-evenly" }}>
-                  {activeItems.filter((m) => m.cat === c.name).map((m) => (
-                    <div key={m.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
-                      <span style={{ fontWeight: 600, fontSize: "clamp(10px, 0.95vw, 14px)", color: "#E4D8C0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
-                      <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.3)", marginBottom: 4 }} />
-                      <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(11px, 1.05vw, 15px)", color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {pages.length > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, paddingBottom: "clamp(6px, 1vh, 10px)", flexShrink: 0 }}>
-          {pages.map((_, i) => (
-            <span key={i} style={{ width: i === page ? 20 : 7, height: 7, borderRadius: 4, background: i === page ? GOLD : "rgba(242,200,121,0.3)", transition: "all 0.3s ease" }} />
-          ))}
-        </div>
-      )}
-
-      <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "clamp(6px, 1vh, 12px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
-        <div style={{ display: "flex", width: "max-content", animation: "mbTicker 22s linear infinite" }}>
-          {[...tickerMsgs, ...tickerMsgs].map((msg, i) => (
-            <span key={i} style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(11px, 1vw, 15px)", color: GOLD, letterSpacing: 2, padding: "0 clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>{msg}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", paddingBottom: "clamp(8px, 1.4vh, 14px)", display: "flex", alignItems: "center" }}>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(currentCats.length, 2) || 1}, 1fr)`, gap: "clamp(10px, 1.4vw, 18px)", width: "100%" }}>
-          {currentCats.map((c) => {
-            const accent = avatarColor(c.name);
-            return (
-              <div key={c.name} style={{ background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: "clamp(12px, 1.6vh, 18px) clamp(14px, 1.8vw, 20px)", border: `1px solid ${accent}44`, boxShadow: "0 10px 24px rgba(0,0,0,0.3)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "clamp(8px, 1.2vh, 12px)" }}>
-                  <span style={{ width: "clamp(26px, 2.4vw, 34px)", height: "clamp(26px, 2.4vw, 34px)", borderRadius: "50%", background: accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "clamp(13px, 1.3vw, 17px)", flexShrink: 0 }}>{c.icon}</span>
-                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(14px, 1.4vw, 19px)", color: "#F5ECD9", letterSpacing: 1, textTransform: "uppercase" }}>{c.name}</span>
-                </div>
-                {activeItems.filter((m) => m.cat === c.name).map((m) => (
-                  <div key={m.id} style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "clamp(3px, 0.6vh, 6px) 0", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
-                    <span style={{ fontWeight: 600, fontSize: "clamp(11px, 1vw, 15px)", color: "#E4D8C0", whiteSpace: "nowrap" }}>{m.name}</span>
-                    <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.3)", marginBottom: 4 }} />
-                    <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(12px, 1.1vw, 16px)", color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {pages.length > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, paddingBottom: "clamp(6px, 1vh, 10px)", flexShrink: 0 }}>
-          {pages.map((_, i) => (
-            <span key={i} style={{ width: i === page ? 20 : 7, height: 7, borderRadius: 4, background: i === page ? GOLD : "rgba(242,200,121,0.3)", transition: "all 0.3s ease" }} />
-          ))}
-        </div>
-      )}
-
-      <div style={{ borderTop: `2px solid ${AMBER}55`, background: "rgba(0,0,0,0.35)", padding: "clamp(6px, 1vh, 12px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box" }}>
-        <div style={{ display: "flex", width: "max-content", animation: "mbTicker 22s linear infinite" }}>
-          {[...tickerMsgs, ...tickerMsgs].map((msg, i) => (
-            <span key={i} style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(11px, 1vw, 15px)", color: GOLD, letterSpacing: 2, padding: "0 clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>{msg}</span>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDeleteExpense }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -3041,7 +2948,6 @@ function PaydayBanner({ employees, payments, clockRecords }) {
   const now = new Date();
   const today = now.getDate();
   const lastDayOfThisMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  // Segundo pago: día 30, o el último día del mes si tiene menos de 30 días (ej. febrero)
   const isSecondPayday = today === 30 || (today === lastDayOfThisMonth && lastDayOfThisMonth < 30);
   const isFirstPayday = today === 15;
   if (!isFirstPayday && !isSecondPayday) return null;
