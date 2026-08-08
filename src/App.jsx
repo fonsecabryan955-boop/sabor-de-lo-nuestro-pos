@@ -3264,6 +3264,8 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   const [role, setRole] = useState(ROLES[0]);
   const [phone, setPhone] = useState("");
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("Todos");
+  const [sortBy, setSortBy] = useState("nombre");
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState("");
   const [expanded, setExpanded] = useState(null);
@@ -3272,6 +3274,16 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   const today = todayStr();
   const monthKey = new Date().toISOString().slice(0, 7);
   const todayRecords = clockRecords.filter((r) => new Date(r.time).toDateString() === today).slice().reverse();
+
+  const INK = "#15100B";
+  const CARD = "#1E1611";
+  const CARD2 = "#251C15";
+  const GOLD = "#F2C879";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const LINE = "rgba(242,200,121,0.14)";
 
   const monthPayroll = payments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((sum, p) => sum + p.amount, 0);
 
@@ -3290,122 +3302,191 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   const activeEmployees = employees.filter((e) => e.active !== false);
   const inactiveEmployees = employees.filter((e) => e.active === false);
   const totalOwedAll = activeEmployees.reduce((sum, emp) => sum + employeeStats(emp).owed, 0);
-  const visibleEmployees = (showInactive ? employees : activeEmployees).filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
+
+  const teamPunctuality = useMemo(() => {
+    const withRecords = activeEmployees.map((e) => employeeStats(e)).filter((s) => s.totalDays > 0);
+    if (withRecords.length === 0) return null;
+    return Math.round(withRecords.reduce((sum, s) => sum + s.punctuality, 0) / withRecords.length);
+  }, [activeEmployees, clockRecords]);
+
+  const availableRoles = useMemo(() => {
+    const set = new Set(employees.map((e) => e.role || "Personal"));
+    return ["Todos", ...Array.from(set)];
+  }, [employees]);
+
+  const visibleEmployees = useMemo(() => {
+    let list = (showInactive ? employees : activeEmployees).filter((e) => e.name.toLowerCase().includes(search.toLowerCase()));
+    if (roleFilter !== "Todos") list = list.filter((e) => (e.role || "Personal") === roleFilter);
+    list = list.slice();
+    if (sortBy === "nombre") list.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === "pendiente") list.sort((a, b) => employeeStats(b).owed - employeeStats(a).owed);
+    if (sortBy === "puntualidad") list.sort((a, b) => employeeStats(b).punctuality - employeeStats(a).punctuality);
+    return list;
+  }, [employees, activeEmployees, showInactive, search, roleFilter, sortBy, payments, clockRecords]);
 
   return (
-    <div>
-      <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>👥 Personal y Nómina</h2>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600&display=swap');
+        @keyframes empFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes empPulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .emp-card { animation: empFadeUp 0.35s ease; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .emp-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(0,0,0,0.4); }
+        .emp-chip { transition: all 0.15s ease; }
+        .emp-chip:hover { transform: translateY(-1px); filter: brightness(1.08); }
+      `}</style>
+
+      {/* HERO */}
+      <div style={{
+        background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`,
+        borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
+        boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
+      }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.10), transparent 70%)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", animation: "empPulseDot 1.6s infinite" }} />
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 2.5, color: "#8FD9A8", textTransform: "uppercase" }}>Equipo en turno</span>
+            </div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 30, margin: 0, color: CREAM, letterSpacing: 0.2 }}>Personal y Nómina</h2>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Turno: {SHIFT_START} a {SHIFT_END} · tolerancia {LATE_GRACE_MIN} min</div>
+          </div>
+          {employees.length > 0 && (
+            <button onClick={() => printPayrollSummary(employees, payments, clockRecords)} className="emp-chip" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: `1px solid ${LINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(255,255,255,0.04)", color: GOLD }}>
+              <Printer size={14} /> Imprimir nómina
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 22, position: "relative" }}>
+          {[
+            { label: "PAGADO ESTE MES", value: money(monthPayroll), accent: GOLD },
+            { label: "PENDIENTE DE PAGAR", value: money(totalOwedAll), accent: totalOwedAll > 0 ? "#F87171" : "#4ADE80" },
+            { label: "EQUIPO ACTIVO", value: activeEmployees.length, accent: "#3E7FD9" },
+            { label: "PUNTUALIDAD DEL EQUIPO", value: teamPunctuality !== null ? `${teamPunctuality}%` : "—", accent: teamPunctuality !== null && teamPunctuality >= 90 ? "#4ADE80" : teamPunctuality !== null && teamPunctuality >= 70 ? AMBER : "#F87171" },
+          ].map((s, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: CREAM }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <PaydayBanner employees={employees} payments={payments} clockRecords={clockRecords} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <p style={{ fontSize: 12, color: "#8a7a63", margin: 0 }}>Turno: {SHIFT_START} a {SHIFT_END} (tolerancia {LATE_GRACE_MIN} min)</p>
-        {employees.length > 0 && (
-          <button onClick={() => printPayrollSummary(employees, payments, clockRecords)} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700, color: "#8a7a63" }}>
-            <Printer size={13} /> Imprimir nómina del mes
-          </button>
-        )}
-      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, margin: "14px 0 20px" }}>
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ color: "#F2C879", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>💰 PAGADO ESTE MES</div>
-          <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(monthPayroll)}</div>
-        </div>
-        <div style={{ background: totalOwedAll > 0 ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "linear-gradient(135deg, #26A65B, #158A4A)", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ color: "#fff", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>⏳ PENDIENTE DE PAGAR</div>
-          <div style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>{money(totalOwedAll)}</div>
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 18px" }}>
-          <div style={{ color: "#8a7a63", fontWeight: 700, fontSize: 12, letterSpacing: 0.5, marginBottom: 4 }}>👥 EQUIPO ACTIVO</div>
-          <div style={{ color: "#2B2118", fontWeight: 800, fontSize: 22 }}>{activeEmployees.length}</div>
-        </div>
-      </div>
-
-      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 24 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>➕ Agregar nuevo empleado</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+      {/* Agregar empleado */}
+      <div style={{ background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: `1px solid ${LINE}`, borderRadius: 18, padding: 20, marginBottom: 22 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: CREAM, marginBottom: 12 }}>➕ Agregar nuevo empleado</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
           {ROLES.map((r) => (
-            <button key={r} onClick={() => setRole(r)} style={{ padding: "6px 12px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: role === r ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: role === r ? "#fff" : "#5a4c3a" }}>
+            <button key={r} onClick={() => setRole(r)} className="emp-chip" style={{ padding: "7px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: role === r ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.05)", color: role === r ? "#fff" : MUTED }}>
               {ROLE_ICONS[r]} {r}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input placeholder="Nombre del empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 180 }} />
-          <input placeholder="Teléfono (opcional)" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
-          <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...inp, maxWidth: 140 }} />
-          <button onClick={() => { onAdd(name, wage, role, phone); setName(""); setWage(""); setPhone(""); }} disabled={!name} style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}>Agregar</button>
+          <input placeholder="Nombre del empleado" value={name} onChange={(e) => setName(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 180 }} />
+          <input placeholder="Teléfono (opcional)" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 150 }} />
+          <input placeholder="Pago por día (C$)" type="number" value={wage} onChange={(e) => setWage(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 140 }} />
+          <button onClick={() => { onAdd(name, wage, role, phone); setName(""); setWage(""); setPhone(""); }} disabled={!name} style={{ padding: "0 18px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: name ? 1 : 0.5, boxShadow: "0 6px 16px rgba(193,39,45,0.3)" }}>Agregar</button>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
-        <input placeholder="🔍 Buscar empleado..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
-        {inactiveEmployees.length > 0 && (
-          <button onClick={() => setShowInactive((s) => !s)} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 12px", cursor: "pointer", color: "#8a7a63", fontWeight: 700 }}>
-            {showInactive ? "Ocultar" : "Ver"} inactivos ({inactiveEmployees.length})
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
-        <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ ...inp, maxWidth: 220 }}>
+      {/* Marcar entrada */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center", background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: `1px solid ${LINE}`, borderRadius: 18, padding: 16 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, marginRight: 4 }}>⏱ Marcar entrada:</span>
+        <select value={selected} onChange={(e) => setSelected(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 220 }}>
           <option value="">Selecciona un empleado</option>
           {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
         </select>
         <button
           disabled={!selected}
           onClick={() => onClockIn(selected)}
-          style={{ padding: "10px 16px", border: "none", borderRadius: 8, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: selected ? 1 : 0.5 }}
+          className="emp-chip"
+          style={{ padding: "10px 18px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: selected ? 1 : 0.5 }}
         >
           Marcar entrada
         </button>
       </div>
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginBottom: 10 }}>Equipo</h3>
-      {visibleEmployees.length === 0 && <p style={{ color: "#8a7a63" }}>No se encontraron empleados.</p>}
-      <div style={{ display: "grid", gap: 10 }}>
+      {/* Filtros */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
+        <input placeholder="🔍 Buscar empleado..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 200, background: CARD }} />
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 170, background: CARD }}>
+          {availableRoles.map((r) => <option key={r} value={r}>{r === "Todos" ? "Todos los puestos" : r}</option>)}
+        </select>
+        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 170, background: CARD }}>
+          <option value="nombre">Ordenar: Nombre</option>
+          <option value="pendiente">Ordenar: Pendiente de pago</option>
+          <option value="puntualidad">Ordenar: Puntualidad</option>
+        </select>
+        {inactiveEmployees.length > 0 && (
+          <button onClick={() => setShowInactive((s) => !s)} className="emp-chip" style={{ fontSize: 12, background: "none", border: `1px solid ${LINE}`, borderRadius: 8, padding: "9px 14px", cursor: "pointer", color: MUTED, fontWeight: 700 }}>
+            {showInactive ? "Ocultar" : "Ver"} inactivos ({inactiveEmployees.length})
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {visibleEmployees.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: MUTED, background: CARD, borderRadius: 16, border: `1px dashed ${LINE}` }}>
+            No se encontraron empleados con esos filtros.
+          </div>
+        )}
         {visibleEmployees.map((emp) => {
           const st = employeeStats(emp);
           const isOpen = expanded === emp.id;
-          const key = emp.id;
           const isInactive = emp.active === false;
+          const punctColor = st.punctuality >= 90 ? "#4ADE80" : st.punctuality >= 70 ? AMBER : "#F87171";
           return (
-            <div key={emp.id} style={{ background: isInactive ? "#F5F0E8" : "#fff", border: st.owed > 0 && !isInactive ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, overflow: "hidden", boxShadow: "0 3px 8px rgba(0,0,0,0.06)", opacity: isInactive ? 0.7 : 1 }}>
+            <div key={emp.id} className="emp-card" style={{
+              background: `linear-gradient(175deg, ${CARD}, ${CARD2})`,
+              border: st.owed > 0 && !isInactive ? `1.5px solid ${AMBER}77` : `1px solid ${LINE}`,
+              borderRadius: 18, overflow: "hidden", opacity: isInactive ? 0.55 : 1,
+            }}>
               <button
                 onClick={() => setExpanded(isOpen ? null : emp.id)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: 16, border: "none", background: "none", cursor: "pointer", textAlign: "left" }}
               >
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: avatarColor(emp.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, flexShrink: 0 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 14, background: avatarColor(emp.name), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 16, flexShrink: 0, boxShadow: `0 6px 14px ${avatarColor(emp.name)}55` }}>
                   {initials(emp.name)}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 800, fontSize: 15 }}>{emp.name}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: "#F3ECE0", color: "#5a4c3a", padding: "2px 8px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
-                    {isInactive && <span style={{ fontSize: 10, fontWeight: 700, background: "#FCE8E8", color: "#C1272D", padding: "2px 8px", borderRadius: 20 }}>Inactivo</span>}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 800, fontSize: 15.5, color: CREAM, fontFamily: "'Fraunces', serif" }}>{emp.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(255,255,255,0.06)", color: MUTED, padding: "2px 9px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
+                    {isInactive && <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(193,39,45,0.15)", color: "#F87171", padding: "2px 9px", borderRadius: 20 }}>Inactivo</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 2 }}>
-                    {money(emp.dailyWage)}/día · {st.totalDays} entradas ·
-                    <span style={{ color: st.punctuality >= 90 ? "#2E7D32" : st.punctuality >= 70 ? "#C99A1E" : "#C1272D", fontWeight: 700 }}> {st.punctuality}% puntual</span>
-                    {emp.hireDate && <span> · Antigüedad: {seniorityLabel(emp.hireDate)}</span>}
+                  <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span>{money(emp.dailyWage)}/día</span>
+                    <span>·</span>
+                    <span>{st.totalDays} entradas</span>
+                    <span>·</span>
+                    <span style={{ color: punctColor, fontWeight: 700 }}>{st.punctuality}% puntual</span>
+                    {emp.hireDate && <><span>·</span><span>{seniorityLabel(emp.hireDate)}</span></>}
                   </div>
-                  {emp.phone && <div style={{ fontSize: 11, color: "#8a7a63" }}>📞 {emp.phone}</div>}
+                  <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 4, height: 4, marginTop: 7, overflow: "hidden", maxWidth: 200 }}>
+                    <div style={{ width: `${st.punctuality}%`, height: "100%", background: punctColor, borderRadius: 4 }} />
+                  </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
                   {st.owed > 0 ? (
                     <>
-                      <div style={{ fontWeight: 800, color: "#C1272D", fontSize: 16 }}>{money(st.owed)}</div>
-                      <div style={{ fontSize: 10, color: "#C1531F", fontWeight: 700 }}>se le debe · {st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</div>
+                      <div style={{ fontWeight: 800, color: "#F87171", fontSize: 16 }}>{money(st.owed)}</div>
+                      <div style={{ fontSize: 10, color: AMBER, fontWeight: 700 }}>se le debe · {st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</div>
                     </>
                   ) : (
                     <>
-                      <div style={{ fontWeight: 800, color: "#2E7D32", fontSize: 15 }}>Al día ✅</div>
-                      <div style={{ fontSize: 10, color: "#8a7a63" }}>{money(st.totalPaid)} pagado total</div>
+                      <div style={{ fontWeight: 800, color: "#4ADE80", fontSize: 14.5 }}>Al día ✅</div>
+                      <div style={{ fontSize: 10, color: MUTED }}>{money(st.totalPaid)} pagado total</div>
                     </>
                   )}
                 </div>
               </button>
               {isOpen && (
-                <div style={{ padding: "0 14px 14px", borderTop: "1px solid #F0E8D8" }}>
+                <div style={{ padding: "0 16px 16px", borderTop: `1px solid ${LINE}` }}>
                   {editingEmployee === emp.id ? (
                     <EmployeeEditForm
                       employee={emp}
@@ -3416,30 +3497,21 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                     <>
                       <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-                        <button
-                          onClick={() => setEditingEmployee(emp.id)}
-                          style={{ fontSize: 12, background: "none", border: "1px solid #1565C0", color: "#1565C0", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
-                        >
+                        <button onClick={() => setEditingEmployee(emp.id)} className="emp-chip" style={{ fontSize: 12, background: "rgba(62,127,217,0.10)", border: "1px solid #3E7FD955", color: "#7FA8E8", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
                           ✏️ Editar datos
                         </button>
-                        <button
-                          onClick={() => onToggleActive(emp.id)}
-                          style={{ fontSize: 12, background: "none", border: `1px solid ${isInactive ? "#2E7D32" : "#C1272D"}`, color: isInactive ? "#2E7D32" : "#C1272D", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
-                        >
+                        <button onClick={() => onToggleActive(emp.id)} className="emp-chip" style={{ fontSize: 12, background: isInactive ? "rgba(74,222,128,0.10)" : "rgba(193,39,45,0.10)", border: `1px solid ${isInactive ? "#4ADE80" : EMBER}55`, color: isInactive ? "#4ADE80" : "#F87171", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
                           {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
                         </button>
-                        <button
-                          onClick={() => { if (window.confirm(`¿Eliminar a "${emp.name}" por completo? Esto borra al empleado (no su historial de pagos ya registrado) y no se puede deshacer.`)) onDeleteEmployee(emp.id); }}
-                          style={{ fontSize: 12, background: "none", border: "1px solid #8a7a63", color: "#8a7a63", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}
-                        >
+                        <button onClick={() => { if (window.confirm(`¿Eliminar a "${emp.name}" por completo? Esto borra al empleado (no su historial de pagos ya registrado) y no se puede deshacer.`)) onDeleteEmployee(emp.id); }} className="emp-chip" style={{ fontSize: 12, background: "rgba(255,255,255,0.04)", border: `1px solid ${LINE}`, color: MUTED, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
                           🗑️ Eliminar empleado
                         </button>
                       </div>
                     </>
                   )}
                   {!editingEmployee && st.pendingDays > 0 && (
-                    <div style={{ fontSize: 12, color: "#8a7a63", margin: "10px 0 0" }}>
-                      <strong style={{ color: "#2B2118" }}>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
+                    <div style={{ fontSize: 12, color: MUTED, margin: "12px 0 0" }}>
+                      <strong style={{ color: CREAM }}>{st.pendingDays} día{st.pendingDays !== 1 ? "s" : ""}</strong> trabajado{st.pendingDays !== 1 ? "s" : ""} desde el último pago
                       {st.lastPayment && <span> · Último pago: {new Date(st.lastPayment.time).toLocaleDateString("es-NI")}</span>}
                     </div>
                   )}
@@ -3450,23 +3522,23 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                         pendingDays={st.pendingDays}
                         onPay={(data) => onAddPayment(emp.name, data.amount, data.note, { bruto: data.bruto, bono: data.bono, deducciones: data.deducciones, days: data.days })}
                       />
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Historial de pagos</div>
-                      {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: "#C9BBA3" }}>Sin pagos registrados todavía.</p>}
+                      <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 6 }}>Historial de pagos</div>
+                      {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: MUTED }}>Sin pagos registrados todavía.</p>}
                       {st.empPayments.map((p) => (
-                        <div key={p.id} style={{ padding: "8px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
+                        <div key={p.id} style={{ padding: "8px 0", borderBottom: `1px solid ${LINE}`, fontSize: 12 }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div style={{ fontWeight: 700 }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: "#8a7a63" }}>· {p.note}</span>}</div>
+                            <div style={{ fontWeight: 700, color: CREAM }}>{money(p.amount)} {p.note && <span style={{ fontWeight: 400, color: MUTED }}>· {p.note}</span>}</div>
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <button onClick={() => printPayStub(emp, p)} title="Imprimir recibo" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: "#8a7a63" }}><Printer size={12} /></button>
-                              <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer" }}><X size={14} /></button>
+                              <button onClick={() => printPayStub(emp, p)} title="Imprimir recibo" style={{ background: "none", border: `1px solid ${LINE}`, borderRadius: 6, padding: "3px 7px", cursor: "pointer", color: MUTED }}><Printer size={12} /></button>
+                              <button onClick={() => { if (window.confirm("¿Borrar este pago?")) onDeletePayment(p.id); }} style={{ background: "none", border: "none", color: MUTED, cursor: "pointer" }}><X size={14} /></button>
                             </div>
                           </div>
-                          <div style={{ fontSize: 10, color: "#C9BBA3", marginTop: 2 }}>{new Date(p.time).toLocaleString("es-NI")}</div>
+                          <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{new Date(p.time).toLocaleString("es-NI")}</div>
                           {(p.days || p.bono || p.deducciones) && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
-                              {p.days ? <span style={{ fontSize: 10, background: "#F3ECE0", color: "#5a4c3a", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>📅 {p.days} día{p.days !== 1 ? "s" : ""} × {money(emp.dailyWage)}</span> : null}
-                              {p.bono > 0 ? <span style={{ fontSize: 10, background: "#E8F5E9", color: "#2E7D32", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>🎁 Bono {money(p.bono)}</span> : null}
-                              {p.deducciones > 0 ? <span style={{ fontSize: 10, background: "#FCE8E8", color: "#C1272D", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>➖ Deducción {money(p.deducciones)}</span> : null}
+                              {p.days ? <span style={{ fontSize: 10, background: "rgba(255,255,255,0.06)", color: MUTED, padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>📅 {p.days} día{p.days !== 1 ? "s" : ""} × {money(emp.dailyWage)}</span> : null}
+                              {p.bono > 0 ? <span style={{ fontSize: 10, background: "rgba(74,222,128,0.12)", color: "#4ADE80", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>🎁 Bono {money(p.bono)}</span> : null}
+                              {p.deducciones > 0 ? <span style={{ fontSize: 10, background: "rgba(193,39,45,0.12)", color: "#F87171", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>➖ Deducción {money(p.deducciones)}</span> : null}
                             </div>
                           )}
                         </div>
@@ -3497,6 +3569,9 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   );
 }
 
+function empInp(line, cream) {
+  return { padding: 9, borderRadius: 9, border: `1px solid ${line}`, background: "rgba(255,255,255,0.03)", color: cream, fontSize: 13, fontFamily: "inherit" };
+}
 function EmployeeEditForm({ employee, onSave, onCancel }) {
   const [name, setName] = useState(employee.name);
   const [role, setRole] = useState(employee.role || ROLES[0]);
