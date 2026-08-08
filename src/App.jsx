@@ -411,7 +411,7 @@ export default function App() {
     }
   }
   function addExpense(exp) {
-    const record = { id: Date.now(), ...exp, time: new Date().toISOString() };
+    const record = { id: Date.now(), ...exp, time: exp.time || new Date().toISOString() };
     persist({ ...state, expenses: [...expenses, record], expensesLog: [...expensesLog, record] });
   }
   function addEmployee(name, dailyWage, role, phone) {
@@ -3721,9 +3721,38 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
     URL.revokeObjectURL(url);
   }
 
+  const EXPENSE_CATS = [
+    { id: "Insumos", icon: "🍗", label: "Insumos", color: "#C1272D" },
+    { id: "Luz", icon: "💡", label: "Luz", color: "#E8A33D" },
+    { id: "Agua", icon: "🚰", label: "Agua", color: "#3E7FD9" },
+    { id: "Otro", icon: "🧾", label: "Otro gasto", color: "#8a7a63" },
+  ];
+  function expenseCatMeta(catId) {
+    return EXPENSE_CATS.find((c) => c.id === (catId || "Otro")) || EXPENSE_CATS[3];
+  }
+
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("Insumos");
+  const [expenseDate, setExpenseDate] = useState(() => {
+    const d = new Date();
+    const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0, 10);
+  });
+
+  const todayExpensesByCat = useMemo(() => {
+    return EXPENSE_CATS.map((cat) => ({
+      ...cat,
+      amount: todayExpenses.filter((e) => (e.category || "Otro") === cat.id).reduce((sum, e) => sum + Number(e.amount), 0),
+    }));
+  }, [todayExpenses]);
+  const monthExpensesByCat = useMemo(() => {
+    return EXPENSE_CATS.map((cat) => ({
+      ...cat,
+      amount: monthExpenses.filter((e) => (e.category || "Otro") === cat.id).reduce((sum, e) => sum + Number(e.amount), 0),
+    }));
+  }, [monthExpenses]);
+  const maxCatAmount = Math.max(1, ...monthExpensesByCat.map((c) => c.amount));
 
   const byItem = useMemo(() => {
     const map = {};
@@ -3932,29 +3961,61 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         </span>
       </div>
 
+      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(242,200,121,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#F2C879", letterSpacing: 0.5, marginBottom: 14 }}>📊 GASTOS POR CATEGORÍA — {isToday ? "HOY" : new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { day: "numeric", month: "short" }).toUpperCase()}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 18 }}>
+          {todayExpensesByCat.map((cat) => (
+            <div key={cat.id} style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12, borderLeft: `3px solid ${cat.color}` }}>
+              <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 3 }}>{cat.icon} {cat.label}</div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#fff" }}>{money(cat.amount)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#C9BBA3", letterSpacing: 0.5, marginBottom: 10, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 14 }}>ACUMULADO DEL MES ({monthLabel.toUpperCase()})</div>
+        {monthExpensesByCat.map((cat) => (
+          <div key={cat.id} style={{ marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#fff", marginBottom: 3 }}>
+              <span>{cat.icon} {cat.label}</span><span style={{ fontWeight: 700 }}>{money(cat.amount)}</span>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 7, overflow: "hidden" }}>
+              <div style={{ width: `${(cat.amount / maxCatAmount) * 100}%`, height: "100%", background: cat.color, borderRadius: 6 }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Registrar gasto</h3>
+      <p style={{ fontSize: 11, color: "#8a7a63", marginTop: -4, marginBottom: 10 }}>
+        Podés poner la fecha real de la compra aunque no sea hoy — así los insumos que compraste otro día no se mezclan con la venta de hoy.
+      </p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        {["Insumos", "Otro"].map((c) => (
+        {EXPENSE_CATS.map((c) => (
           <button
-            key={c}
-            onClick={() => setCategory(c)}
+            key={c.id}
+            onClick={() => setCategory(c.id)}
             style={{
               padding: "8px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
-              background: category === c ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0",
-              color: category === c ? "#fff" : "#5a4c3a",
+              background: category === c.id ? c.color : "#F3ECE0",
+              color: category === c.id ? "#fff" : "#5a4c3a",
             }}
           >
-            {c === "Insumos" ? "🍗 Insumos" : "🧾 Otro gasto"}
+            {c.icon} {c.label}
           </button>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-        <input placeholder="Descripción (ej: pollo, gas)" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 20 }}>
+        <input placeholder="Descripción (ej: pollo, factura ENEL)" value={desc} onChange={(e) => setDesc(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
         <input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
+        <div>
+          <input type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} title="Fecha real del gasto" style={{ ...inp, maxWidth: 150 }} />
+        </div>
         <button
           disabled={!desc || !amount}
-          onClick={() => { onAddExpense({ description: desc, amount: Number(amount), category }); setDesc(""); setAmount(""); }}
-          style={{ padding: "0 16px", border: "none", borderRadius: 6, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: desc && amount ? 1 : 0.5 }}
+          onClick={() => {
+            onAddExpense({ description: desc, amount: Number(amount), category, time: new Date(expenseDate + "T12:00:00").toISOString() });
+            setDesc(""); setAmount("");
+          }}
+          style={{ padding: "0 16px", height: 38, border: "none", borderRadius: 6, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: desc && amount ? 1 : 0.5 }}
         >
           Agregar gasto
         </button>
@@ -3963,7 +4024,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         <div style={{ marginBottom: 20 }}>
           {todayExpenses.slice().reverse().map((e) => (
             <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-              <span>{(e.category || "Otro") === "Insumos" ? "🍗" : "🧾"} {e.description}</span>
+              <span>{expenseCatMeta(e.category).icon} {e.description}</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontWeight: 700, color: "#C1272D" }}>-{money(e.amount)}</span>
                 <button onClick={() => onDeleteExpense(e.id)} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
