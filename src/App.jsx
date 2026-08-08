@@ -2365,10 +2365,45 @@ function ChangePin({ current, onChange }) {
   );
 }
 
+function DeliveryElapsed({ createdAtMs }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 20000);
+    return () => clearInterval(iv);
+  }, []);
+  const mins = Math.max(0, Math.floor((now - createdAtMs) / 60000));
+  const urgent = mins >= 25;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
+      background: urgent ? "rgba(248,113,113,0.18)" : "rgba(255,255,255,0.08)", color: urgent ? "#F87171" : "#C9BBA3",
+    }}>
+      ⏱ {mins} min
+    </span>
+  );
+}
+
 function DeliveryView({ deliveries, onNew, onOpen }) {
+  const [search, setSearch] = useState("");
+  const [sortOldest, setSortOldest] = useState(true);
+
+  const INK = "#15100B";
+  const CARD = "#1E1611";
+  const CARD2 = "#251C15";
+  const GOLD = "#F2C879";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const LINE = "rgba(242,200,121,0.14)";
+  const BLUE = "#3E7FD9";
+
   const activos = deliveries.filter((d) => d.kitchenStatus !== "entregado");
-  const delivery = activos.filter((d) => d.type !== "pickup");
-  const pickup = activos.filter((d) => d.type === "pickup");
+  const filtered = activos.filter((d) => d.customer.toLowerCase().includes(search.toLowerCase()));
+  const sorted = filtered.slice().sort((a, b) => sortOldest ? a.id - b.id : b.id - a.id);
+  const delivery = sorted.filter((d) => d.type !== "pickup");
+  const pickup = sorted.filter((d) => d.type === "pickup");
+  const listos = activos.filter((d) => d.kitchenStatus === "listo").length;
 
   function sendDispatchWhatsapp(d, e) {
     e.stopPropagation();
@@ -2377,34 +2412,67 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
     const url = digits ? `https://wa.me/${digits}?text=${encodeURIComponent(msg)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank");
   }
+  function callCustomer(d, e) {
+    e.stopPropagation();
+    const digits = (d.phone || "").replace(/[^0-9]/g, "");
+    if (digits) window.open(`tel:${digits}`, "_self");
+  }
 
-  function Section({ title, icon, list, showDispatch }) {
+  function Section({ title, icon, list, showDispatch, accent }) {
     return (
-      <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 800, color: "#8a7a63", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>{icon} {title} ({list.length})</h3>
-        {list.length === 0 && <p style={{ color: "#C9BBA3", fontSize: 13 }}>Sin pedidos activos.</p>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 14 }}>
+      <div style={{ marginBottom: 26 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 15 }}>{icon}</span>
+          <h3 style={{ fontSize: 12.5, fontWeight: 800, color: CREAM, textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>{title}</h3>
+          <span style={{ fontSize: 11, fontWeight: 700, color: accent, background: `${accent}22`, borderRadius: 20, padding: "2px 9px" }}>{list.length}</span>
+        </div>
+        {list.length === 0 && <p style={{ color: MUTED, fontSize: 12.5 }}>Sin pedidos activos.</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 14 }}>
           {list.map((d) => {
             const st = statusStyle(d.kitchenStatus, d.items.length > 0);
             const canDispatch = showDispatch && d.kitchenStatus === "listo" && d.phone;
+            const orderTotalAmt = orderTotal(d.items);
             return (
-              <button key={d.id} onClick={() => onOpen(d.id)} style={{ textAlign: "left", background: st.grad, border: "none", borderRadius: 14, padding: 16, cursor: "pointer", color: st.text, boxShadow: "0 4px 10px rgba(0,0,0,0.12)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <strong style={{ fontSize: 16 }}>{d.customer}</strong>
-                  <span style={{ fontSize: 20 }}>{st.icon}</span>
-                </div>
-                {d.address && <p style={{ margin: "6px 0 2px", fontSize: 12, opacity: 0.9 }}>📍 {d.address}</p>}
-                {d.phone && <p style={{ margin: "2px 0 8px", fontSize: 12, opacity: 0.9 }}>📞 {d.phone}</p>}
-                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5, background: "rgba(255,255,255,0.3)", display: "inline-block", padding: "3px 10px", borderRadius: 20 }}>{st.label}</div>
-                {canDispatch && (
-                  <div
-                    onClick={(e) => sendDispatchWhatsapp(d, e)}
-                    style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#25D366", color: "#fff", fontWeight: 800, fontSize: 12, padding: "8px 10px", borderRadius: 8, cursor: "pointer" }}
-                  >
-                    📱 Avisar por WhatsApp
+              <div key={d.id} onClick={() => onOpen(d.id)} style={{
+                cursor: "pointer", background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: `1px solid ${LINE}`,
+                borderRadius: 18, overflow: "hidden", transition: "transform 0.15s ease, box-shadow 0.15s ease",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 16px 34px rgba(0,0,0,0.4)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <div style={{ height: 4, background: `linear-gradient(90deg, ${st.icon === "✅" ? "#4ADE80" : accent}, ${AMBER})` }} />
+                <div style={{ padding: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                    <strong style={{ fontSize: 15.5, color: CREAM, fontFamily: "'Fraunces', serif" }}>{d.customer}</strong>
+                    <DeliveryElapsed createdAtMs={d.id} />
                   </div>
-                )}
-              </button>
+                  {d.address && <p style={{ margin: "0 0 4px", fontSize: 12, color: MUTED }}>📍 {d.address}</p>}
+                  {d.phone && <p style={{ margin: "0 0 8px", fontSize: 12, color: MUTED }}>📞 {d.phone}</p>}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <span style={{
+                      fontSize: 10.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5,
+                      background: `${st.icon === "✅" ? "#4ADE80" : st.icon === "🔥" || st.icon === "🆕" ? EMBER : AMBER}22`,
+                      color: st.icon === "✅" ? "#4ADE80" : st.icon === "🔥" || st.icon === "🆕" ? "#F87171" : AMBER,
+                      padding: "3px 10px", borderRadius: 20,
+                    }}>{st.icon} {st.label}</span>
+                    {d.items.length > 0 && <span style={{ fontSize: 13, fontWeight: 800, color: GOLD }}>{money(orderTotalAmt)}</span>}
+                  </div>
+                  {(d.phone || canDispatch) && (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {d.phone && (
+                        <button onClick={(e) => callCustomer(d, e)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(62,127,217,0.12)", border: `1px solid ${BLUE}55`, color: "#7FA8E8", fontWeight: 700, fontSize: 12, padding: "8px 10px", borderRadius: 10, cursor: "pointer" }}>
+                          📞 Llamar
+                        </button>
+                      )}
+                      {canDispatch && (
+                        <button onClick={(e) => sendDispatchWhatsapp(d, e)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "#25D366", border: "none", color: "#fff", fontWeight: 700, fontSize: 12, padding: "8px 10px", borderRadius: 10, cursor: "pointer" }}>
+                          📱 Avisar
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>
@@ -2413,23 +2481,68 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>🛵 Delivery &amp; Para llevar</h2>
-        <button onClick={onNew} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", boxShadow: "0 3px 8px rgba(193,39,45,0.3)" }}>
-          <Plus size={16} /> Nuevo pedido
-        </button>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600&display=swap');
+        @keyframes delFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes delPulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+      `}</style>
+
+      {/* HERO */}
+      <div style={{
+        background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`,
+        borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
+        boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
+      }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.10), transparent 70%)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", animation: "delPulseDot 1.6s infinite" }} />
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 2.5, color: "#8FD9A8", textTransform: "uppercase" }}>Pedidos en curso</span>
+            </div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 30, margin: 0, color: CREAM, letterSpacing: 0.2 }}>Delivery &amp; Para llevar</h2>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{RESTAURANT_NAME}</div>
+          </div>
+          <button onClick={onNew} style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 20px", border: "none", borderRadius: 12, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 20px rgba(193,39,45,0.3)" }}>
+            <Plus size={16} /> Nuevo pedido
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 22, position: "relative" }}>
+          {[
+            { label: "PEDIDOS ACTIVOS", value: activos.length, accent: GOLD },
+            { label: "🛵 EN CAMINO", value: delivery.length, accent: BLUE },
+            { label: "🥡 PARA LLEVAR", value: pickup.length, accent: AMBER },
+            { label: "✅ LISTOS", value: listos, accent: "#4ADE80" },
+          ].map((s, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: CREAM }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {activos.length > 0 && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
+          <input placeholder="🔍 Buscar por cliente..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ padding: 9, borderRadius: 9, border: `1px solid ${LINE}`, background: CARD, color: CREAM, fontSize: 13, maxWidth: 220 }} />
+          <button onClick={() => setSortOldest((s) => !s)} style={{ fontSize: 12, background: CARD, border: `1px solid ${LINE}`, borderRadius: 9, padding: "9px 14px", cursor: "pointer", color: MUTED, fontWeight: 700 }}>
+            {sortOldest ? "⏱ Más antiguos primero" : "🕐 Más recientes primero"}
+          </button>
+        </div>
+      )}
+
       {activos.length === 0 && (
-        <div style={{ textAlign: "center", padding: "50px 20px", color: "#8a7a63" }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>🛵</div>
-          <p>No hay pedidos activos.</p>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: MUTED, background: CARD, borderRadius: 20, border: `1px dashed ${LINE}` }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>🛵</div>
+          <p style={{ fontFamily: "'Fraunces', serif", fontSize: 16, color: CREAM, margin: 0 }}>No hay pedidos activos</p>
         </div>
       )}
       {activos.length > 0 && (
         <>
-          <Section title="Delivery" icon="🛵" list={delivery} showDispatch />
-          <Section title="Para llevar" icon="🥡" list={pickup} />
+          <Section title="Delivery" icon="🛵" list={delivery} showDispatch accent={BLUE} />
+          <Section title="Para llevar" icon="🥡" list={pickup} accent={AMBER} />
         </>
       )}
     </div>
@@ -2440,37 +2553,50 @@ function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
   const [type, setType] = useState("delivery");
   const [customer, setCustomer] = useState("");
   const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
   const valid = type === "delivery" ? customer && address : true;
+
+  const INK = "#15100B";
+  const CARD = "#1E1611";
+  const GOLD = "#F2C879";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const LINE = "rgba(242,200,121,0.14)";
 
   function handleCreate() {
     if (type === "pickup") {
       onCreate({ type: "pickup", customer: `Para llevar #${pickupCount + 1}`, phone: "", address: "" });
     } else {
-      onCreate({ type: "delivery", customer, phone: "", address });
+      onCreate({ type: "delivery", customer, phone, address });
     }
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <div style={{ background: "#FFF8ED", borderRadius: 12, width: "100%", maxWidth: 380, padding: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Nuevo pedido</h3>
-        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "delivery" ? "#fff" : "#5a4c3a" }}>🛵 Delivery</button>
-          <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? "linear-gradient(135deg, #C1272D, #E8A33D)" : "#F3ECE0", color: type === "pickup" ? "#fff" : "#5a4c3a" }}>🥡 Para llevar</button>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&display=swap');`}</style>
+      <div style={{ background: `linear-gradient(175deg, ${CARD}, ${INK})`, border: `1px solid ${LINE}`, borderRadius: 20, width: "100%", maxWidth: 380, padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
+        <h3 style={{ marginTop: 0, marginBottom: 16, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, color: CREAM }}>Nuevo pedido</h3>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.05)", color: type === "delivery" ? "#fff" : MUTED }}>🛵 Delivery</button>
+          <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.05)", color: type === "pickup" ? "#fff" : MUTED }}>🥡 Para llevar</button>
         </div>
         {type === "delivery" ? (
           <>
-            <label style={lbl}>Nombre del cliente</label>
-            <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={inp} />
-            <label style={lbl}>Dirección</label>
-            <input value={address} onChange={(e) => setAddress(e.target.value)} style={inp} />
+            <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: MUTED, marginBottom: 5 }}>Nombre del cliente</label>
+            <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box", marginBottom: 12 }} />
+            <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: MUTED, marginBottom: 5 }}>Teléfono (opcional, para WhatsApp/llamada)</label>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ej: 8888 8888" style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box", marginBottom: 12 }} />
+            <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: MUTED, marginBottom: 5 }}>Dirección</label>
+            <input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box" }} />
           </>
         ) : (
-          <p style={{ fontSize: 13, color: "#8a7a63", margin: "10px 0" }}>No se necesita ningún dato — solo confirma para crear el pedido.</p>
+          <p style={{ fontSize: 13, color: MUTED, margin: "10px 0" }}>No se necesita ningún dato — solo confirma para crear el pedido.</p>
         )}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <button onClick={onClose} style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #E5D9C3", background: "#fff", cursor: "pointer" }}>Cancelar</button>
-          <button disabled={!valid} onClick={handleCreate} style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: valid ? 1 : 0.5 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: 11, borderRadius: 10, border: `1px solid ${LINE}`, background: "transparent", color: MUTED, cursor: "pointer", fontWeight: 700 }}>Cancelar</button>
+          <button disabled={!valid} onClick={handleCreate} style={{ flex: 1, padding: 11, borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: valid ? 1 : 0.5 }}>
             Crear
           </button>
         </div>
@@ -2478,7 +2604,6 @@ function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
     </div>
   );
 }
-
 function ClientesView({ salesLog }) {
   const [expanded, setExpanded] = useState(null);
 
@@ -2587,7 +2712,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
   const GOLD = "#F2C879";
   const CREAM = "#F7F0E4";
-  const INK = "#0F0C09";
+  const INK = "#0A0806";
   const EMBER = "#C1272D";
   const AMBER = "#E8A33D";
   const tickerMsgs = ["HECHO AL MOMENTO", "PÍDELO PICANTE", "DELIVERY DISPONIBLE", "MASATEPE · MASAYA", "SABOR CASERO DE VERDAD"];
@@ -2600,6 +2725,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const SLIDE_SECONDS = 9;
   const [slide, setSlide] = useState(0);
   const [tick, setTick] = useState(0);
+  const [clock, setClock] = useState(new Date());
   useEffect(() => {
     if (slides.length <= 1) return;
     const iv = setInterval(() => { setSlide((s) => (s + 1) % slides.length); setTick(0); }, SLIDE_SECONDS * 1000);
@@ -2609,6 +2735,10 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
     const iv = setInterval(() => setTick((t) => Math.min(100, t + (100 / (SLIDE_SECONDS * 10)))), 100);
     return () => clearInterval(iv);
   }, [slide]);
+  useEffect(() => {
+    const iv = setInterval(() => setClock(new Date()), 1000 * 15);
+    return () => clearInterval(iv);
+  }, []);
 
   const current = slides[Math.min(slide, slides.length - 1)] || null;
   const c = current && current.type === "cat" ? current.cat : null;
@@ -2638,25 +2768,40 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
         @keyframes mbTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes mbPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
         @keyframes mbShine { 0% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
-        @keyframes mbBadgeGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(242,200,121,0.4); } 50% { box-shadow: 0 0 0 10px rgba(242,200,121,0); } }
+        @keyframes mbBadgeGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(242,200,121,0.4), 0 0 22px 2px rgba(242,200,121,0.15); } 50% { box-shadow: 0 0 0 10px rgba(242,200,121,0), 0 0 30px 6px rgba(242,200,121,0.3); } }
+        @keyframes mbTitleShimmer { 0% { background-position: -120% 0; } 100% { background-position: 220% 0; } }
+        @keyframes mbScanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+        @keyframes mbCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
+        @keyframes mbSweep { 0% { left: -30%; } 100% { left: 130%; } }
       `}</style>
+
+      {/* Rejilla tecnológica de fondo */}
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 0, opacity: 0.05, pointerEvents: "none",
+        backgroundImage: "linear-gradient(rgba(242,200,121,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(242,200,121,0.6) 1px, transparent 1px)",
+        backgroundSize: "42px 42px",
+      }} />
+      {/* Barrido de luz superior */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, zIndex: 3, overflow: "hidden", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", top: 0, width: "30%", height: "100%", background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, animation: "mbSweep 6s ease-in-out infinite" }} />
+      </div>
 
       {/* Fondo ambientado con el color de la categoría actual */}
       <div key={"bg" + slide} style={{
         position: "absolute", inset: 0, zIndex: 0, animation: "mbBgFade 0.8s ease",
-        background: `radial-gradient(ellipse 90% 60% at 50% 0%, ${accent}3D, transparent 65%), radial-gradient(ellipse 70% 50% at 100% 100%, ${accent}22, transparent 60%), ${INK}`,
+        background: `radial-gradient(ellipse 90% 60% at 50% 0%, ${accent}38, transparent 65%), radial-gradient(ellipse 70% 50% at 100% 100%, ${accent}1E, transparent 60%), ${INK}`,
       }} />
       {/* Marca de agua grande del ícono de la categoría */}
       {c && (
         <div key={"wm" + slide} style={{
-          position: "absolute", right: "-6%", top: "8%", fontSize: "min(46vh, 40vw)", opacity: 0.05, zIndex: 0,
+          position: "absolute", right: "-6%", top: "8%", fontSize: "min(46vh, 40vw)", opacity: 0.045, zIndex: 0,
           animation: "mbWatermarkDrift 9s ease-in-out infinite alternate, mbBgFade 1s ease",
           filter: "grayscale(1) brightness(2)",
         }}>{c.icon}</div>
       )}
 
-      {/* Barra superior minimalista */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "clamp(14px, 2vh, 24px) clamp(24px, 3.2vw, 48px) clamp(6px, 1vh, 10px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
+      {/* Barra superior — logo + reloj en vivo estilo panel inteligente */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "clamp(14px, 2vh, 22px) clamp(24px, 3.2vw, 48px) clamp(6px, 1vh, 10px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: "clamp(19px, 2vw, 27px)" }}>🍔🍗</span>
           <div>
@@ -2664,40 +2809,69 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
             <div style={{ fontSize: "clamp(7.5px, 0.7vw, 9.5px)", color: "#8A7A62", letterSpacing: 2.5, fontWeight: 700 }}>MASATEPE · MASAYA · NICARAGUA</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", animation: "mbPulse 1.6s infinite" }} />
-          <span style={{ fontSize: "clamp(8px, 0.75vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 2 }}>MENÚ DIGITAL</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(15px, 1.5vw, 20px)", color: GOLD, letterSpacing: 1, lineHeight: 1 }}>
+              {clock.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}
+            </div>
+            <div style={{ fontSize: "clamp(7px, 0.65vw, 9px)", color: "#8A7A62", letterSpacing: 1, textTransform: "capitalize" }}>
+              {clock.toLocaleDateString("es-NI", { weekday: "short", day: "numeric", month: "short" })}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 20, padding: "5px 12px" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", animation: "mbPulse 1.6s infinite" }} />
+            <span style={{ fontSize: "clamp(8px, 0.72vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 1.5 }}>EN VIVO</span>
+          </div>
         </div>
       </div>
 
-      {/* Contenido principal */}
-      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center", padding: "0 clamp(24px, 4vw, 64px)", position: "relative", zIndex: 2 }}>
+      {/* Contenido principal con marco tipo HUD */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "center", padding: "clamp(10px,1.6vh,18px) clamp(24px, 4vw, 64px)", position: "relative", zIndex: 2 }}>
+
+        {/* Esquinas estilo HUD */}
+        {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v, h], i) => (
+          <div key={i} style={{
+            position: "absolute", [v]: "clamp(4px,0.8vh,10px)", [h]: "clamp(10px,1.6vw,26px)",
+            width: "clamp(18px,2vw,30px)", height: "clamp(18px,2vh,30px)",
+            borderTop: v === "top" ? `2px solid ${accent}` : "none",
+            borderBottom: v === "bottom" ? `2px solid ${accent}` : "none",
+            borderLeft: h === "left" ? `2px solid ${accent}` : "none",
+            borderRight: h === "right" ? `2px solid ${accent}` : "none",
+            opacity: 0.5, animation: "mbCornerGlow 3s ease-in-out infinite", pointerEvents: "none", zIndex: 1,
+          }} />
+        ))}
 
         {isPromoSlide ? (
           <div key="promo-slide">
-            <div style={{ textAlign: "center", marginBottom: "clamp(20px, 3.2vh, 40px)" }}>
+            <div style={{ textAlign: "center", marginBottom: "clamp(18px, 3vh, 36px)" }}>
               <div style={{ fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 4, animation: "mbKickerIn 0.6s ease both" }}>OFERTAS ESPECIALES</div>
-              <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(30px, 4.4vw, 62px)", color: CREAM, letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 6, animation: "mbTitleIn 0.6s ease 0.08s both" }}>
-                Combos <span style={{ color: EMBER }}>de Hoy</span>
+              <div style={{
+                fontFamily: "'Anton', sans-serif", fontSize: "clamp(28px, 4.2vw, 58px)", letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 6,
+                animation: "mbTitleIn 0.6s ease 0.08s both",
+                backgroundImage: `linear-gradient(100deg, ${CREAM} 30%, ${GOLD} 45%, ${CREAM} 60%)`, backgroundSize: "250% 100%",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                animationName: "mbTitleIn, mbTitleShimmer", animationDuration: "0.6s, 4s", animationTimingFunction: "ease, linear", animationIterationCount: "1, infinite", animationFillMode: "both, none", animationDelay: "0.08s, 0.6s",
+              }}>
+                Combos <span style={{ WebkitTextFillColor: EMBER, color: EMBER }}>de Hoy</span>
               </div>
-              <div style={{ "--rule-w": "110px", height: 3, width: 110, background: `linear-gradient(90deg, ${EMBER}, ${AMBER})`, margin: "clamp(12px, 1.8vh, 18px) auto 0", borderRadius: 3, animation: "mbRuleIn 0.6s ease 0.2s both" }} />
+              <div style={{ "--rule-w": "100px", height: 3, width: 100, background: `linear-gradient(90deg, ${EMBER}, ${AMBER})`, margin: "clamp(10px, 1.6vh, 16px) auto 0", borderRadius: 3, animation: "mbRuleIn 0.6s ease 0.2s both" }} />
             </div>
 
             <div style={{
               display: "grid",
               gridTemplateColumns: promotions.length > 3 ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(300px, 1fr))",
-              gap: "clamp(14px, 2vw, 24px)",
-              maxWidth: 1100, margin: "0 auto", width: "100%",
+              gap: "clamp(12px, 1.8vw, 20px)",
+              maxWidth: 1080, margin: "0 auto", width: "100%",
             }}>
               {promotions.map((p, i) => (
                 <div key={p.id} style={{
                   position: "relative", overflow: "hidden",
-                  background: "linear-gradient(155deg, rgba(38,32,25,0.9), rgba(20,16,12,0.9))",
+                  background: "linear-gradient(155deg, rgba(38,32,25,0.92), rgba(14,11,8,0.92))",
                   backdropFilter: "blur(6px)",
-                  border: `1px solid ${GOLD}2A`, borderRadius: 20,
-                  padding: "clamp(18px, 2.4vh, 26px) clamp(20px, 2.4vw, 28px)",
+                  border: `1px solid ${GOLD}33`, borderRadius: 18,
+                  padding: "clamp(16px, 2.1vh, 22px) clamp(18px, 2.2vw, 26px)",
                   animation: `mbCardIn 0.5s ease ${0.15 + i * 0.08}s both`,
-                  boxShadow: "0 18px 38px rgba(0,0,0,0.4)",
+                  boxShadow: `0 16px 34px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(242,200,121,0.04)`,
                 }}>
                   <div style={{
                     position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none",
@@ -2708,16 +2882,16 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         display: "inline-block", fontSize: "clamp(8.5px, 0.78vw, 10.5px)", fontWeight: 800, letterSpacing: 1.5,
-                        color: "#FF9A8B", background: "rgba(193,39,45,0.18)", padding: "3px 11px", borderRadius: 20, marginBottom: 11,
+                        color: "#FF9A8B", background: "rgba(193,39,45,0.18)", padding: "3px 11px", borderRadius: 20, marginBottom: 10,
                       }}>COMBO ESPECIAL</div>
-                      <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: "clamp(17px, 2vw, 25px)", color: CREAM, lineHeight: 1.25 }}>{p.name}</div>
+                      <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: "clamp(16px, 1.9vw, 23px)", color: CREAM, lineHeight: 1.25 }}>{p.name}</div>
                     </div>
                     <div style={{
                       flexShrink: 0, textAlign: "center", background: `linear-gradient(160deg, ${AMBER}, ${EMBER})`,
-                      borderRadius: 14, padding: "clamp(9px, 1.2vh, 13px) clamp(13px, 1.5vw, 19px)",
-                      animation: "mbBadgeGlow 2.6s infinite",
+                      borderRadius: 14, padding: "clamp(9px, 1.1vh, 12px) clamp(13px, 1.4vw, 18px)",
+                      animation: "mbBadgeGlow 2.4s infinite",
                     }}>
-                      <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(17px, 2vw, 26px)", color: "#fff", lineHeight: 1 }}>{money(p.price)}</div>
+                      <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(16px, 1.9vw, 24px)", color: "#fff", lineHeight: 1 }}>{money(p.price)}</div>
                     </div>
                   </div>
                 </div>
@@ -2726,33 +2900,42 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
           </div>
         ) : c && (
           <div key={c.name}>
-            <div style={{ textAlign: "center", marginBottom: "clamp(20px, 3.4vh, 42px)" }}>
+            <div style={{ textAlign: "center", marginBottom: "clamp(18px, 3.1vh, 38px)" }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: accent, letterSpacing: 4, animation: "mbKickerIn 0.6s ease both" }}>
                 <span style={{ fontSize: "clamp(16px, 1.6vw, 22px)" }}>{c.icon}</span> CATEGORÍA DESTACADA
               </div>
-              <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(32px, 4.8vw, 68px)", color: CREAM, letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 8, animation: "mbTitleIn 0.6s ease 0.08s both", textShadow: `0 6px 30px ${accent}55` }}>
+              <div style={{
+                fontFamily: "'Anton', sans-serif", fontSize: "clamp(30px, 4.6vw, 64px)", letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 8,
+                backgroundImage: `linear-gradient(100deg, ${CREAM} 30%, ${GOLD} 45%, ${CREAM} 60%)`, backgroundSize: "250% 100%",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                animationName: "mbTitleIn, mbTitleShimmer", animationDuration: "0.6s, 4.5s", animationTimingFunction: "ease, linear", animationIterationCount: "1, infinite", animationFillMode: "both, none", animationDelay: "0.08s, 0.6s",
+                filter: `drop-shadow(0 4px 20px ${accent}55)`,
+              }}>
                 {c.name}
               </div>
-              <div style={{ "--rule-w": "90px", height: 3, width: 90, background: `linear-gradient(90deg, ${accent}, ${GOLD})`, margin: "clamp(12px, 1.8vh, 18px) auto 0", borderRadius: 3, animation: "mbRuleIn 0.6s ease 0.2s both" }} />
+              <div style={{ "--rule-w": "90px", height: 3, width: 90, background: `linear-gradient(90deg, ${accent}, ${GOLD})`, margin: "clamp(10px, 1.6vh, 16px) auto 0", borderRadius: 3, animation: "mbRuleIn 0.6s ease 0.2s both" }} />
             </div>
 
             <div style={{
               display: "grid",
               gridTemplateColumns: items.length > 5 ? "1fr 1fr" : "1fr",
-              gap: "0 clamp(36px, 4.5vw, 70px)",
-              maxWidth: items.length > 5 ? 1180 : 780,
+              gap: "0 clamp(32px, 4.2vw, 64px)",
+              maxWidth: items.length > 5 ? 1140 : 760,
               margin: "0 auto", width: "100%",
             }}>
               {items.map((m, i) => (
                 <div key={m.id} style={{
                   display: "flex", alignItems: "baseline", gap: 12,
-                  padding: "clamp(9px, 1.5vh, 16px) clamp(6px,0.8vw,10px)",
-                  borderBottom: "1px solid rgba(255,255,255,0.07)",
+                  padding: "clamp(8px, 1.35vh, 14px) clamp(6px,0.8vw,10px)",
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
                   animation: `mbRowIn 0.45s ease ${0.2 + i * 0.05}s both`,
                 }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: "clamp(16px, 1.85vw, 25px)", color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
-                  <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.22)", marginBottom: 6, minWidth: 12 }} />
-                  <span style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(15px, 1.7vw, 23px)", color: GOLD, whiteSpace: "nowrap" }}>{money(m.price)}</span>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: "clamp(15px, 1.75vw, 23px)", color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
+                  <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.2)", marginBottom: 6, minWidth: 12 }} />
+                  <span style={{
+                    fontFamily: "'Anton', sans-serif", fontSize: "clamp(14px, 1.6vw, 21px)", color: GOLD, whiteSpace: "nowrap",
+                    padding: "2px 10px", borderRadius: 8, background: "rgba(242,200,121,0.06)", border: "1px solid rgba(242,200,121,0.15)",
+                  }}>{money(m.price)}</span>
                 </div>
               ))}
             </div>
@@ -2761,7 +2944,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
       </div>
 
       {/* Indicador de progreso */}
-      <div style={{ padding: "clamp(10px, 1.6vh, 18px) clamp(24px, 3.2vw, 48px) clamp(6px, 1vh, 10px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
+      <div style={{ padding: "clamp(9px, 1.4vh, 16px) clamp(24px, 3.2vw, 48px) clamp(5px, 0.9vh, 9px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", gap: 6, maxWidth: 640, margin: "0 auto" }}>
           {slides.map((sl, i) => (
             <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: "rgba(255,255,255,0.10)", overflow: "hidden" }}>
@@ -2769,6 +2952,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
                 height: "100%", borderRadius: 3, background: sl.type === "promo" ? EMBER : GOLD,
                 width: i < slide ? "100%" : i === slide ? `${tick}%` : "0%",
                 transition: i === slide ? "none" : "width 0.3s ease",
+                boxShadow: i === slide ? `0 0 8px ${sl.type === "promo" ? EMBER : GOLD}` : "none",
               }} />
             </div>
           ))}
@@ -2776,7 +2960,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
       </div>
 
       {/* Ticker inferior */}
-      <div style={{ borderTop: "1px solid rgba(242,200,121,0.12)", background: "rgba(0,0,0,0.4)", padding: "clamp(7px, 1.1vh, 12px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
+      <div style={{ borderTop: "1px solid rgba(242,200,121,0.12)", background: "rgba(0,0,0,0.45)", padding: "clamp(6px, 1vh, 11px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", width: "max-content", animation: "mbTicker 24s linear infinite" }}>
           {[...tickerMsgs, ...tickerMsgs, ...tickerMsgs].map((msg, i) => (
             <span key={i} style={{ display: "flex", alignItems: "center", gap: "clamp(16px, 2vw, 34px)", fontSize: "clamp(9.5px, 0.9vw, 12.5px)", color: "#8A7A62", letterSpacing: 2.5, fontWeight: 700, paddingRight: "clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>
