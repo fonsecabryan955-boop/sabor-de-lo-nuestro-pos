@@ -358,6 +358,13 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
+  function cancelOrder(kind, id) {
+    if (kind === "table") {
+      withTables((ts) => ts.map((t) => (t.id === id ? { ...t, status: "libre", kitchenStatus: null, items: [], kitchenSentAt: null, occupiedAt: null } : t)));
+    } else {
+      withDeliveries((ds) => ds.filter((d) => d.id !== id));
+    }
+  }
   function advanceKitchen(kind, id, next) {
     const stamp = (x) => ({ ...x, kitchenStatus: next, kitchenSentAt: new Date().toISOString() });
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
@@ -708,6 +715,7 @@ export default function App() {
           onQty={(menuId, d) => changeQty("table", activeTable, menuId, d)}
           onNote={(menuId, note) => setNote("table", activeTable, menuId, note)}
           onSend={() => sendToKitchen("table", activeTable)}
+          onCancelOrder={() => { cancelOrder("table", activeTable); setActiveTable(null); }}
           onClose={() => setActiveTable(null)}
         />
       )}
@@ -724,6 +732,7 @@ export default function App() {
           onQty={(menuId, d) => changeQty("delivery", activeDelivery, menuId, d)}
           onNote={(menuId, note) => setNote("delivery", activeDelivery, menuId, note)}
           onSend={() => sendToKitchen("delivery", activeDelivery)}
+          onCancelOrder={() => { cancelOrder("delivery", activeDelivery); setActiveDelivery(null); }}
           onClose={() => setActiveDelivery(null)}
         />
       )}
@@ -1259,7 +1268,7 @@ function WingOptionsModal({ item, onConfirm, onClose }) {
   );
 }
 
-function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCats, onAdd, onQty, onNote, onSend, onClose }) {
+function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCats, onAdd, onQty, onNote, onSend, onCancelOrder, onClose }) {
   const activeItems = menuItems.filter((m) => m.active !== false);
   const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
   const allCatNames = promotions && promotions.length > 0 ? [...catsWithItems.map((c) => c.name), "Promociones"] : catsWithItems.map((c) => c.name);
@@ -1316,9 +1325,25 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
               {title}
             </h3>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: "50%", color: ESPRESSO, cursor: "pointer", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <X size={17} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {items.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm(kitchenStatus
+                    ? "¿Cancelar este pedido? Ya se había enviado a cocina — avisa a la cocina antes de cancelar. Esto lo borra por completo y no se puede deshacer."
+                    : "¿Cancelar este pedido? Se van a borrar todos los productos agregados y no se puede deshacer.")) {
+                    onCancelOrder();
+                  }
+                }}
+                style={{ background: "transparent", border: "1px solid #C1272D66", borderRadius: 20, color: "#C1272D", cursor: "pointer", padding: "8px 16px", fontSize: 12.5, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <X size={13} /> Cancelar pedido
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${LINE}`, borderRadius: "50%", color: ESPRESSO, cursor: "pointer", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <X size={17} />
+            </button>
+          </div>
         </div>
 
         {/* Cuerpo: 3 columnas — categorías | productos | pedido (siempre visible) */}
