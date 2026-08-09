@@ -3092,12 +3092,26 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
       })
       .reduce((sum, x) => sum + Number(key === "sale" ? x.total : (key === "pay" ? x.amount : x.amount)), 0);
   }
+  function sumExpenseCatInRange(dayStart, dayEnd, catId) {
+    return expensesLog
+      .filter((e) => {
+        const t = new Date(e.time);
+        if (t.getFullYear() !== qYear || t.getMonth() !== qMonth - 1) return false;
+        const day = t.getDate();
+        return day >= dayStart && day <= dayEnd && (e.category || "Otro") === catId;
+      })
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+  }
   const q1Sold = sumInDayRange(salesLog, 1, 15, "sale");
   const q1Spent = sumInDayRange(expensesLog, 1, 15, "exp");
   const q1Payroll = sumInDayRange(payments, 1, 15, "pay");
+  const q1Luz = sumExpenseCatInRange(1, 15, "Luz");
+  const q1Agua = sumExpenseCatInRange(1, 15, "Agua");
   const q2Sold = sumInDayRange(salesLog, 16, lastDay, "sale");
   const q2Spent = sumInDayRange(expensesLog, 16, lastDay, "exp");
   const q2Payroll = sumInDayRange(payments, 16, lastDay, "pay");
+  const q2Luz = sumExpenseCatInRange(16, lastDay, "Luz");
+  const q2Agua = sumExpenseCatInRange(16, lastDay, "Agua");
   const monthLabel = new Date(qYear, qMonth - 1, 1).toLocaleDateString("es-NI", { month: "long", year: "numeric" });
 
   const monthSalesAll = salesLog.filter((s) => { const t = new Date(s.time); return t.getFullYear() === qYear && t.getMonth() === qMonth - 1; });
@@ -3105,7 +3119,9 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
   const monthIncomeAll = q1Sold + q2Sold;
   const monthSpentAll = q1Spent + q2Spent;
   const monthInsumosAll = monthExpensesAll.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
-  const monthOtrosAll = monthSpentAll - monthInsumosAll;
+  const monthLuzAll = q1Luz + q2Luz;
+  const monthAguaAll = q1Agua + q2Agua;
+  const monthOtrosAll = monthSpentAll - monthInsumosAll - monthLuzAll - monthAguaAll;
   const monthPayrollAll = q1Payroll + q2Payroll;
   const monthRealProfitAll = monthIncomeAll - monthSpentAll - monthPayrollAll;
   const monthFoodCostPctAll = monthIncomeAll > 0 ? Math.round((monthInsumosAll / monthIncomeAll) * 100) : 0;
@@ -3131,6 +3147,12 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q1Spent)}</span>
             </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 2, paddingLeft: 8 }}>
+              <span style={{ opacity: 0.65 }}>💡 Luz</span><span style={{ opacity: 0.85 }}>-{money(q1Luz)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 4, paddingLeft: 8 }}>
+              <span style={{ opacity: 0.65 }}>🚰 Agua</span><span style={{ opacity: 0.85 }}>-{money(q1Agua)}</span>
+            </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
               <span style={{ opacity: 0.8 }}>Nómina</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q1Payroll)}</span>
             </div>
@@ -3146,6 +3168,12 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q2Spent)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 2, paddingLeft: 8 }}>
+              <span style={{ opacity: 0.65 }}>💡 Luz</span><span style={{ opacity: 0.85 }}>-{money(q2Luz)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, marginBottom: 4, paddingLeft: 8 }}>
+              <span style={{ opacity: 0.65 }}>🚰 Agua</span><span style={{ opacity: 0.85 }}>-{money(q2Agua)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
               <span style={{ opacity: 0.8 }}>Nómina</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q2Payroll)}</span>
@@ -3164,9 +3192,11 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
 
       <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 20, color: "#fff" }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 BALANCE DETALLADO DEL MES — {monthLabel.toUpperCase()}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
           <div><div style={{ color: "#C9BBA3" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(monthIncomeAll)}</div></div>
           <div><div style={{ color: "#C9BBA3" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthInsumosAll)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− 💡 Luz</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthLuzAll)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− 🚰 Agua</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthAguaAll)}</div></div>
           <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthOtrosAll)}</div></div>
           <div><div style={{ color: "#C9BBA3" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthPayrollAll)}</div></div>
         </div>
@@ -4010,6 +4040,8 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
   const monthIncome = monthSales.reduce((sum, s) => sum + s.total, 0);
   const monthSpent = monthExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const monthInsumos = monthExpenses.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthLuz = monthExpenses.filter((e) => (e.category || "Otro") === "Luz").reduce((sum, e) => sum + Number(e.amount), 0);
+  const monthAgua = monthExpenses.filter((e) => (e.category || "Otro") === "Agua").reduce((sum, e) => sum + Number(e.amount), 0);
   const monthPayroll = monthPayments.reduce((sum, p) => sum + p.amount, 0);
   const monthNet = monthIncome - monthSpent;
   const monthRealProfit = monthIncome - monthSpent - monthPayroll;
@@ -4046,6 +4078,20 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
   const q1Spent = sumInDayRange(expensesLog || expenses, 1, 15, "exp");
   const q2Sold = sumInDayRange(salesLog || sales, 16, lastDayOfMonth, "sale");
   const q2Spent = sumInDayRange(expensesLog || expenses, 16, lastDayOfMonth, "exp");
+  function expenseCatInDayRange(dayStart, dayEnd, catId) {
+    return (expensesLog || expenses)
+      .filter((e) => {
+        const t = new Date(e.time);
+        if (t.getFullYear() !== Number(yy) || t.getMonth() !== Number(mm) - 1) return false;
+        const day = t.getDate();
+        return day >= dayStart && day <= dayEnd && (e.category || "Otro") === catId;
+      })
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+  }
+  const q1Luz = expenseCatInDayRange(1, 15, "Luz");
+  const q1Agua = expenseCatInDayRange(1, 15, "Agua");
+  const q2Luz = expenseCatInDayRange(16, lastDayOfMonth, "Luz");
+  const q2Agua = expenseCatInDayRange(16, lastDayOfMonth, "Agua");
   function payrollInDayRange(dayStart, dayEnd) {
     return (payments || [])
       .filter((p) => {
@@ -4135,34 +4181,86 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
   }, [sales]);
   const max7 = Math.max(1, ...last7Days.map((d) => d.total));
 
+  const rCard = { background: "linear-gradient(175deg, #1E1611, #251C15)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 14, padding: 14 };
+  const rLabel = { fontSize: 10.5, color: "#A8977E", fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 };
+  const rValue = { fontSize: 20, fontWeight: 800, color: "#F5ECD9" };
+
+  function shiftDate(days) {
+    const d = new Date(selectedDate + "T12:00:00");
+    d.setDate(d.getDate() + days);
+    const tz = d.getTimezoneOffset() * 60000;
+    setSelectedDate(new Date(d - tz).toISOString().slice(0, 10));
+  }
+
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{isToday ? "Reporte de hoy" : "Reporte del día seleccionado"}</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
-          <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63" }}>
-            <Printer size={15} />
-          </button>
-          {todaySales.length > 0 && (
-            <button onClick={exportCSV} title="Exportar a Excel/CSV" style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 8, padding: "8px 10px", cursor: "pointer", color: "#8a7a63", fontSize: 15 }}>
-              📥
+    <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:wght@500;600&display=swap');
+        @keyframes repFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes repPulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .rep-chip { transition: all 0.15s ease; }
+        .rep-chip:hover { transform: translateY(-1px); filter: brightness(1.1); }
+      `}</style>
+
+      {/* HERO */}
+      <div style={{
+        background: "linear-gradient(160deg, #15100B, #211710 60%, #15100B)",
+        borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
+        boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: "1px solid rgba(242,200,121,0.14)",
+      }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.10), transparent 70%)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", animation: "repPulseDot 1.6s infinite" }} />
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 2.5, color: "#8FD9A8", textTransform: "uppercase" }}>{isToday ? "Reporte de hoy" : "Reporte histórico"}</span>
+            </div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 30, margin: 0, color: "#F5ECD9", letterSpacing: 0.2 }}>Reportes</h2>
+            <div style={{ fontSize: 12, color: "#A8977E", marginTop: 3, textTransform: "capitalize" }}>
+              {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={() => shiftDate(-1)} className="rep-chip" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 10, color: "#F2C879", cursor: "pointer", width: 36, height: 36, fontSize: 16 }}>‹</button>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(242,200,121,0.14)", background: "rgba(255,255,255,0.03)", color: "#F5ECD9", fontSize: 13, maxWidth: 150 }} />
+            <button onClick={() => shiftDate(1)} className="rep-chip" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 10, color: "#F2C879", cursor: "pointer", width: 36, height: 36, fontSize: 16 }}>›</button>
+            {!isToday && (
+              <button onClick={() => { const d = new Date(); const tz = d.getTimezoneOffset() * 60000; setSelectedDate(new Date(d - tz).toISOString().slice(0, 10)); }} className="rep-chip" style={{ fontSize: 11, background: "rgba(242,200,121,0.10)", border: "1px solid rgba(242,200,121,0.3)", borderRadius: 9, padding: "9px 12px", cursor: "pointer", color: "#F2C879", fontWeight: 700 }}>Hoy</button>
+            )}
+            <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" className="rep-chip" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 10, padding: "9px 11px", cursor: "pointer", color: "#F2C879" }}>
+              <Printer size={15} />
             </button>
-          )}
+            {todaySales.length > 0 && (
+              <button onClick={exportCSV} title="Exportar a Excel/CSV" className="rep-chip" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 10, padding: "9px 11px", cursor: "pointer", color: "#F2C879", fontSize: 15 }}>
+                📥
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 22, position: "relative" }}>
+          {[
+            { label: "INGRESOS", value: money(income), accent: "#4ADE80" },
+            { label: "GASTOS TOTALES", value: money(spent), accent: "#F87171" },
+            { label: "PEDIDOS CERRADOS", value: count, accent: "#3E7FD9" },
+            { label: "TICKET PROMEDIO", value: money(avgTicket), accent: "#F2C879" },
+          ].map((s, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#A8977E", letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#F5ECD9" }}>{s.value}</div>
+            </div>
+          ))}
         </div>
       </div>
-      <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 12 }}>
-        Viendo: {new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-      </p>
 
-      <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 10 }}>📈 Tendencia de ventas — últimos 7 días</div>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 90 }}>
+      <div style={{ ...rCard, marginBottom: 18 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 12, letterSpacing: 0.5 }}>📈 TENDENCIA DE VENTAS — ÚLTIMOS 7 DÍAS</div>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
           {last7Days.map((d, i) => (
-            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div style={{ fontSize: 9, color: "#8a7a63" }}>{d.total > 0 ? money(d.total).replace("C$", "") : ""}</div>
-              <div style={{ width: "100%", height: Math.max(4, (d.total / max7) * 60), background: "linear-gradient(180deg, #E8A33D, #C1272D)", borderRadius: 4 }} />
-              <div style={{ fontSize: 10, color: "#8a7a63", textTransform: "capitalize" }}>{d.label}</div>
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <div style={{ fontSize: 9.5, color: "#A8977E", fontWeight: 700 }}>{d.total > 0 ? money(d.total).replace("C$", "") : ""}</div>
+              <div style={{ width: "100%", height: Math.max(4, (d.total / max7) * 66), background: "linear-gradient(180deg, #E8A33D, #C1272D)", borderRadius: 5, boxShadow: d.total > 0 ? "0 0 12px rgba(232,163,61,0.3)" : "none" }} />
+              <div style={{ fontSize: 10.5, color: "#A8977E", textTransform: "capitalize", fontWeight: 600 }}>{d.label}</div>
             </div>
           ))}
         </div>
@@ -4184,32 +4282,30 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <div style={statCard}><div style={statLabel}>Ingresos</div><div style={statValue}>{money(income)}</div></div>
-        <div style={statCard}><div style={statLabel}>Gastos totales</div><div style={{ ...statValue, color: "#C1272D" }}>{money(spent)}</div></div>
-        <div style={statCard}><div style={statLabel}>Pedidos cerrados</div><div style={statValue}>{count}</div></div>
-        <div style={statCard}><div style={statLabel}>Ticket promedio</div><div style={statValue}>{money(avgTicket)}</div></div>
-        <div style={statCard}><div style={statLabel}>Hora pico</div><div style={{ ...statValue, fontSize: 16 }}>{peakHourLabel || "—"}</div></div>
-        <div style={statCard}><div style={statLabel}>Llegadas tarde</div><div style={statValue}>{lateToday}</div></div>
+        <div style={rCard}><div style={rLabel}>PEDIDOS CERRADOS</div><div style={rValue}>{count}</div></div>
+        <div style={rCard}><div style={rLabel}>TICKET PROMEDIO</div><div style={rValue}>{money(avgTicket)}</div></div>
+        <div style={rCard}><div style={rLabel}>HORA PICO</div><div style={{ ...rValue, fontSize: 16 }}>{peakHourLabel || "—"}</div></div>
+        <div style={rCard}><div style={rLabel}>LLEGADAS TARDE</div><div style={{ ...rValue, color: lateToday > 0 ? "#F87171" : "#4ADE80" }}>{lateToday}</div></div>
       </div>
 
       {income > 0 && (
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#8a7a63", marginBottom: 10 }}>💳 Método de pago (hoy)</div>
-          <div style={{ display: "flex", gap: 16 }}>
+        <div style={{ ...rCard, marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 12, letterSpacing: 0.5 }}>💳 MÉTODO DE PAGO (HOY)</div>
+          <div style={{ display: "flex", gap: 20 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6, color: "#F5ECD9" }}>
                 <span>💵 Efectivo</span><span style={{ fontWeight: 700 }}>{money(cashToday)}</span>
               </div>
-              <div style={{ background: "#F0E8D8", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                <div style={{ width: `${income > 0 ? (cashToday / income) * 100 : 0}%`, height: "100%", background: "#26A65B", borderRadius: 6 }} />
+              <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                <div style={{ width: `${income > 0 ? (cashToday / income) * 100 : 0}%`, height: "100%", background: "#4ADE80", borderRadius: 6 }} />
               </div>
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6, color: "#F5ECD9" }}>
                 <span>💳 Tarjeta</span><span style={{ fontWeight: 700 }}>{money(cardToday)}</span>
               </div>
-              <div style={{ background: "#F0E8D8", borderRadius: 6, height: 10, overflow: "hidden" }}>
-                <div style={{ width: `${income > 0 ? (cardToday / income) * 100 : 0}%`, height: "100%", background: "#1565C0", borderRadius: 6 }} />
+              <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                <div style={{ width: `${income > 0 ? (cardToday / income) * 100 : 0}%`, height: "100%", background: "#3E7FD9", borderRadius: 6 }} />
               </div>
             </div>
           </div>
@@ -4218,10 +4314,12 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
       <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#fff" }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL DEL MES — {monthLabel.toUpperCase()}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
           <div><div style={{ color: "#C9BBA3" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(monthIncome)}</div></div>
           <div><div style={{ color: "#C9BBA3" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthInsumos)}</div></div>
-          <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthSpent - monthInsumos)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− 💡 Luz</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthLuz)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− 🚰 Agua</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthAgua)}</div></div>
+          <div><div style={{ color: "#C9BBA3" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthSpent - monthInsumos - monthLuz - monthAgua)}</div></div>
           <div><div style={{ color: "#C9BBA3" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#FF8A80" }}>{money(monthPayroll)}</div></div>
         </div>
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -4232,25 +4330,25 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       </div>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Balance del mes — {monthLabel}</h3>
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#A8977E", margin: 0, fontWeight: 700, letterSpacing: 0.5 }}>Balance del mes — {monthLabel}</h3>
         {(monthSales.length > 0 || monthExpenses.length > 0) && (
           <button
             onClick={() => { if (window.confirm(`¿Borrar TODAS las ventas y gastos de ${monthLabel}? Esto no se puede deshacer.`)) onClearMonth(monthKey); }}
-            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", color: "#C1272D", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+            style={{ fontSize: 11, background: "rgba(193,39,45,0.10)", border: "1px solid #C1272D55", color: "#F87171", borderRadius: 8, padding: "5px 11px", cursor: "pointer", fontWeight: 700 }}
           >
             Borrar mes completo
           </button>
         )}
       </div>
       {prevMonthIncome > 0 || prevMonthSpent > 0 ? (
-        <div style={{ background: "linear-gradient(160deg, #fff, #FBF2E4)", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, margin: "10px 0 14px" }}>
+        <div style={{ ...rCard, margin: "10px 0 14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: "#5a4c3a", letterSpacing: 0.3, textTransform: "capitalize" }}>📊 Comparado con {prevMonthLabel}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#F2C879", letterSpacing: 0.3, textTransform: "capitalize" }}>📊 Comparado con {prevMonthLabel}</span>
             {monthChangePct !== null && (
               <span style={{
                 fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-                background: monthChangePct >= 0 ? "#E8F5E9" : "#FCE8E8",
-                color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D",
+                background: monthChangePct >= 0 ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.15)",
+                color: monthChangePct >= 0 ? "#4ADE80" : "#F87171",
               }}>
                 {monthChangePct >= 0 ? "📈 +" : "📉 "}{monthChangePct}% en ventas
               </span>
@@ -4258,43 +4356,43 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
             <div>
-              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>VENDIDO</div>
-              <div style={{ fontSize: 15, fontWeight: 800 }}>{money(prevMonthIncome)}</div>
+              <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>VENDIDO</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#F5ECD9" }}>{money(prevMonthIncome)}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>INSUMOS</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#C1272D" }}>{money(prevMonthInsumos)}</div>
+              <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>INSUMOS</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#F87171" }}>{money(prevMonthInsumos)}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>NÓMINA</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#C1272D" }}>{money(prevMonthPayroll)}</div>
+              <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>NÓMINA</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "#F87171" }}>{money(prevMonthPayroll)}</div>
             </div>
             <div>
-              <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.3 }}>GANANCIA REAL</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: prevMonthRealProfit >= 0 ? "#2E7D32" : "#C1272D" }}>{money(prevMonthRealProfit)}</div>
+              <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>GANANCIA REAL</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: prevMonthRealProfit >= 0 ? "#4ADE80" : "#F87171" }}>{money(prevMonthRealProfit)}</div>
             </div>
           </div>
         </div>
       ) : (
         monthChangePct !== null && (
-          <div style={{ fontSize: 12, margin: "6px 0 10px", color: monthChangePct >= 0 ? "#2E7D32" : "#C1272D", fontWeight: 700 }}>
+          <div style={{ fontSize: 12, margin: "6px 0 10px", color: monthChangePct >= 0 ? "#4ADE80" : "#F87171", fontWeight: 700 }}>
             {monthChangePct >= 0 ? "📈" : "📉"} {monthChangePct >= 0 ? "+" : ""}{monthChangePct}% vs. mes anterior ({money(prevMonthIncome)})
           </div>
         )
       )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <div style={statCard}><div style={statLabel}>Ingresos del mes</div><div style={statValue}>{money(monthIncome)}</div></div>
-        <div style={statCard}><div style={statLabel}>Insumos del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthInsumos)}</div></div>
-        <div style={statCard}><div style={statLabel}>Nómina del mes</div><div style={{ ...statValue, color: "#C1272D" }}>{money(monthPayroll)}</div></div>
-        <div style={statCard}><div style={statLabel}>Ventas del mes</div><div style={statValue}>{monthSales.length}</div></div>
-        <div style={statCard}><div style={statLabel}>Ticket promedio (mes)</div><div style={statValue}>{money(monthSales.length > 0 ? monthIncome / monthSales.length : 0)}</div></div>
-        <div style={statCard}><div style={statLabel}>Días con ventas</div><div style={statValue}>{new Set(monthSales.map((s) => s.time.slice(0, 10))).size}</div></div>
+        <div style={rCard}><div style={rLabel}>INGRESOS DEL MES</div><div style={rValue}>{money(monthIncome)}</div></div>
+        <div style={rCard}><div style={rLabel}>INSUMOS DEL MES</div><div style={{ ...rValue, color: "#F87171" }}>{money(monthInsumos)}</div></div>
+        <div style={rCard}><div style={rLabel}>NÓMINA DEL MES</div><div style={{ ...rValue, color: "#F87171" }}>{money(monthPayroll)}</div></div>
+        <div style={rCard}><div style={rLabel}>VENTAS DEL MES</div><div style={rValue}>{monthSales.length}</div></div>
+        <div style={rCard}><div style={rLabel}>TICKET PROMEDIO (MES)</div><div style={rValue}>{money(monthSales.length > 0 ? monthIncome / monthSales.length : 0)}</div></div>
+        <div style={rCard}><div style={rLabel}>DÍAS CON VENTAS</div><div style={rValue}>{new Set(monthSales.map((s) => s.time.slice(0, 10))).size}</div></div>
       </div>
 
       <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(242,200,121,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
         <div style={{ fontWeight: 800, fontSize: 14, color: "#F2C879", letterSpacing: 0.5, marginBottom: 14 }}>📆 CONTROL QUINCENAL — {monthLabel.toUpperCase()}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-          {[{ label: `QUINCENA 1 (1 al 15)`, sold: q1Sold, spent: q1Spent, payroll: q1Payroll }, { label: `QUINCENA 2 (16 al ${lastDayOfMonth})`, sold: q2Sold, spent: q2Spent, payroll: q2Payroll }].map((q) => (
+          {[{ label: `QUINCENA 1 (1 al 15)`, sold: q1Sold, spent: q1Spent, payroll: q1Payroll, luz: q1Luz, agua: q1Agua }, { label: `QUINCENA 2 (16 al ${lastDayOfMonth})`, sold: q2Sold, spent: q2Spent, payroll: q2Payroll, luz: q2Luz, agua: q2Agua }].map((q) => (
             <div key={q.label} style={{ background: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 14, border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#C9BBA3", letterSpacing: 0.5, marginBottom: 10 }}>{q.label}</div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 4 }}>
@@ -4302,6 +4400,12 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 4 }}>
                 <span style={{ opacity: 0.8 }}>Gastado</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q.spent)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#fff", marginBottom: 2, paddingLeft: 8 }}>
+                <span style={{ opacity: 0.6 }}>💡 Luz</span><span style={{ opacity: 0.8 }}>-{money(q.luz)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "#fff", marginBottom: 4, paddingLeft: 8 }}>
+                <span style={{ opacity: 0.6 }}>🚰 Agua</span><span style={{ opacity: 0.8 }}>-{money(q.agua)}</span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 8 }}>
                 <span style={{ opacity: 0.8 }}>Nómina pagada</span><span style={{ fontWeight: 800, color: "#FF8A80" }}>-{money(q.payroll)}</span>
@@ -4395,40 +4499,42 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         </div>
       )}
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Productos más vendidos</h3>
-      {byItem.length === 0 && <p style={{ color: "#8a7a63" }}>Aún no hay ventas registradas ese día.</p>}
-      {byItem.map(([name, qty]) => (
-        <div key={name} style={{ marginBottom: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 3 }}>
-            <span>{name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
+      <div style={{ ...rCard, marginBottom: 22 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 14, letterSpacing: 0.5 }}>🏆 PRODUCTOS MÁS VENDIDOS {isToday ? "(HOY)" : ""}</div>
+        {byItem.length === 0 && <p style={{ color: "#A8977E", fontSize: 13 }}>Aún no hay ventas registradas ese día.</p>}
+        {byItem.map(([name, qty], i) => (
+          <div key={name} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4, color: "#F5ECD9" }}>
+              <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "▫️"} {name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 8, overflow: "hidden" }}>
+              <div style={{ width: `${(qty / maxItemQty) * 100}%`, height: "100%", background: "linear-gradient(90deg, #E8A33D, #C1272D)", borderRadius: 6 }} />
+            </div>
           </div>
-          <div style={{ background: "#F0E8D8", borderRadius: 6, height: 8, overflow: "hidden" }}>
-            <div style={{ width: `${(qty / maxItemQty) * 100}%`, height: "100%", background: "linear-gradient(90deg, #E8A33D, #C1272D)", borderRadius: 6 }} />
-          </div>
-        </div>
-      ))}
-
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20 }}>
-        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>🧾 Consumo por pedido — Historial de cobros</h3>
-        <span style={{ fontSize: 10, color: "#2E7D32", background: "#E8F5E9", padding: "3px 10px", borderRadius: 20, fontWeight: 700 }}>🔒 Permanente — nunca se borra</span>
+        ))}
       </div>
-      {dayPermanentSales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin cobros ese día.</p>}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 20, marginBottom: 12 }}>
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#A8977E", margin: 0, fontWeight: 700, letterSpacing: 0.5 }}>🧾 Consumo por pedido — Historial de cobros</h3>
+        <span style={{ fontSize: 10, color: "#4ADE80", background: "rgba(74,222,128,0.12)", padding: "3px 10px", borderRadius: 20, fontWeight: 700 }}>🔒 Permanente — nunca se borra</span>
+      </div>
+      {dayPermanentSales.length === 0 && <p style={{ color: "#A8977E" }}>Sin cobros ese día.</p>}
       <div style={{ display: "grid", gap: 12 }}>
         {dayPermanentSales.slice().reverse().map((s) => (
-          <div key={s.id} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ background: "#FBF2E4", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+          <div key={s.id} style={{ background: "linear-gradient(175deg, #1E1611, #251C15)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 14, overflow: "hidden" }}>
+            <div style={{ background: "rgba(255,255,255,0.03)", padding: "11px 15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, borderBottom: "1px solid rgba(242,200,121,0.1)" }}>
               <div>
-                <span style={{ fontWeight: 800, fontSize: 13 }}>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref}</span>
-                <span style={{ fontSize: 11, color: "#8a7a63", marginLeft: 8 }}>{new Date(s.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
+                <span style={{ fontWeight: 800, fontSize: 13.5, color: "#F5ECD9" }}>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref}</span>
+                <span style={{ fontSize: 11, color: "#A8977E", marginLeft: 8 }}>{new Date(s.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontWeight: 800, fontSize: 15, color: "#C1272D" }}>{money(s.total)}</span>
+                <span style={{ fontWeight: 800, fontSize: 15, color: "#F2C879" }}>{money(s.total)}</span>
               </div>
             </div>
-            <div style={{ padding: "8px 14px" }}>
+            <div style={{ padding: "9px 15px" }}>
               {s.items.map((it) => (
-                <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: "#5a4c3a" }}>
-                  <span><strong style={{ color: "#2B2118" }}>{it.qty}x</strong> {it.name}{it.notes ? <span style={{ color: "#C1531F", fontStyle: "italic" }}> — {it.notes}</span> : ""}</span>
+                <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: "#C9BBA3" }}>
+                  <span><strong style={{ color: "#F5ECD9" }}>{it.qty}x</strong> {it.name}{it.notes ? <span style={{ color: "#E8846B", fontStyle: "italic" }}> — {it.notes}</span> : ""}</span>
                   <span>{money(it.price * it.qty)}</span>
                 </div>
               ))}
