@@ -666,7 +666,7 @@ export default function App() {
 
         {view === "caja" &&
           (cajaUnlocked ? (
-            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
+            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} onAddExpense={addExpense} onDeleteExpense={deleteExpense} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
           ) : (
             <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />
           ))}
@@ -1617,13 +1617,25 @@ function CocinaView({ tables, deliveries, onAdvance }) {
   );
 }
 
-function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, onCloseSession }) {
+function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onAddExpense, onDeleteExpense }) {
   const active = cashSessions.find((s) => !s.closedAt);
   const [openedBy, setOpenedBy] = useState("");
   const [openingAmount, setOpeningAmount] = useState("");
   const [counted, setCounted] = useState("");
   const [notes, setNotes] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [expDesc, setExpDesc] = useState("");
+  const [expAmount, setExpAmount] = useState("");
+  const [expCategory, setExpCategory] = useState("Insumos");
+  const EXPENSE_CATS_CAJA = [
+    { id: "Insumos", icon: "🍗", color: "#C1272D" },
+    { id: "Luz", icon: "💡", color: "#E8A33D" },
+    { id: "Agua", icon: "🚰", color: "#3E7FD9" },
+    { id: "Otro", icon: "🧾", color: "#8a7a63" },
+  ];
+  function catIcon(catId) {
+    return (EXPENSE_CATS_CAJA.find((c) => c.id === (catId || "Otro")) || EXPENSE_CATS_CAJA[3]).icon;
+  }
 
   const closedSessions = cashSessions.filter((s) => s.closedAt).slice().reverse();
 
@@ -1665,6 +1677,7 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   const cardSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
   const sessionSalesCount = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt)).length;
   const sessionExpenses = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).reduce((sum, e) => sum + Number(e.amount), 0);
+  const sessionExpensesList = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).slice().reverse();
   const expectedCash = active.openingAmount + cashSales - sessionExpenses;
   const diff = counted !== "" ? Number(counted) - expectedCash : null;
 
@@ -1703,6 +1716,54 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
         </div>
       </div>
       <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong></div>
+
+      <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 16 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 10, letterSpacing: 0.5 }}>📤 GASTOS DE ESTE TURNO</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          {EXPENSE_CATS_CAJA.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setExpCategory(c.id)}
+              style={{
+                padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11.5,
+                background: expCategory === c.id ? c.color : "rgba(255,255,255,0.08)",
+                color: expCategory === c.id ? "#fff" : "#C9BBA3",
+              }}
+            >
+              {c.icon} {c.id}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: sessionExpensesList.length > 0 ? 12 : 0 }}>
+          <input placeholder="Descripción (ej: pollo, factura ENEL)" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} style={{ ...inp, maxWidth: 220, color: "#2B2118" }} />
+          <input placeholder="Monto" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} style={{ ...inp, maxWidth: 110, color: "#2B2118" }} />
+          <button
+            disabled={!expDesc || !expAmount}
+            onClick={() => {
+              onAddExpense({ description: expDesc, amount: Number(expAmount), category: expCategory });
+              setExpDesc(""); setExpAmount("");
+            }}
+            style={{ padding: "9px 16px", border: "none", borderRadius: 8, background: "#F2C879", color: "#2B2118", fontWeight: 800, cursor: "pointer", opacity: expDesc && expAmount ? 1 : 0.5 }}
+          >
+            + Agregar
+          </button>
+        </div>
+        {sessionExpensesList.length > 0 && (
+          <div>
+            {sessionExpensesList.map((e) => (
+              <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 12.5 }}>
+                <span>{catIcon(e.category)} {e.description}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong style={{ color: "#FF8A80" }}>-{money(e.amount)}</strong>
+                  {onDeleteExpense && (
+                    <button onClick={() => { if (window.confirm("¿Borrar este gasto?")) onDeleteExpense(e.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer", padding: 2 }}><X size={13} /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.08)" }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 10, letterSpacing: 0.5 }}>🧮 CONTEO FÍSICO PARA CERRAR</div>
@@ -1931,7 +1992,7 @@ function CashKeypad({ value, onChange }) {
   );
 }
 
-function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, pin, onChangePin, salesGoal, onSetGoal }) {
+function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onCharge, onAddExpense, onDeleteExpense, pin, onChangePin, salesGoal, onSetGoal }) {
   const abiertas = [
     ...tables.filter((t) => t.items.length > 0).map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `${d.customer}`, ...d })),
@@ -2050,7 +2111,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
 
       <GoalBar sales={sales} salesGoal={salesGoal} onSetGoal={onSetGoal} />
 
-      <CorteCaja sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={onOpenSession} onCloseSession={onCloseSession} />
+      <CorteCaja sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={onOpenSession} onCloseSession={onCloseSession} onAddExpense={onAddExpense} onDeleteExpense={onDeleteExpense} />
 
       {abiertas.length === 0 && (
         <div style={{ textAlign: "center", padding: "60px 20px", color: MUTED, background: CARD, borderRadius: 20, border: `1px dashed ${LINE}` }}>
@@ -3000,6 +3061,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
 function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDeleteExpense }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [expandedSale, setExpandedSale] = useState(null);
   const [quincenaMonth, setQuincenaMonth] = useState(() => {
     const d = new Date();
     const tz = d.getTimezoneOffset() * 60000;
@@ -3137,19 +3199,34 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
       </div>
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Ventas</h3>
+      <p style={{ fontSize: 11, color: "#8a7a63", marginTop: -6, marginBottom: 10 }}>Toca una venta para ver qué consumió exactamente el cliente.</p>
       {filteredSales.length === 0 && <p style={{ color: "#8a7a63" }}>Sin ventas en este rango.</p>}
-      {filteredSales.map((s) => (
-        <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>{s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <strong>{money(s.total)}</strong>
-              <button onClick={() => { if (window.confirm("¿Borrar esta venta del historial permanente?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+      {filteredSales.map((s) => {
+        const isExpanded = expandedSale === s.id;
+        return (
+          <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
+            <div onClick={() => setExpandedSale(isExpanded ? null : s.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+              <span>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""} <span style={{ color: "#C9BBA3" }}>{isExpanded ? "▲" : "▼"}</span></span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <strong>{money(s.total)}</strong>
+                <button onClick={(e) => { e.stopPropagation(); if (window.confirm("¿Borrar esta venta del historial permanente?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
+              </div>
             </div>
+            <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(s.time).toLocaleString("es-NI")}</div>
+            {isExpanded && s.items && (
+              <div style={{ background: "#FBF2E4", borderRadius: 10, padding: "10px 14px", marginTop: 8 }}>
+                {s.items.map((it) => (
+                  <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 0", color: "#5a4c3a" }}>
+                    <span><strong style={{ color: "#2B2118" }}>{it.qty}x</strong> {it.name}{it.notes ? <span style={{ color: "#C1531F", fontStyle: "italic" }}> — {it.notes}</span> : ""}</span>
+                    <span>{money(it.price * it.qty)}</span>
+                  </div>
+                ))}
+                {s.tip > 0 && <div style={{ fontSize: 11, color: "#2E7D32", fontWeight: 700, marginTop: 4 }}>🙌 Propina: {money(s.tip)}</div>}
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 11, color: "#8a7a63" }}>{new Date(s.time).toLocaleString("es-NI")}</div>
-        </div>
-      ))}
+        );
+      })}
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 20 }}>Gastos</h3>
       {filteredExpenses.length === 0 && <p style={{ color: "#8a7a63" }}>Sin gastos en este rango.</p>}
