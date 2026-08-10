@@ -1628,13 +1628,13 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   const [expAmount, setExpAmount] = useState("");
   const [expCategory, setExpCategory] = useState("Insumos");
   const EXPENSE_CATS_CAJA = [
-    { id: "Insumos", icon: "🍗", color: "#C1272D" },
-    { id: "Luz", icon: "💡", color: "#E8A33D" },
-    { id: "Agua", icon: "🚰", color: "#3E7FD9" },
-    { id: "Otro", icon: "🧾", color: "#8a7a63" },
+    { id: "Insumos", icon: "🍗", label: "Insumos", color: "#C1272D" },
+    { id: "Otro", icon: "🧾", label: "Gasto de Turno", color: "#F2C879" },
+    { id: "Luz", icon: "💡", label: "Luz", color: "#E8A33D" },
+    { id: "Agua", icon: "🚰", label: "Agua", color: "#3E7FD9" },
   ];
-  function catIcon(catId) {
-    return (EXPENSE_CATS_CAJA.find((c) => c.id === (catId || "Otro")) || EXPENSE_CATS_CAJA[3]).icon;
+  function catMeta(catId) {
+    return EXPENSE_CATS_CAJA.find((c) => c.id === (catId || "Otro")) || EXPENSE_CATS_CAJA[1];
   }
 
   const closedSessions = cashSessions.filter((s) => s.closedAt).slice().reverse();
@@ -1676,8 +1676,12 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   const cashSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
   const sessionSalesCount = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt)).length;
-  const sessionExpenses = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).reduce((sum, e) => sum + Number(e.amount), 0);
-  const sessionExpensesList = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt)).slice().reverse();
+  const sessionExpensesAll = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt));
+  const sessionExpenses = sessionExpensesAll.reduce((sum, e) => sum + Number(e.amount), 0);
+  const sessionExpensesList = sessionExpensesAll.slice().reverse();
+  const sessionInsumos = sessionExpensesAll.filter((e) => (e.category || "Otro") === "Insumos").reduce((sum, e) => sum + Number(e.amount), 0);
+  const sessionTurno = sessionExpensesAll.filter((e) => (e.category || "Otro") === "Otro").reduce((sum, e) => sum + Number(e.amount), 0);
+  const sessionLuzAgua = sessionExpenses - sessionInsumos - sessionTurno;
   const expectedCash = active.openingAmount + cashSales - sessionExpenses;
   const diff = counted !== "" ? Number(counted) - expectedCash : null;
 
@@ -1706,61 +1710,90 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           <div style={{ fontSize: 10, color: "#C9BBA3" }}>💳 Ventas tarjeta</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cardSales)}</div>
         </div>
-        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #FF5252" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>📤 Gastos del turno</div>
-          <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionExpenses)}</div>
+        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #C1272D" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>🍗 Gasto en Insumos</div>
+          <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionInsumos)}</div>
         </div>
+        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #F2C879" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>🧾 Gasto de Turno</div>
+          <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionTurno)}</div>
+        </div>
+        {sessionLuzAgua > 0 && (
+          <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #3E7FD9" }}>
+            <div style={{ fontSize: 10, color: "#C9BBA3" }}>💡🚰 Luz / Agua</div>
+            <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionLuzAgua)}</div>
+          </div>
+        )}
         <div style={{ background: "#F2C879", borderRadius: 10, padding: 12 }}>
           <div style={{ fontSize: 10, color: "#2B2118", fontWeight: 700 }}>💰 EFECTIVO ESPERADO</div>
           <div style={{ fontWeight: 800, fontSize: 17, color: "#2B2118" }}>{money(expectedCash)}</div>
         </div>
       </div>
-      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong></div>
+      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong> · Gastado en total: <strong style={{ color: "#FF8A80" }}>-{money(sessionExpenses)}</strong></div>
 
-      <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 16 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#F2C879", marginBottom: 10, letterSpacing: 0.5 }}>📤 GASTOS DE ESTE TURNO</div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+      <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 18, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(242,200,121,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📤</div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#F2C879" }}>Registrar gasto del turno</div>
+            <div style={{ fontSize: 10.5, color: "#8A7A62" }}>Separa insumos (materia prima) de los demás gastos del día a día</div>
+          </div>
+        </div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#8A7A62", letterSpacing: 0.5, marginBottom: 6 }}>TIPO DE GASTO</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {EXPENSE_CATS_CAJA.map((c) => (
             <button
               key={c.id}
               onClick={() => setExpCategory(c.id)}
+              className="caja-chip"
               style={{
-                padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 11.5,
-                background: expCategory === c.id ? c.color : "rgba(255,255,255,0.08)",
-                color: expCategory === c.id ? "#fff" : "#C9BBA3",
+                display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
+                background: expCategory === c.id ? c.color : "rgba(255,255,255,0.06)",
+                color: expCategory === c.id ? (c.id === "Otro" ? "#2B2118" : "#fff") : "#C9BBA3",
+                boxShadow: expCategory === c.id ? `0 4px 12px ${c.color}44` : "none",
               }}
             >
-              {c.icon} {c.id}
+              {c.icon} {c.label}
             </button>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: sessionExpensesList.length > 0 ? 12 : 0 }}>
-          <input placeholder="Descripción (ej: pollo, factura ENEL)" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} style={{ ...inp, maxWidth: 220, color: "#2B2118" }} />
-          <input placeholder="Monto" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} style={{ ...inp, maxWidth: 110, color: "#2B2118" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: sessionExpensesList.length > 0 ? 14 : 0 }}>
+          <input placeholder={expCategory === "Insumos" ? "Ej: pollo, papas, aceite" : expCategory === "Otro" ? "Ej: propina motorizado, reparación" : "Ej: factura ENEL / ENACAL"} value={expDesc} onChange={(e) => setExpDesc(e.target.value)} style={{ ...inp, maxWidth: 230, color: "#2B2118" }} />
+          <input placeholder="Monto (C$)" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} style={{ ...inp, maxWidth: 110, color: "#2B2118" }} />
           <button
             disabled={!expDesc || !expAmount}
             onClick={() => {
               onAddExpense({ description: expDesc, amount: Number(expAmount), category: expCategory });
               setExpDesc(""); setExpAmount("");
             }}
-            style={{ padding: "9px 16px", border: "none", borderRadius: 8, background: "#F2C879", color: "#2B2118", fontWeight: 800, cursor: "pointer", opacity: expDesc && expAmount ? 1 : 0.5 }}
+            className="caja-chip"
+            style={{ padding: "10px 18px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: expDesc && expAmount ? 1 : 0.5, boxShadow: "0 6px 16px rgba(193,39,45,0.3)" }}
           >
             + Agregar
           </button>
         </div>
         {sessionExpensesList.length > 0 && (
-          <div>
-            {sessionExpensesList.map((e) => (
-              <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 12.5 }}>
-                <span>{catIcon(e.category)} {e.description}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <strong style={{ color: "#FF8A80" }}>-{money(e.amount)}</strong>
-                  {onDeleteExpense && (
-                    <button onClick={() => { if (window.confirm("¿Borrar este gasto?")) onDeleteExpense(e.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer", padding: 2 }}><X size={13} /></button>
-                  )}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 4 }}>
+            {sessionExpensesList.map((e) => {
+              const meta = catMeta(e.category);
+              return (
+                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid rgba(255,255,255,0.06)", fontSize: 12.5 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                    <span style={{ width: 26, height: 26, borderRadius: 8, background: `${meta.color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{meta.icon}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: "#F5ECD9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description}</div>
+                      <div style={{ fontSize: 9.5, color: "#8A7A62" }}>{meta.label}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <strong style={{ color: "#FF8A80" }}>-{money(e.amount)}</strong>
+                    {onDeleteExpense && (
+                      <button onClick={() => { if (window.confirm("¿Borrar este gasto?")) onDeleteExpense(e.id); }} style={{ background: "none", border: "none", color: "#C9BBA3", cursor: "pointer", padding: 2 }}><X size={13} /></button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -2044,6 +2077,9 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         @keyframes cajaFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes cajaShine { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         @keyframes cajaPulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        @keyframes cajaSweep { 0% { left: -30%; } 100% { left: 130%; } }
+        @keyframes cajaNumGlow { 0%,100% { text-shadow: 0 0 12px rgba(242,200,121,0.25); } 50% { text-shadow: 0 0 20px rgba(242,200,121,0.55); } }
+        @keyframes cajaCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
         .caja-card { animation: cajaFadeUp 0.35s ease; transition: transform 0.15s ease, box-shadow 0.15s ease; }
         .caja-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(0,0,0,0.4); }
         .caja-tab { transition: all 0.18s ease; }
@@ -2059,6 +2095,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         }
         .caja-chip { transition: all 0.15s ease; }
         .caja-chip:hover { transform: translateY(-1px); filter: brightness(1.08); }
+        .caja-stat-num { animation: cajaNumGlow 2.6s ease-in-out infinite; }
       `}</style>
 
       <div style={{
@@ -2066,9 +2103,30 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
         boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
       }}>
+        {/* Rejilla tecnológica de fondo */}
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 0, opacity: 0.045, pointerEvents: "none",
+          backgroundImage: `linear-gradient(${GOLD}99 1px, transparent 1px), linear-gradient(90deg, ${GOLD}99 1px, transparent 1px)`,
+          backgroundSize: "36px 36px",
+        }} />
+        {/* Barrido de luz superior */}
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", top: 0, width: "26%", height: "100%", background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, animation: "cajaSweep 6s ease-in-out infinite" }} />
+        </div>
+        {/* Esquinas HUD */}
+        {[["top", "left"], ["top", "right"], ["bottom", "left"], ["bottom", "right"]].map(([v, h], i) => (
+          <div key={i} style={{
+            position: "absolute", [v]: 10, [h]: 14, width: 22, height: 22,
+            borderTop: v === "top" ? `2px solid ${GOLD}` : "none",
+            borderBottom: v === "bottom" ? `2px solid ${GOLD}` : "none",
+            borderLeft: h === "left" ? `2px solid ${GOLD}` : "none",
+            borderRight: h === "right" ? `2px solid ${GOLD}` : "none",
+            opacity: 0.4, animation: "cajaCornerGlow 3s ease-in-out infinite", pointerEvents: "none", zIndex: 1,
+          }} />
+        ))}
         <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.10), transparent 70%)" }} />
         <div style={{ position: "absolute", bottom: -80, left: -40, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(193,39,45,0.10), transparent 70%)" }} />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative", zIndex: 2 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#4ADE80", animation: "cajaPulseDot 1.6s infinite" }} />
@@ -2087,16 +2145,16 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         </div>
 
         {abiertas.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 22, position: "relative" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 22, position: "relative", zIndex: 2 }}>
             {[
               { label: "CUENTAS ABIERTAS", value: abiertas.length, accent: GOLD },
               { label: "MESAS", value: mesasAbiertas, accent: "#E8846B" },
               { label: "DELIVERY", value: deliveryAbiertos, accent: BLUE },
               { label: "TOTAL A COBRAR", value: money(grandTotal), accent: "#4ADE80", big: true },
             ].map((s, i) => (
-              <div key={i} style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+              <div key={i} style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}`, backdropFilter: "blur(2px)" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
-                <div style={{ fontSize: s.big ? 22 : 24, fontWeight: 800, color: CREAM, fontFamily: s.big ? "'Anton', sans-serif" : "inherit" }}>{s.value}</div>
+                <div className={s.big ? "caja-stat-num" : ""} style={{ fontSize: s.big ? 22 : 24, fontWeight: 800, color: s.big ? "#4ADE80" : CREAM, fontFamily: s.big ? "'Anton', sans-serif" : "inherit" }}>{s.value}</div>
               </div>
             ))}
           </div>
