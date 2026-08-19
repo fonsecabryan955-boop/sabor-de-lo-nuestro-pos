@@ -330,6 +330,13 @@ export default function App() {
   function withDeliveries(fn) {
     persist({ ...state, deliveries: fn(deliveries) });
   }
+  function addTable() {
+    const nextId = tables.length ? Math.max(...tables.map((t) => t.id)) + 1 : 1;
+    withTables((ts) => [...ts, { id: nextId, status: "libre", kitchenStatus: null, items: [] }]);
+  }
+  function removeTable(id) {
+    withTables((ts) => ts.filter((t) => t.id !== id));
+  }
 
   function addItemToOrder(kind, id, menuItem) {
     const addFn = (items) => {
@@ -660,7 +667,7 @@ export default function App() {
       )}
 
       <div style={view === "menutv" ? { padding: 0, flex: 1, minHeight: 0, width: "100%", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto" }}>
-        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onManageMenu={() => setMenuManagerOpen(true)} />}
+        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onManageMenu={() => setMenuManagerOpen(true)} onAddTable={addTable} onRemoveTable={removeTable} />}
 
         {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} kiosk={kiosk} />}
 
@@ -813,10 +820,13 @@ function TableElapsed({ occupiedAt }) {
   return <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>⏱ {mins} min ocupada</span>;
 }
 
-function MesasView({ tables, onOpen, onManageMenu }) {
+function MesasView({ tables, onOpen, onManageMenu, onAddTable, onRemoveTable }) {
+  const [manageMode, setManageMode] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   const libres = tables.filter((t) => t.items.length === 0).length;
   const ocupadas = tables.length - libres;
   const floorTotal = tables.reduce((sum, t) => sum + orderTotal(t.items), 0);
+  const tableToRemove = tables.find((t) => t.id === confirmRemoveId);
 
   return (
     <div>
@@ -825,13 +835,38 @@ function MesasView({ tables, onOpen, onManageMenu }) {
           <h2 style={{ fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: 0.2 }}>🍽️ Piso del restaurante</h2>
           <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 2 }}>{RESTAURANT_NAME}</div>
         </div>
-        <button
-          onClick={onManageMenu}
-          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", boxShadow: "0 3px 10px rgba(43,33,24,0.25)" }}
-        >
-          🍔 Gestionar menú
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => setManageMode((m) => !m)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, cursor: "pointer",
+              fontWeight: 800, fontSize: 13, boxShadow: "0 3px 10px rgba(43,33,24,0.15)",
+              border: manageMode ? "1px solid #2B2118" : "1px solid #E5D9C3",
+              background: manageMode ? "#2B2118" : "#fff", color: manageMode ? "#F2C879" : "#2B2118",
+            }}
+          >
+            {manageMode ? "✓ Listo" : "🛠️ Editar mesas"}
+          </button>
+          <button
+            onClick={onAddTable}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #26A65B, #158A4A)", color: "#fff", boxShadow: "0 3px 10px rgba(21,138,74,0.25)" }}
+          >
+            ➕ Agregar mesa
+          </button>
+          <button
+            onClick={onManageMenu}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", boxShadow: "0 3px 10px rgba(43,33,24,0.25)" }}
+          >
+            🍔 Gestionar menú
+          </button>
+        </div>
       </div>
+
+      {manageMode && (
+        <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#6b5738" }}>
+          Modo edición activo: toca la ❌ en una mesa libre (sin pedidos) para eliminarla. Las mesas ocupadas no se pueden eliminar.
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
         <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 16px" }}>
@@ -857,18 +892,30 @@ function MesasView({ tables, onOpen, onManageMenu }) {
           const st = statusStyle(t.kitchenStatus, t.items.length > 0);
           const total = orderTotal(t.items);
           const itemCount = t.items.reduce((s, it) => s + it.qty, 0);
+          const canRemove = manageMode && t.items.length === 0;
           return (
             <button
               key={t.id}
-              onClick={() => onOpen(t.id)}
+              onClick={() => (manageMode ? null : onOpen(t.id))}
               style={{
-                background: st.grad, border: "none", borderRadius: 18, padding: "22px 16px", cursor: "pointer",
+                background: st.grad, border: "none", borderRadius: 18, padding: "22px 16px", cursor: manageMode ? "default" : "pointer",
                 textAlign: "left", color: st.text, boxShadow: `0 8px 20px ${st.glow}`, position: "relative", overflow: "hidden",
                 transition: "transform 0.15s ease",
               }}
             >
               <div style={{ position: "absolute", top: -18, right: -18, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
-              <div style={{ fontSize: 24, position: "absolute", top: 12, right: 14, opacity: 0.9 }}>{st.icon}</div>
+              {canRemove ? (
+                <div
+                  onClick={(e) => { e.stopPropagation(); setConfirmRemoveId(t.id); }}
+                  style={{
+                    position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: "50%",
+                    background: "rgba(0,0,0,0.35)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, fontWeight: 800, cursor: "pointer", zIndex: 2,
+                  }}
+                >✕</div>
+              ) : (
+                <div style={{ fontSize: 24, position: "absolute", top: 12, right: 14, opacity: 0.9 }}>{st.icon}</div>
+              )}
               <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85, letterSpacing: 1 }}>MESA</div>
               <div style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.1, marginTop: -2 }}>{t.id}</div>
               <div style={{
@@ -886,6 +933,25 @@ function MesasView({ tables, onOpen, onManageMenu }) {
           );
         })}
       </div>
+
+      {tableToRemove && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 16 }}>
+          <div style={{ background: "#FFF8ED", borderRadius: 16, width: "100%", maxWidth: 360, padding: 22, boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: "#2B2118", marginBottom: 8 }}>¿Eliminar Mesa {tableToRemove.id}?</div>
+            <div style={{ fontSize: 13, color: "#6b5738", marginBottom: 20 }}>Esta acción no se puede deshacer. La mesa se quitará del piso del restaurante.</div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setConfirmRemoveId(null)}
+                style={{ padding: "9px 16px", borderRadius: 10, border: "1px solid #E5D9C3", background: "#fff", color: "#2B2118", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >Cancelar</button>
+              <button
+                onClick={() => { onRemoveTable(tableToRemove.id); setConfirmRemoveId(null); }}
+                style={{ padding: "9px 16px", borderRadius: 10, border: "none", background: "#D84315", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}
+              >Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
