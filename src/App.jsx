@@ -970,11 +970,37 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
   const [newCatIcon, setNewCatIcon] = useState("🍽️");
   const [editingId, setEditingId] = useState(null);
   const [editPrice, setEditPrice] = useState("");
+  const [newPhotoFile, setNewPhotoFile] = useState(null);
+  const [newPhotoPreview, setNewPhotoPreview] = useState(null);
+  const [uploadingId, setUploadingId] = useState(null);
+  const [uploadingNew, setUploadingNew] = useState(false);
 
-  function handleAdd() {
+  async function uploadPhoto(file, keyHint) {
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const path = `${keyHint}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("menu-fotos").upload(path, file, { upsert: true, cacheControl: "3600" });
+    if (error) { alert("No se pudo subir la foto: " + error.message + "\n\nAsegúrate de haber creado el bucket público 'menu-fotos' en Supabase Storage."); return null; }
+    const { data } = supabase.storage.from("menu-fotos").getPublicUrl(path);
+    return data?.publicUrl || null;
+  }
+
+  async function handleAdd() {
     if (!name.trim() || !price) return;
-    onAddItem({ name: name.trim(), price: Number(price), ...(price12 ? { price12: Number(price12) } : {}), cat });
-    setName(""); setPrice(""); setPrice12("");
+    let photoUrl = null;
+    if (newPhotoFile) {
+      setUploadingNew(true);
+      photoUrl = await uploadPhoto(newPhotoFile, "item");
+      setUploadingNew(false);
+    }
+    onAddItem({ name: name.trim(), price: Number(price), ...(price12 ? { price12: Number(price12) } : {}), cat, ...(photoUrl ? { photoUrl } : {}) });
+    setName(""); setPrice(""); setPrice12(""); setNewPhotoFile(null); setNewPhotoPreview(null);
+  }
+  async function handlePhotoChange(m, file) {
+    if (!file) return;
+    setUploadingId(m.id);
+    const photoUrl = await uploadPhoto(file, `item-${m.id}`);
+    setUploadingId(null);
+    if (photoUrl) onUpdateItem(m.id, { photoUrl });
   }
   function handleAddCat() {
     if (!newCatName.trim()) return;
@@ -999,6 +1025,14 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
               <input placeholder="Precio (C$)" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inp, maxWidth: 120 }} />
               <input placeholder="Precio alterno (opcional)" type="number" value={price12} onChange={(e) => setPrice12(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
             </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 700, color: "#5a4c3a", border: "1px dashed #C1272D", borderRadius: 8, padding: "8px 12px", cursor: "pointer" }}>
+                📷 {newPhotoFile ? "Cambiar foto" : "Subir foto para Menú TV"}
+                <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) { setNewPhotoFile(f); setNewPhotoPreview(URL.createObjectURL(f)); } }} />
+              </label>
+              {newPhotoPreview && <img src={newPhotoPreview} alt="" style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 8, border: "1px solid #E5D9C3" }} />}
+              {uploadingNew && <span style={{ fontSize: 11, color: "#8a7a63" }}>Subiendo...</span>}
+            </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               {!newCatMode ? (
                 <>
@@ -1008,7 +1042,7 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
                   <button onClick={() => setNewCatMode(true)} style={{ fontSize: 12, background: "none", border: "1px dashed #C1272D", color: "#C1272D", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 700 }}>
                     + Nueva categoría
                   </button>
-                  <button onClick={handleAdd} disabled={!name || !price} style={{ marginLeft: "auto", padding: "0 18px", height: 38, border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: name && price ? 1 : 0.5 }}>
+                  <button onClick={handleAdd} disabled={!name || !price || uploadingNew} style={{ marginLeft: "auto", padding: "0 18px", height: 38, border: "none", borderRadius: 8, background: "#2E7D32", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: name && price && !uploadingNew ? 1 : 0.5 }}>
                     Agregar platillo
                   </button>
                 </>
@@ -1036,7 +1070,21 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
                 <div style={{ display: "grid", gap: 6 }}>
                   {items.map((m) => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #F0E8D8", borderRadius: 10, padding: "8px 12px", opacity: m.active === false ? 0.5 : 1 }}>
+                      {m.photoUrl ? (
+                        <img src={m.photoUrl} alt="" style={{ width: 32, height: 32, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                      ) : (
+                        <label title="Subir foto para Menú TV" style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: "1px dashed #C9BBA3", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13 }}>
+                          {uploadingId === m.id ? "…" : "📷"}
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handlePhotoChange(m, e.target.files?.[0])} />
+                        </label>
+                      )}
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}{m.price12 ? ` (x12: ${money(m.price12)})` : ""}</span>
+                      {m.photoUrl && (
+                        <label title="Cambiar foto" style={{ fontSize: 11, color: "#8a7a63", cursor: "pointer", textDecoration: "underline" }}>
+                          {uploadingId === m.id ? "…" : "cambiar foto"}
+                          <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handlePhotoChange(m, e.target.files?.[0])} />
+                        </label>
+                      )}
                       {editingId === m.id ? (
                         <>
                           <input type="number" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} style={{ ...inp, maxWidth: 90, padding: 6 }} />
@@ -2963,10 +3011,13 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const AMBER = "#E8A33D";
   const tickerMsgs = ["HECHO AL MOMENTO", "PÍDELO PICANTE", "DELIVERY DISPONIBLE", "MASATEPE · MASAYA", "SABOR CASERO DE VERDAD"];
 
-  const slides = [
-    ...catsWithItems.map((c) => ({ type: "cat", cat: c })),
-    ...(promotions && promotions.length > 0 ? [{ type: "promo" }] : []),
-  ];
+  const itemsWithPhotos = activeItems.filter((m) => m.photoUrl);
+  const slides = [];
+  catsWithItems.forEach((cat) => {
+    slides.push({ type: "cat", cat });
+    itemsWithPhotos.filter((m) => m.cat === cat.name).forEach((m) => slides.push({ type: "spotlight", item: m, cat }));
+  });
+  if (promotions && promotions.length > 0) slides.push({ type: "promo" });
 
   const SLIDE_SECONDS = 9;
   const [slide, setSlide] = useState(0);
@@ -2988,9 +3039,12 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
 
   const current = slides[Math.min(slide, slides.length - 1)] || null;
   const c = current && current.type === "cat" ? current.cat : null;
-  const accent = c ? avatarColor(c.name) : GOLD;
-  const items = c ? activeItems.filter((m) => m.cat === c.name) : [];
   const isPromoSlide = current && current.type === "promo";
+  const isSpotlightSlide = current && current.type === "spotlight";
+  const spotlightItem = isSpotlightSlide ? current.item : null;
+  const spotlightCat = isSpotlightSlide ? current.cat : null;
+  const accent = (c || spotlightCat) ? avatarColor((c || spotlightCat).name) : GOLD;
+  const items = c ? activeItems.filter((m) => m.cat === c.name) : [];
 
   return (
     <div style={{
@@ -3019,6 +3073,9 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
         @keyframes mbScanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
         @keyframes mbCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
         @keyframes mbSweep { 0% { left: -30%; } 100% { left: 130%; } }
+        @keyframes mbKenBurns { 0% { transform: scale(1.06) translate(0%, 0%); } 50% { transform: scale(1.2) translate(-2%, -1.4%); } 100% { transform: scale(1.1) translate(1.4%, 0.8%); } }
+        @keyframes mbSpotIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes mbSparkle { 0%,100% { opacity: 0; transform: translateY(0) scale(0.6); } 50% { opacity: 1; transform: translateY(-14px) scale(1); } }
       `}</style>
 
       {/* Rejilla tecnológica de fondo */}
@@ -3087,7 +3144,38 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
           }} />
         ))}
 
-        {isPromoSlide ? (
+        {isSpotlightSlide ? (
+          <div key={"spot" + slide} style={{ position: "relative", height: "100%", width: "100%", borderRadius: "clamp(14px,1.6vw,22px)", overflow: "hidden", boxShadow: `0 24px 60px ${accent}40`, animation: "mbBgFade 0.7s ease" }}>
+            <img
+              src={spotlightItem.photoUrl}
+              alt={spotlightItem.name}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", animation: `mbKenBurns ${SLIDE_SECONDS + 1}s ease-in-out both`, transformOrigin: "center center" }}
+            />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,8,6,0.05) 22%, rgba(10,8,6,0.55) 62%, rgba(10,8,6,0.94) 100%)" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.10) 50%, transparent 60%)", backgroundSize: "250% 100%", animation: "mbShine 4.2s linear infinite" }} />
+            {[["18%", "10%"], ["30%", "78%"], ["62%", "16%"], ["70%", "68%"]].map(([top, left], i) => (
+              <span key={i} style={{ position: "absolute", top, left, fontSize: "clamp(10px,1.1vw,16px)", color: GOLD, animation: `mbSparkle ${2.6 + i * 0.4}s ease-in-out ${i * 0.5}s infinite` }}>✦</span>
+            ))}
+            <div style={{ position: "absolute", left: "clamp(20px,4vw,56px)", right: "clamp(20px,4vw,56px)", bottom: "clamp(20px,3.4vh,44px)", animation: "mbSpotIn 0.6s ease 0.15s both" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 9, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 3.5, marginBottom: 8 }}>
+                <span style={{ fontSize: "clamp(14px, 1.4vw, 19px)" }}>{spotlightCat.icon}</span> ESPECIALIDAD DE LA CASA
+              </div>
+              <div style={{
+                fontFamily: "'Anton', sans-serif", fontSize: "clamp(30px, 4.8vw, 66px)", letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1.02,
+                color: CREAM, filter: "drop-shadow(0 6px 22px rgba(0,0,0,0.55))",
+              }}>
+                {spotlightItem.name}
+              </div>
+              <div style={{
+                display: "inline-block", marginTop: 14, fontFamily: "'Anton', sans-serif", fontSize: "clamp(18px, 2.2vw, 28px)", color: "#fff",
+                background: `linear-gradient(135deg, ${AMBER}, ${EMBER})`, padding: "clamp(8px,1vh,12px) clamp(18px,2vw,26px)", borderRadius: 14,
+                animation: "mbBadgeGlow 2.4s infinite", boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
+              }}>
+                {money(spotlightItem.price)}
+              </div>
+            </div>
+          </div>
+        ) : isPromoSlide ? (
           <div key="promo-slide">
             <div style={{ textAlign: "center", marginBottom: "clamp(18px, 3vh, 36px)" }}>
               <div style={{ fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 4, animation: "mbKickerIn 0.6s ease both" }}>OFERTAS ESPECIALES</div>
