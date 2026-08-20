@@ -70,6 +70,9 @@ function money(n) {
 function orderTotal(items) {
   return items.reduce((sum, it) => sum + it.price * it.qty, 0);
 }
+function methodLabel(s) {
+  return s.method + (s.bank ? ` (${s.bank})` : "");
+}
 function emptyTables() {
   return Array.from({ length: 5 }, (_, i) => ({ id: i + 1, status: "libre", kitchenStatus: null, items: [] }));
 }
@@ -377,9 +380,10 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
-  function closeTicket(kind, id, method, discount, tip, itemMenuIds) {
+  function closeTicket(kind, id, method, discount, tip, itemMenuIds, bank) {
     const disc = discount && discount.value > 0 ? discount : null;
     const tipAmount = Number(tip) || 0;
+    const bankInfo = (method === "Tarjeta" || method === "Transferencia") && bank ? bank : null;
     function computeTotal(items) {
       const sub = orderTotal(items);
       if (!disc) return { subtotal: sub, discountAmount: 0, total: sub };
@@ -394,7 +398,7 @@ export default function App() {
       const remainingItems = splitting ? t.items.filter((it) => !itemMenuIds.includes(it.menuId)) : [];
       if (!chargedItems.length) return;
       const { subtotal, discountAmount, total } = computeTotal(chargedItems);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, bank: bankInfo, time: new Date().toISOString() };
       const invResult = deductInventoryForSale(chargedItems);
       const next = {
         ...state,
@@ -410,7 +414,7 @@ export default function App() {
       const d = deliveries.find((d) => d.id === id);
       if (!d.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(d.items);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, bank: bankInfo, time: new Date().toISOString() };
       const invResult = deductInventoryForSale(d.items);
       const next = {
         ...state,
@@ -1741,6 +1745,7 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
 
   const cashSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const transferSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
   const sessionSalesCount = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt)).length;
   const sessionExpensesAll = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt));
   const sessionExpenses = sessionExpensesAll.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -1776,6 +1781,10 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           <div style={{ fontSize: 10, color: "#C9BBA3" }}>💳 Ventas tarjeta</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cardSales)}</div>
         </div>
+        <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #6A4FB6" }}>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>🏦 Ventas transferencia</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>{money(transferSales)}</div>
+        </div>
         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #C1272D" }}>
           <div style={{ fontSize: 10, color: "#C9BBA3" }}>🍗 Gasto en Insumos</div>
           <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>-{money(sessionInsumos)}</div>
@@ -1795,7 +1804,7 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           <div style={{ fontWeight: 800, fontSize: 17, color: "#2B2118" }}>{money(expectedCash)}</div>
         </div>
       </div>
-      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales)}</strong> · Gastado en total: <strong style={{ color: "#FF8A80" }}>-{money(sessionExpenses)}</strong></div>
+      <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales + transferSales)}</strong> · Gastado en total: <strong style={{ color: "#FF8A80" }}>-{money(sessionExpenses)}</strong></div>
 
       <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 14, padding: 18, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -1901,13 +1910,14 @@ function printSessionReport(session, sales, expenses) {
   const sessionExpenses = expenses.filter((e) => new Date(e.time) >= start && new Date(e.time) <= end);
   const cash = sessionSales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const card = sessionSales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const transfer = sessionSales.filter((s) => s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
   const expensesTotal = sessionExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
   const rows = sessionSales.map((s) => `
     <tr>
       <td>#${String(s.folio || s.id).padStart(5, "0")}</td>
       <td>${s.ref}</td>
-      <td>${s.method}</td>
+      <td>${methodLabel(s)}</td>
       <td style="text-align:right">${money(s.total)}</td>
     </tr>`).join("");
 
@@ -1941,6 +1951,7 @@ function printSessionReport(session, sales, expenses) {
         <tr><td>Fondo inicial</td><td colspan="2"></td><td style="text-align:right">${money(session.openingAmount)}</td></tr>
         <tr><td>Ventas efectivo</td><td colspan="2"></td><td style="text-align:right">${money(cash)}</td></tr>
         <tr><td>Ventas tarjeta</td><td colspan="2"></td><td style="text-align:right">${money(card)}</td></tr>
+        <tr><td>Ventas transferencia</td><td colspan="2"></td><td style="text-align:right">${money(transfer)}</td></tr>
         <tr><td>Gastos</td><td colspan="2"></td><td style="text-align:right">-${money(expensesTotal)}</td></tr>
         <tr class="big"><td>EFECTIVO ESPERADO</td><td colspan="2"></td><td style="text-align:right">${money(session.expectedCash != null ? session.expectedCash : session.openingAmount + cash - expensesTotal)}</td></tr>
         ${session.countedCash != null ? `<tr class="big"><td>EFECTIVO CONTADO</td><td colspan="2"></td><td style="text-align:right">${money(session.countedCash)}</td></tr>
@@ -2097,6 +2108,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
     ...deliveries.filter((d) => d.items.length > 0 && d.kitchenStatus !== "entregado").map((d) => ({ kind: "delivery", id: d.id, label: `${d.customer}`, ...d })),
   ];
   const [method, setMethod] = useState({});
+  const [bank, setBank] = useState({});
   const [discountOpen, setDiscountOpen] = useState({});
   const [discountType, setDiscountType] = useState({});
   const [discountValue, setDiscountValue] = useState({});
@@ -2439,7 +2451,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 8 }}>MÉTODO DE PAGO</div>
                   <div style={{ display: "flex", gap: 10 }}>
-                    {[{ id: "Efectivo", icon: "💵" }, { id: "Tarjeta", icon: "💳" }].map((opt) => (
+                    {[{ id: "Efectivo", icon: "💵" }, { id: "Tarjeta", icon: "💳" }, { id: "Transferencia", icon: "🏦" }].map((opt) => (
                       <button
                         key={opt.id}
                         onClick={() => setMethod((s) => ({ ...s, [key]: opt.id }))}
@@ -2457,6 +2469,29 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     ))}
                   </div>
                 </div>
+
+                {(m === "Tarjeta" || m === "Transferencia") && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 8 }}>¿EN QUÉ BANCO?</div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {["BAC", "Lafise", "BanPro"].map((bk) => (
+                        <button
+                          key={bk}
+                          onClick={() => setBank((s) => ({ ...s, [key]: bk }))}
+                          className="caja-chip"
+                          style={{
+                            flex: "1 1 auto", padding: "10px 12px", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 12.5,
+                            border: (bank[key] || "") === bk ? `2px solid ${GOLD}` : `1px solid ${LINE}`,
+                            background: (bank[key] || "") === bk ? "rgba(242,200,121,0.10)" : "rgba(255,255,255,0.02)",
+                            color: (bank[key] || "") === bk ? GOLD : CREAM,
+                          }}
+                        >
+                          🏦 {bk}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {!isSplitting && (
                   <div style={{ marginBottom: 12 }}>
@@ -2519,8 +2554,8 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
 
                 {isSplitting ? (
                   <button
-                    disabled={selectedIds.length === 0}
-                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, null, null, selectedIds); setSplitSelected((s) => ({ ...s, [key]: [] })); setSplitMode((s) => ({ ...s, [key]: false })); }}
+                    disabled={selectedIds.length === 0 || ((m === "Tarjeta" || m === "Transferencia") && !bank[key])}
+                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, null, null, selectedIds, bank[key]); setSplitSelected((s) => ({ ...s, [key]: [] })); setSplitMode((s) => ({ ...s, [key]: false })); }}
                     className="caja-charge-btn"
                     style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: selectedIds.length ? `linear-gradient(135deg, ${BLUE}, #2A5FB0)` : "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 800, cursor: selectedIds.length ? "pointer" : "not-allowed", fontSize: 14.5, letterSpacing: 0.3 }}
                   >
@@ -2528,11 +2563,12 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                   </button>
                 ) : (
                   <button
-                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key]); }}
+                    disabled={(m === "Tarjeta" || m === "Transferencia") && !bank[key]}
+                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key], undefined, bank[key]); }}
                     className="caja-charge-btn"
-                    style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 14.5, letterSpacing: 0.3, boxShadow: "0 8px 20px rgba(193,39,45,0.3)" }}
+                    style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: ((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "rgba(255,255,255,0.08)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: ((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "not-allowed" : "pointer", fontSize: 14.5, letterSpacing: 0.3, boxShadow: "0 8px 20px rgba(193,39,45,0.3)" }}
                   >
-                    ✓ Cobrar y cerrar{tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}
+                    {((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "Selecciona el banco" : `✓ Cobrar y cerrar${tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}`}
                   </button>
                 )}
               </div>
@@ -3360,7 +3396,7 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
         return (
           <div key={s.id} style={{ padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 13 }}>
             <div onClick={() => setExpandedSale(isExpanded ? null : s.id)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
-              <span>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""} <span style={{ color: "#C9BBA3" }}>{isExpanded ? "▲" : "▼"}</span></span>
+              <span>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref} · {methodLabel(s)}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""} <span style={{ color: "#C9BBA3" }}>{isExpanded ? "▲" : "▼"}</span></span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <strong>{money(s.total)}</strong>
                 <button onClick={(e) => { e.stopPropagation(); if (window.confirm("¿Borrar esta venta del historial permanente?")) onDeleteSale(s.id); }} style={{ background: "none", border: "none", color: "#8a7a63", cursor: "pointer", padding: 2 }}><X size={14} /></button>
@@ -4094,7 +4130,7 @@ const inp = { width: "100%", padding: 9, borderRadius: 6, border: "1px solid #E5
 function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insumos, payroll, realProfit) {
   const daySales = sales.filter((s) => new Date(s.time).toDateString() === dayStr);
   const dayExpenses = expenses.filter((e) => new Date(e.time).toDateString() === dayStr);
-  const rows = daySales.map((s) => `<tr><td>#${String(s.folio || s.id).padStart(5, "0")}</td><td>${s.ref}</td><td>${s.method}</td><td style="text-align:right">${money(s.total)}</td></tr>`).join("");
+  const rows = daySales.map((s) => `<tr><td>#${String(s.folio || s.id).padStart(5, "0")}</td><td>${s.ref}</td><td>${methodLabel(s)}</td><td style="text-align:right">${money(s.total)}</td></tr>`).join("");
   const expRows = dayExpenses.map((e) => `<tr><td colspan="3">${(e.category || "Otro") === "Insumos" ? "🍗" : "🧾"} ${e.description}</td><td style="text-align:right">-${money(e.amount)}</td></tr>`).join("");
   const html = `
     <html><head><title>Reporte del Día</title><style>
@@ -4231,6 +4267,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
   const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const transferToday = todaySales.filter((s) => s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
   const avgTicket = count > 0 ? income / count : 0;
   const hourlyMap = {};
   todaySales.forEach((s) => {
@@ -4242,7 +4279,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
   function exportCSV() {
     const header = "Ticket,Referencia,Metodo,Subtotal,Descuento,Total,Hora\n";
-    const rows = todaySales.map((s) => `${s.folio || s.id},"${s.ref}",${s.method},${s.subtotal || s.total},${s.discountAmount || 0},${s.total},${new Date(s.time).toLocaleTimeString("es-NI")}`).join("\n");
+    const rows = todaySales.map((s) => `${s.folio || s.id},"${s.ref}",${methodLabel(s)},${s.subtotal || s.total},${s.discountAmount || 0},${s.total},${new Date(s.time).toLocaleTimeString("es-NI")}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -4430,6 +4467,14 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
               </div>
               <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
                 <div style={{ width: `${income > 0 ? (cardToday / income) * 100 : 0}%`, height: "100%", background: "#3E7FD9", borderRadius: 6 }} />
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6, color: "#F5ECD9" }}>
+                <span>🏦 Transferencia</span><span style={{ fontWeight: 700 }}>{money(transferToday)}</span>
+              </div>
+              <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+                <div style={{ width: `${income > 0 ? (transferToday / income) * 100 : 0}%`, height: "100%", background: "#9C63D8", borderRadius: 6 }} />
               </div>
             </div>
           </div>
@@ -4649,7 +4694,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
             <div style={{ background: "rgba(255,255,255,0.03)", padding: "11px 15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, borderBottom: "1px solid rgba(242,200,121,0.1)" }}>
               <div>
                 <span style={{ fontWeight: 800, fontSize: 13.5, color: "#F5ECD9" }}>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref}</span>
-                <span style={{ fontSize: 11, color: "#A8977E", marginLeft: 8 }}>{new Date(s.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })} · {s.method}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
+                <span style={{ fontSize: 11, color: "#A8977E", marginLeft: 8 }}>{new Date(s.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })} · {methodLabel(s)}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontWeight: 800, fontSize: 15, color: "#F2C879" }}>{money(s.total)}</span>
@@ -4687,7 +4732,7 @@ function ReceiptModal({ sale, onClose }) {
     "",
     ...(sale.discountAmount > 0 ? [`Subtotal: ${money(sale.subtotal)}`, `Descuento (${sale.discountLabel}): -${money(sale.discountAmount)}`] : []),
     `Total: ${money(sale.total)}`,
-    `Pago: ${sale.method}`,
+    `Pago: ${methodLabel(sale)}`,
     "",
     "¡Gracias por su compra!",
   ].join("\n");
@@ -4752,7 +4797,7 @@ function ReceiptModal({ sale, onClose }) {
               <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(sale.total)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, background: "#FFF3E0", padding: "6px 10px", borderRadius: 6, border: "1px solid #F2C879" }}>
-              <span>💳 Forma de pago</span><span style={{ fontWeight: 800 }}>{sale.method}</span>
+              <span>💳 Forma de pago</span><span style={{ fontWeight: 800 }}>{methodLabel(sale)}</span>
             </div>
             {sale.tip > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginTop: 6, color: "#2E7D32", fontWeight: 700 }}>
