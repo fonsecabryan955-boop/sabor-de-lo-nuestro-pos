@@ -112,6 +112,7 @@ export default function App() {
   const [activeDelivery, setActiveDelivery] = useState(null);
   const [showNewDelivery, setShowNewDelivery] = useState(false);
   const [menuManagerOpen, setMenuManagerOpen] = useState(false);
+  const [tvManagerOpen, setTvManagerOpen] = useState(false);
   const [cajaUnlocked, setCajaUnlocked] = useState(false);
   const [receiptFor, setReceiptFor] = useState(null);
   const [connStatus, setConnStatus] = useState("Conectando…");
@@ -475,6 +476,12 @@ export default function App() {
     if (menuCats.some((c) => c.name.toLowerCase() === clean.toLowerCase())) return;
     persist({ ...state, menuCats: [...menuCats, { name: clean, icon: icon || "🍽️" }] });
   }
+  function updateMenuCategory(name, patch) {
+    persist({ ...state, menuCats: menuCats.map((c) => (c.name === name ? { ...c, ...patch } : c)) });
+  }
+  function setTvShowPromos(v) {
+    persist({ ...state, tvShowPromos: v });
+  }
   function addInventoryItem(item) {
     persist({ ...state, inventory: [...inventory, { id: `inv${Date.now()}`, stock: 0, minStock: 0, ...item }] });
   }
@@ -711,7 +718,7 @@ export default function App() {
 
         {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
-        {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} />}
+        {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} tvShowPromos={state.tvShowPromos} onManage={() => setTvManagerOpen(true)} />}
       </div>
 
       {activeTable && (
@@ -772,6 +779,18 @@ export default function App() {
           onDeleteItem={deleteMenuItem}
           onAddCategory={addMenuCategory}
           onClose={() => setMenuManagerOpen(false)}
+        />
+      )}
+
+      {tvManagerOpen && (
+        <TvMenuManagerModal
+          menuItems={menuItems}
+          menuCats={menuCats}
+          tvShowPromos={state.tvShowPromos}
+          onUpdateCategory={updateMenuCategory}
+          onUpdateItem={updateMenuItem}
+          onSetShowPromos={setTvShowPromos}
+          onClose={() => setTvManagerOpen(false)}
         />
       )}
     </div>
@@ -1113,6 +1132,72 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
   );
 }
 
+function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategory, onUpdateItem, onSetShowPromos, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 75, padding: 16 }}>
+      <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>📺 Editar Menú TV</h3>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: 18, overflow: "auto" }}>
+          <div style={{ fontSize: 12.5, color: "#8a7a63", marginBottom: 16 }}>
+            Elegí qué categorías aparecen en la rotación del Menú TV, y qué platillos con foto muestran su diapositiva estilo video.
+          </div>
+
+          <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "12px 16px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5 }}>🏷️ Mostrar diapositiva de promociones</span>
+            <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+              <input type="checkbox" checked={tvShowPromos !== false} onChange={(e) => onSetShowPromos(e.target.checked)} style={{ width: 18, height: 18 }} />
+            </label>
+          </div>
+
+          {menuCats.map((c) => {
+            const items = menuItems.filter((m) => m.cat === c.name);
+            if (!items.length) return null;
+            const catOn = c.tvHidden !== true;
+            return (
+              <div key={c.name} style={{ marginBottom: 18, opacity: catOn ? 1 : 0.5 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#5a4c3a", letterSpacing: 0.3 }}>{c.icon} {c.name.toUpperCase()}</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, color: catOn ? "#2E7D32" : "#8a7a63", cursor: "pointer" }}>
+                    {catOn ? "Visible en TV" : "Oculta en TV"}
+                    <input type="checkbox" checked={catOn} onChange={(e) => onUpdateCategory(c.name, { tvHidden: !e.target.checked })} style={{ width: 16, height: 16 }} />
+                  </label>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  {items.map((m) => (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #F0E8D8", borderRadius: 10, padding: "8px 12px" }}>
+                      {m.photoUrl ? (
+                        <img src={m.photoUrl} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 6, background: "#F0E8D8" }} />
+                      )}
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</span>
+                      {m.photoUrl ? (
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: m.tvSpotlightHidden ? "#8a7a63" : "#2E7D32", cursor: "pointer" }}>
+                          {m.tvSpotlightHidden ? "Video oculto" : "Video activo"}
+                          <input type="checkbox" checked={m.tvSpotlightHidden !== true} onChange={(e) => onUpdateItem(m.id, { tvSpotlightHidden: !e.target.checked })} style={{ width: 15, height: 15 }} />
+                        </label>
+                      ) : (
+                        <span style={{ fontSize: 10.5, color: "#C9BBA3" }}>sin foto</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: 14, borderTop: "1px solid #E5D9C3", background: "#fff" }}>
+          <button onClick={onClose} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #E5D9C3", background: "#fff", fontWeight: 700, cursor: "pointer" }}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function StockBar({ stock, minStock }) {
   const low = minStock > 0 && stock <= minStock;
   const pct = minStock > 0 ? Math.min(100, Math.round((stock / (minStock * 2 || 1)) * 100)) : 100;
@@ -3001,9 +3086,9 @@ function PromoView({ promotions, onAdd, onDelete }) {
   );
 }
 
-function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
+function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, onManage }) {
   const activeItems = menuItems.filter((m) => m.active !== false);
-  const catsWithItems = menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
+  const catsWithItems = menuCats.filter((c) => c.tvHidden !== true && activeItems.some((m) => m.cat === c.name));
   const GOLD = "#F2C879";
   const CREAM = "#F7F0E4";
   const INK = "#0A0806";
@@ -3011,13 +3096,13 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
   const AMBER = "#E8A33D";
   const tickerMsgs = ["HECHO AL MOMENTO", "PÍDELO PICANTE", "DELIVERY DISPONIBLE", "MASATEPE · MASAYA", "SABOR CASERO DE VERDAD"];
 
-  const itemsWithPhotos = activeItems.filter((m) => m.photoUrl);
+  const itemsWithPhotos = activeItems.filter((m) => m.photoUrl && m.tvSpotlightHidden !== true);
   const slides = [];
   catsWithItems.forEach((cat) => {
     slides.push({ type: "cat", cat });
     itemsWithPhotos.filter((m) => m.cat === cat.name).forEach((m) => slides.push({ type: "spotlight", item: m, cat }));
   });
-  if (promotions && promotions.length > 0) slides.push({ type: "promo" });
+  if (promotions && promotions.length > 0 && tvShowPromos !== false) slides.push({ type: "promo" });
 
   const SLIDE_SECONDS = 9;
   const [slide, setSlide] = useState(0);
@@ -3125,6 +3210,16 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk }) {
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", animation: "mbPulse 1.6s infinite" }} />
             <span style={{ fontSize: "clamp(8px, 0.72vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 1.5 }}>EN VIVO</span>
           </div>
+          {!kiosk && onManage && (
+            <button
+              onClick={onManage}
+              title="Editar qué se muestra en el Menú TV"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", width: "clamp(28px,2.4vw,34px)", height: "clamp(28px,2.4vw,34px)",
+                borderRadius: "50%", border: `1px solid ${GOLD}55`, background: "rgba(242,200,121,0.08)", color: GOLD, cursor: "pointer", fontSize: "clamp(13px,1.2vw,16px)",
+              }}
+            >⚙️</button>
+          )}
         </div>
       </div>
 
