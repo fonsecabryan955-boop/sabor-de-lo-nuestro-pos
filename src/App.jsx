@@ -1143,7 +1143,7 @@ function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategor
 
         <div style={{ padding: 18, overflow: "auto" }}>
           <div style={{ fontSize: 12.5, color: "#8a7a63", marginBottom: 16 }}>
-            Elegí qué categorías aparecen en la rotación del Menú TV, y qué platillos con foto muestran su diapositiva estilo video.
+            Por cada categoría elegí cómo aparece en el Menú TV: solo como lista de precios, solo como video con fotos, ambas cosas, o que no aparezca.
           </div>
 
           <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "12px 16px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1156,36 +1156,58 @@ function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategor
           {menuCats.map((c) => {
             const items = menuItems.filter((m) => m.cat === c.name);
             if (!items.length) return null;
-            const catOn = c.tvHidden !== true;
+            const itemsWithPhoto = items.filter((m) => m.photoUrl);
+            const mode = c.tvHidden === true ? "oculta" : (c.tvMode || "ambos");
+            const modeOptions = [
+              { id: "ambos", label: "Lista + Video", icon: "📋🎬" },
+              { id: "lista", label: "Solo lista", icon: "📋" },
+              { id: "video", label: "Solo video", icon: "🎬", disabled: itemsWithPhoto.length === 0 },
+              { id: "oculta", label: "Ocultar", icon: "🚫" },
+            ];
             return (
-              <div key={c.name} style={{ marginBottom: 18, opacity: catOn ? 1 : 0.5 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#5a4c3a", letterSpacing: 0.3 }}>{c.icon} {c.name.toUpperCase()}</div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, color: catOn ? "#2E7D32" : "#8a7a63", cursor: "pointer" }}>
-                    {catOn ? "Visible en TV" : "Oculta en TV"}
-                    <input type="checkbox" checked={catOn} onChange={(e) => onUpdateCategory(c.name, { tvHidden: !e.target.checked })} style={{ width: 16, height: 16 }} />
-                  </label>
-                </div>
-                <div style={{ display: "grid", gap: 6 }}>
-                  {items.map((m) => (
-                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #F0E8D8", borderRadius: 10, padding: "8px 12px" }}>
-                      {m.photoUrl ? (
-                        <img src={m.photoUrl} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
-                      ) : (
-                        <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 6, background: "#F0E8D8" }} />
-                      )}
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</span>
-                      {m.photoUrl ? (
-                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: m.tvSpotlightHidden ? "#8a7a63" : "#2E7D32", cursor: "pointer" }}>
-                          {m.tvSpotlightHidden ? "Video oculto" : "Video activo"}
-                          <input type="checkbox" checked={m.tvSpotlightHidden !== true} onChange={(e) => onUpdateItem(m.id, { tvSpotlightHidden: !e.target.checked })} style={{ width: 15, height: 15 }} />
-                        </label>
-                      ) : (
-                        <span style={{ fontSize: 10.5, color: "#C9BBA3" }}>sin foto</span>
-                      )}
-                    </div>
+              <div key={c.name} style={{ marginBottom: 18, opacity: mode === "oculta" ? 0.55 : 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#5a4c3a", letterSpacing: 0.3, marginBottom: 8 }}>{c.icon} {c.name.toUpperCase()}</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  {modeOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      disabled={opt.disabled}
+                      onClick={() => onUpdateCategory(c.name, opt.id === "oculta" ? { tvHidden: true } : { tvHidden: false, tvMode: opt.id })}
+                      title={opt.disabled ? "Esta categoría no tiene platillos con foto todavía" : ""}
+                      style={{
+                        padding: "7px 12px", borderRadius: 10, cursor: opt.disabled ? "not-allowed" : "pointer", fontSize: 11.5, fontWeight: 800,
+                        border: mode === opt.id ? "2px solid #C1272D" : "1px solid #E5D9C3",
+                        background: mode === opt.id ? "rgba(193,39,45,0.08)" : "#fff",
+                        color: mode === opt.id ? "#C1272D" : opt.disabled ? "#C9BBA3" : "#5a4c3a",
+                        opacity: opt.disabled ? 0.6 : 1,
+                      }}
+                    >
+                      {opt.icon} {opt.label}
+                    </button>
                   ))}
                 </div>
+                {mode !== "oculta" && (
+                  <div style={{ display: "grid", gap: 6 }}>
+                    {items.map((m) => (
+                      <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "#fff", border: "1px solid #F0E8D8", borderRadius: 10, padding: "8px 12px" }}>
+                        {m.photoUrl ? (
+                          <img src={m.photoUrl} alt="" style={{ width: 30, height: 30, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 6, background: "#F0E8D8" }} />
+                        )}
+                        <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</span>
+                        {m.photoUrl && mode !== "lista" ? (
+                          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: m.tvSpotlightHidden ? "#8a7a63" : "#2E7D32", cursor: "pointer" }}>
+                            {m.tvSpotlightHidden ? "Video oculto" : "Video activo"}
+                            <input type="checkbox" checked={m.tvSpotlightHidden !== true} onChange={(e) => onUpdateItem(m.id, { tvSpotlightHidden: !e.target.checked })} style={{ width: 15, height: 15 }} />
+                          </label>
+                        ) : !m.photoUrl ? (
+                          <span style={{ fontSize: 10.5, color: "#C9BBA3" }}>sin foto</span>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -3099,8 +3121,9 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   const itemsWithPhotos = activeItems.filter((m) => m.photoUrl && m.tvSpotlightHidden !== true);
   const slides = [];
   catsWithItems.forEach((cat) => {
-    slides.push({ type: "cat", cat });
-    itemsWithPhotos.filter((m) => m.cat === cat.name).forEach((m) => slides.push({ type: "spotlight", item: m, cat }));
+    const mode = cat.tvMode || "ambos";
+    if (mode !== "video") slides.push({ type: "cat", cat });
+    if (mode !== "lista") itemsWithPhotos.filter((m) => m.cat === cat.name).forEach((m) => slides.push({ type: "spotlight", item: m, cat }));
   });
   if (promotions && promotions.length > 0 && tvShowPromos !== false) slides.push({ type: "promo" });
 
