@@ -57,6 +57,18 @@ const DEFAULT_CATS = [
 ];
 
 const INVENTORY_UNITS = ["unidad", "lb", "kg", "g", "litro", "ml", "paquete"];
+const INVENTORY_CATEGORIES = ["Carnes", "Verduras y frutas", "Lácteos", "Abarrotes", "Bebidas", "Empaques y desechables", "Limpieza", "Otros"];
+const MOVEMENT_TYPES = {
+  compra:      { label: "Compra / Entrada", short: "Compra",  dir: 1,  icon: "🟢", color: "#2E7D32", bg: "rgba(46,125,50,0.08)" },
+  consumo:     { label: "Consumo manual",   short: "Consumo", dir: -1, icon: "📤", color: "#E8A33D", bg: "rgba(232,163,61,0.10)" },
+  merma:       { label: "Merma / Pérdida",  short: "Merma",   dir: -1, icon: "🔴", color: "#C1272D", bg: "rgba(193,39,45,0.08)" },
+  ajuste_mas:  { label: "Ajuste por conteo (+)", short: "Ajuste +", dir: 1,  icon: "⚖️", color: "#3E7FD9", bg: "rgba(62,127,217,0.08)" },
+  ajuste_menos:{ label: "Ajuste por conteo (−)", short: "Ajuste −", dir: -1, icon: "⚖️", color: "#3E7FD9", bg: "rgba(62,127,217,0.08)" },
+  venta:       { label: "Venta (automático)", short: "Venta", dir: -1, icon: "🛒", color: "#8a7a63", bg: "rgba(138,122,99,0.08)" },
+  // compatibilidad con registros antiguos
+  entrada:     { label: "Entrada", short: "Entrada", dir: 1,  icon: "🟢", color: "#2E7D32", bg: "rgba(46,125,50,0.08)" },
+  salida:      { label: "Salida", short: "Salida", dir: -1, icon: "🔴", color: "#C1272D", bg: "rgba(193,39,45,0.08)" },
+};
 const WING_SAUCES = [
   { id: "bbq", label: "BBQ" },
   { id: "buffalo", label: "Buffalo" },
@@ -494,7 +506,8 @@ export default function App() {
   function adjustStock(id, qty, type, note, effectiveDate) {
     const item = inventory.find((i) => i.id === id);
     if (!item) return;
-    const delta = type === "salida" ? -Math.abs(qty) : Math.abs(qty);
+    const dir = (MOVEMENT_TYPES[type] && MOVEMENT_TYPES[type].dir) || (type === "salida" ? -1 : 1);
+    const delta = dir * Math.abs(qty);
     const time = effectiveDate ? new Date(effectiveDate + "T12:00:00").toISOString() : new Date().toISOString();
     const logEntry = { id: Date.now(), itemId: id, itemName: item.name, type, qty: Math.abs(qty), note: note || "", time };
     persist({
@@ -1231,6 +1244,7 @@ function StockBar({ stock, minStock }) {
 }
 
 function StockAdjustForm({ item, onAdjust }) {
+  const [mode, setMode] = useState(null); // "compra" | "consumo" | "merma" | "ajuste_mas" | "ajuste_menos"
   const [qty, setQty] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(() => {
@@ -1238,27 +1252,73 @@ function StockAdjustForm({ item, onAdjust }) {
     const tz = d.getTimezoneOffset() * 60000;
     return new Date(d - tz).toISOString().slice(0, 10);
   });
+
+  const requiresNote = mode === "merma" || mode === "ajuste_mas" || mode === "ajuste_menos";
+  const canConfirm = qty && Number(qty) > 0 && (!requiresNote || note.trim());
+
+  function confirm() {
+    if (!canConfirm) return;
+    onAdjust(item.id, Number(qty), mode, note.trim(), date);
+    setQty(""); setNote(""); setMode(null);
+  }
+
+  const buttons = [
+    { id: "compra", label: "Compra", sub: "Entrada de mercadería" },
+    { id: "consumo", label: "Consumo", sub: "Uso manual / cocina" },
+    { id: "merma", label: "Merma", sub: "Se dañó o se perdió" },
+    { id: "ajuste_mas", label: "Ajuste +", sub: "Conteo físico" },
+    { id: "ajuste_menos", label: "Ajuste −", sub: "Conteo físico" },
+  ];
+
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
-      <input type="number" placeholder="Cantidad" value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...inp, maxWidth: 100, padding: 7 }} />
-      <input placeholder="Nota (ej: compra, merma)" value={note} onChange={(e) => setNote(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7 }} />
-      <div>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title="Fecha a la que corresponde este movimiento" style={{ ...inp, maxWidth: 145, padding: 7 }} />
+    <div style={{ marginTop: 10, background: "#FBF6EC", border: "1px solid #F0E8D8", borderRadius: 10, padding: 10 }}>
+      <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8a7a63", letterSpacing: 0.6, marginBottom: 8 }}>REGISTRAR MOVIMIENTO</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: mode ? 10 : 0 }}>
+        {buttons.map((b) => {
+          const mt = MOVEMENT_TYPES[b.id];
+          const active = mode === b.id;
+          return (
+            <button
+              key={b.id}
+              onClick={() => setMode(active ? null : b.id)}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, padding: "6px 11px", borderRadius: 9, cursor: "pointer",
+                border: active ? `2px solid ${mt.color}` : "1px solid #E5D9C3",
+                background: active ? mt.bg : "#fff",
+              }}
+            >
+              <span style={{ fontSize: 11.5, fontWeight: 800, color: mt.color }}>{mt.icon} {b.label}</span>
+              <span style={{ fontSize: 9.5, color: "#a8977e" }}>{b.sub}</span>
+            </button>
+          );
+        })}
       </div>
-      <button
-        disabled={!qty}
-        onClick={() => { onAdjust(item.id, Number(qty), "entrada", note, date); setQty(""); setNote(""); }}
-        style={{ fontSize: 12, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: qty ? 1 : 0.5 }}
-      >
-        + Entrada
-      </button>
-      <button
-        disabled={!qty}
-        onClick={() => { onAdjust(item.id, Number(qty), "salida", note, date); setQty(""); setNote(""); }}
-        style={{ fontSize: 12, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: qty ? 1 : 0.5 }}
-      >
-        − Salida
-      </button>
+
+      {mode && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <input type="number" placeholder={`Cantidad (${item.unit})`} value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...inp, maxWidth: 130, padding: 7 }} autoFocus />
+          <input
+            placeholder={requiresNote ? "Motivo (obligatorio)" : "Nota (opcional)"}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            style={{ ...inp, maxWidth: 200, padding: 7, border: requiresNote && !note.trim() ? "1px solid #C1272D" : inp.border }}
+          />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} title="Fecha del movimiento" style={{ ...inp, maxWidth: 145, padding: 7 }} />
+          <button
+            disabled={!canConfirm}
+            onClick={confirm}
+            style={{
+              fontSize: 12, background: MOVEMENT_TYPES[mode].color, color: "#fff", border: "none", borderRadius: 6, padding: "7px 14px",
+              cursor: canConfirm ? "pointer" : "not-allowed", fontWeight: 700, opacity: canConfirm ? 1 : 0.5,
+            }}
+          >
+            Confirmar {MOVEMENT_TYPES[mode].dir > 0 ? "(+)" : "(−)"}{qty ? ` ${qty} ${item.unit}` : ""}
+          </button>
+          <button onClick={() => { setMode(null); setQty(""); setNote(""); }} style={{ fontSize: 12, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "7px 12px", cursor: "pointer", color: "#8a7a63" }}>
+            Cancelar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1266,19 +1326,63 @@ function StockAdjustForm({ item, onAdjust }) {
 function InventoryView({ inventory, inventoryLog, menuItems, onAdd, onUpdate, onDelete, onAdjust, onSetRecipe }) {
   const [name, setName] = useState("");
   const [unit, setUnit] = useState(INVENTORY_UNITS[0]);
+  const [category, setCategory] = useState(INVENTORY_CATEGORIES[0]);
   const [stock, setStock] = useState("");
   const [minStock, setMinStock] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const [supplier, setSupplier] = useState("");
   const [recipeFor, setRecipeFor] = useState(null);
   const [showLog, setShowLog] = useState(false);
+  const [logFilterType, setLogFilterType] = useState("all");
+  const [logFilterItem, setLogFilterItem] = useState("all");
+  const [catFilter, setCatFilter] = useState("all");
+  const [editCostId, setEditCostId] = useState(null);
+  const [editCostVal, setEditCostVal] = useState("");
 
   const lowStock = inventory.filter((i) => i.minStock > 0 && i.stock <= i.minStock);
+  const totalValue = inventory.reduce((sum, i) => sum + (Number(i.unitCost) || 0) * (i.stock || 0), 0);
+  const todayStr = new Date().toDateString();
+  const movementsToday = inventoryLog.filter((l) => new Date(l.time).toDateString() === todayStr);
+  const mermaToday = movementsToday.filter((l) => l.type === "merma").reduce((s, l) => s + l.qty, 0);
+  const catsPresent = [...new Set(inventory.map((i) => i.category || "Otros"))];
+  const visibleInventory = catFilter === "all" ? inventory : inventory.filter((i) => (i.category || "Otros") === catFilter);
+  const grouped = catsPresent
+    .filter((cat) => catFilter === "all" || cat === catFilter)
+    .map((cat) => ({ cat, items: visibleInventory.filter((i) => (i.category || "Otros") === cat) }))
+    .filter((g) => g.items.length > 0);
+
+  const filteredLog = inventoryLog
+    .filter((l) => logFilterType === "all" || l.type === logFilterType)
+    .filter((l) => logFilterItem === "all" || l.itemId === logFilterItem)
+    .slice()
+    .reverse();
 
   return (
     <div>
       <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 4 }}>📦 Inventario de insumos</h2>
       <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 0, marginBottom: 16 }}>
-        Llevá el control de tus insumos y ligalos a los platillos para que el stock se descuente solo con cada venta.
+        Control detallado de insumos: costo, categoría, movimientos y mermas. Ligalos a los platillos para que el stock se descuente solo con cada venta.
       </p>
+
+      {/* Resumen ejecutivo */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 18 }}>
+        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, borderLeft: "4px solid #2B2118" }}>
+          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>INSUMOS REGISTRADOS</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{inventory.length}</div>
+        </div>
+        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, borderLeft: "4px solid #2E7D32" }}>
+          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>VALOR TOTAL EN STOCK</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#2E7D32" }}>{money(totalValue)}</div>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${lowStock.length ? "#E8A33D" : "#E5D9C3"}`, borderRadius: 12, padding: 14, borderLeft: `4px solid ${lowStock.length ? "#E8A33D" : "#C9BBA3"}` }}>
+          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>STOCK BAJO</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: lowStock.length ? "#E8A33D" : "#2B2118" }}>{lowStock.length}</div>
+        </div>
+        <div style={{ background: "#fff", border: `1px solid ${mermaToday > 0 ? "#C1272D" : "#E5D9C3"}`, borderRadius: 12, padding: 14, borderLeft: `4px solid ${mermaToday > 0 ? "#C1272D" : "#C9BBA3"}` }}>
+          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>MERMA DE HOY</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: mermaToday > 0 ? "#C1272D" : "#2B2118" }}>{mermaToday > 0 ? mermaToday.toFixed(1) : "0"}</div>
+        </div>
+      </div>
 
       {lowStock.length > 0 && (
         <div style={{ background: "linear-gradient(135deg, #C1272D, #E8A33D)", borderRadius: 14, padding: 16, marginBottom: 20, color: "#fff", boxShadow: "0 6px 18px rgba(193,39,45,0.3)" }}>
@@ -1295,66 +1399,112 @@ function InventoryView({ inventory, inventoryLog, menuItems, onAdd, onUpdate, on
 
       <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
         <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 10 }}>➕ Agregar insumo nuevo</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
           <input placeholder="Nombre (ej: Pechuga de pollo)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+          <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ ...inp, maxWidth: 170 }}>
+            {INVENTORY_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
           <select value={unit} onChange={(e) => setUnit(e.target.value)} style={{ ...inp, maxWidth: 110 }}>
             {INVENTORY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
           </select>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
           <input placeholder="Stock inicial" type="number" value={stock} onChange={(e) => setStock(e.target.value)} style={{ ...inp, maxWidth: 130 }} />
           <input placeholder="Stock mínimo (alerta)" type="number" value={minStock} onChange={(e) => setMinStock(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
-          <button
-            disabled={!name}
-            onClick={() => { onAdd({ name: name.trim(), unit, stock: Number(stock) || 0, minStock: Number(minStock) || 0 }); setName(""); setStock(""); setMinStock(""); }}
-            style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}
-          >
-            Agregar
-          </button>
+          <input placeholder="Costo por unidad (C$)" type="number" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} style={{ ...inp, maxWidth: 160 }} />
+          <input placeholder="Proveedor (opcional)" value={supplier} onChange={(e) => setSupplier(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
         </div>
+        <button
+          disabled={!name}
+          onClick={() => {
+            onAdd({ name: name.trim(), unit, category, stock: Number(stock) || 0, minStock: Number(minStock) || 0, unitCost: Number(unitCost) || 0, supplier: supplier.trim() });
+            setName(""); setStock(""); setMinStock(""); setUnitCost(""); setSupplier("");
+          }}
+          style={{ padding: "9px 18px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: name ? 1 : 0.5 }}
+        >
+          Agregar insumo
+        </button>
       </div>
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginBottom: 10 }}>Insumos ({inventory.length})</h3>
-      {inventory.length === 0 && <p style={{ color: "#8a7a63" }}>Todavía no agregás ningún insumo.</p>}
-      <div style={{ display: "grid", gap: 10 }}>
-        {inventory.map((item) => {
-          const low = item.minStock > 0 && item.stock <= item.minStock;
-          const linkedItems = menuItems.filter((m) => (m.recipe || []).some((r) => r.invId === item.id));
-          return (
-            <div key={item.id} style={{ background: "#fff", border: low ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, padding: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div style={{ fontWeight: 800, fontSize: 14 }}>{item.name}</div>
-                  <div style={{ fontSize: 11, color: "#8a7a63" }}>Mínimo: {item.minStock} {item.unit}{linkedItems.length > 0 ? ` · ligado a ${linkedItems.length} platillo${linkedItems.length !== 1 ? "s" : ""}` : ""}</div>
-                  <StockBar stock={item.stock} minStock={item.minStock} />
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 800, fontSize: 18, color: low ? "#C1272D" : "#2B2118" }}>{item.stock} {item.unit}</div>
-                  {low && <div style={{ fontSize: 10, color: "#C1272D", fontWeight: 700 }}>⚠️ Stock bajo</div>}
-                </div>
-              </div>
-              <StockAdjustForm item={item} onAdjust={onAdjust} />
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button onClick={() => setRecipeFor(recipeFor === item.id ? null : item.id)} style={{ fontSize: 11, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#5a4c3a", fontWeight: 700 }}>
-                  🔗 Ligar a platillos
-                </button>
-                <button onClick={() => { if (window.confirm(`¿Eliminar "${item.name}" del inventario?`)) onDelete(item.id); }} style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#C1272D", fontWeight: 700 }}>
-                  Eliminar insumo
-                </button>
-              </div>
-              {recipeFor === item.id && (
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Platillos que usan este insumo:</div>
-                  {menuItems.map((m) => {
-                    const line = (m.recipe || []).find((r) => r.invId === item.id);
-                    return (
-                      <MenuRecipeLine key={m.id} menuItem={m} inventoryItem={item} qty={line?.qty || ""} onSetRecipe={onSetRecipe} />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+        <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", margin: 0 }}>Insumos ({visibleInventory.length})</h3>
+        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...inp, maxWidth: 190, padding: 7, fontSize: 12 }}>
+          <option value="all">Todas las categorías</option>
+          {catsPresent.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
       </div>
+      {inventory.length === 0 && <p style={{ color: "#8a7a63" }}>Todavía no agregás ningún insumo.</p>}
+
+      {grouped.map((g) => (
+        <div key={g.cat} style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#5a4c3a", letterSpacing: 0.5, marginBottom: 8, textTransform: "uppercase" }}>
+            {g.cat} <span style={{ color: "#C9BBA3", fontWeight: 600 }}>({g.items.length})</span>
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {g.items.map((item) => {
+              const low = item.minStock > 0 && item.stock <= item.minStock;
+              const linkedItems = menuItems.filter((m) => (m.recipe || []).some((r) => r.invId === item.id));
+              const itemValue = (Number(item.unitCost) || 0) * (item.stock || 0);
+              const itemMoves = inventoryLog.filter((l) => l.itemId === item.id);
+              const lastMove = itemMoves.length ? itemMoves[itemMoves.length - 1] : null;
+              return (
+                <div key={item.id} style={{ background: "#fff", border: low ? "2px solid #E8A33D" : "1px solid #E5D9C3", borderRadius: 14, padding: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <div style={{ fontWeight: 800, fontSize: 14 }}>{item.name}</div>
+                        {item.supplier && <span style={{ fontSize: 10, background: "#F0E8D8", color: "#5a4c3a", borderRadius: 8, padding: "2px 8px", fontWeight: 700 }}>🚚 {item.supplier}</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 2 }}>
+                        Mínimo: {item.minStock} {item.unit}{linkedItems.length > 0 ? ` · ligado a ${linkedItems.length} platillo${linkedItems.length !== 1 ? "s" : ""}` : ""}
+                        {lastMove && <> · último movimiento: {MOVEMENT_TYPES[lastMove.type]?.short || lastMove.type} el {new Date(lastMove.time).toLocaleDateString("es-NI")}</>}
+                      </div>
+                      <StockBar stock={item.stock} minStock={item.minStock} />
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontWeight: 800, fontSize: 18, color: low ? "#C1272D" : "#2B2118" }}>{item.stock} {item.unit}</div>
+                      {low && <div style={{ fontSize: 10, color: "#C1272D", fontWeight: 700 }}>⚠️ Stock bajo</div>}
+                      <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 3 }}>
+                        {editCostId === item.id ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                            <input type="number" value={editCostVal} onChange={(e) => setEditCostVal(e.target.value)} style={{ ...inp, maxWidth: 80, padding: 4, fontSize: 11 }} autoFocus />
+                            <button onClick={() => { onUpdate(item.id, { unitCost: Number(editCostVal) || 0 }); setEditCostId(null); }} style={{ fontSize: 10, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 4, padding: "3px 7px", cursor: "pointer", fontWeight: 700 }}>OK</button>
+                          </span>
+                        ) : (
+                          <span onClick={() => { setEditCostId(item.id); setEditCostVal(String(item.unitCost || 0)); }} style={{ cursor: "pointer" }} title="Click para editar costo unitario">
+                            costo: {money(item.unitCost || 0)}/{item.unit} ✏️
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#5a4c3a", marginTop: 2 }}>valor: {money(itemValue)}</div>
+                    </div>
+                  </div>
+                  <StockAdjustForm item={item} onAdjust={onAdjust} />
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button onClick={() => setRecipeFor(recipeFor === item.id ? null : item.id)} style={{ fontSize: 11, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#5a4c3a", fontWeight: 700 }}>
+                      🔗 Ligar a platillos
+                    </button>
+                    <button onClick={() => { if (window.confirm(`¿Eliminar "${item.name}" del inventario?`)) onDelete(item.id); }} style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#C1272D", fontWeight: 700 }}>
+                      Eliminar insumo
+                    </button>
+                  </div>
+                  {recipeFor === item.id && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>Platillos que usan este insumo:</div>
+                      {menuItems.map((m) => {
+                        const line = (m.recipe || []).find((r) => r.invId === item.id);
+                        return (
+                          <MenuRecipeLine key={m.id} menuItem={m} inventoryItem={item} qty={line?.qty || ""} onSetRecipe={onSetRecipe} />
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
 
       {inventoryLog.length > 0 && (
         <div style={{ marginTop: 24 }}>
@@ -1362,18 +1512,41 @@ function InventoryView({ inventory, inventoryLog, menuItems, onAdd, onUpdate, on
             📜 {showLog ? "Ocultar" : "Ver"} historial de movimientos ({inventoryLog.length})
           </button>
           {showLog && (
-            <div style={{ marginTop: 10, background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "4px 14px", maxHeight: 300, overflowY: "auto" }}>
-              {inventoryLog.slice().reverse().map((l) => (
-                <div key={l.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F5EEE0", fontSize: 12 }}>
-                  <span>
-                    {l.type === "entrada" ? "🟢" : l.type === "venta" ? "🛒" : "🔴"} <strong>{l.itemName}</strong>
-                    {l.note ? <span style={{ color: "#8a7a63" }}> — {l.note}</span> : ""}
-                  </span>
-                  <span style={{ fontWeight: 700, color: l.type === "entrada" ? "#2E7D32" : "#C1272D" }}>
-                    {l.type === "entrada" ? "+" : "-"}{l.qty} · {new Date(l.time).toLocaleDateString("es-NI")}
-                  </span>
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                <select value={logFilterType} onChange={(e) => setLogFilterType(e.target.value)} style={{ ...inp, maxWidth: 190, padding: 7, fontSize: 12 }}>
+                  <option value="all">Todos los tipos de movimiento</option>
+                  {Object.keys(MOVEMENT_TYPES).filter((t) => !["entrada", "salida"].includes(t)).map((t) => (
+                    <option key={t} value={t}>{MOVEMENT_TYPES[t].icon} {MOVEMENT_TYPES[t].label}</option>
+                  ))}
+                </select>
+                <select value={logFilterItem} onChange={(e) => setLogFilterItem(e.target.value)} style={{ ...inp, maxWidth: 190, padding: 7, fontSize: 12 }}>
+                  <option value="all">Todos los insumos</option>
+                  {inventory.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </div>
+              <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 110px 90px 1fr", gap: 8, padding: "8px 14px", background: "#F5EEE0", fontSize: 10.5, fontWeight: 800, color: "#8a7a63", letterSpacing: 0.4 }}>
+                  <span>FECHA</span><span>INSUMO</span><span>TIPO</span><span style={{ textAlign: "right" }}>CANTIDAD</span><span>MOTIVO / NOTA</span>
                 </div>
-              ))}
+                <div style={{ maxHeight: 340, overflowY: "auto" }}>
+                  {filteredLog.length === 0 && <div style={{ padding: 16, fontSize: 12, color: "#8a7a63", textAlign: "center" }}>No hay movimientos con este filtro.</div>}
+                  {filteredLog.map((l) => {
+                    const mt = MOVEMENT_TYPES[l.type] || { label: l.type, icon: "•", color: "#8a7a63", bg: "#F5EEE0", dir: 1 };
+                    return (
+                      <div key={l.id} style={{ display: "grid", gridTemplateColumns: "100px 1fr 110px 90px 1fr", gap: 8, padding: "9px 14px", borderTop: "1px solid #F5EEE0", fontSize: 12, alignItems: "center" }}>
+                        <span style={{ color: "#8a7a63" }}>{new Date(l.time).toLocaleDateString("es-NI")}</span>
+                        <span style={{ fontWeight: 700 }}>{l.itemName}</span>
+                        <span style={{ display: "inline-block", background: mt.bg, color: mt.color, borderRadius: 8, padding: "2px 8px", fontWeight: 800, fontSize: 10.5, width: "fit-content" }}>
+                          {mt.icon} {mt.short || mt.label}
+                        </span>
+                        <span style={{ textAlign: "right", fontWeight: 800, color: mt.color }}>{mt.dir > 0 ? "+" : "−"}{l.qty}</span>
+                        <span style={{ color: "#8a7a63" }}>{l.note || "—"}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
