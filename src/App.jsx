@@ -5010,6 +5010,38 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
   }, [monthExpenses]);
   const maxCatAmount = Math.max(1, ...monthExpensesByCat.map((c) => c.amount));
 
+  const [insumoSearch, setInsumoSearch] = useState("");
+  function groupByProduct(list) {
+    const map = {};
+    list.forEach((e) => {
+      const key = (e.description || "Sin nombre").trim().toLowerCase();
+      if (!map[key]) map[key] = { key, name: (e.description || "Sin nombre").trim(), count: 0, total: 0, lastDate: e.time, minPrice: Number(e.amount), maxPrice: Number(e.amount) };
+      map[key].count += 1;
+      map[key].total += Number(e.amount);
+      map[key].minPrice = Math.min(map[key].minPrice, Number(e.amount));
+      map[key].maxPrice = Math.max(map[key].maxPrice, Number(e.amount));
+      if (new Date(e.time) > new Date(map[key].lastDate)) map[key].lastDate = e.time;
+    });
+    return Object.values(map).sort((a, b) => b.total - a.total);
+  }
+  const insumosMonthList = useMemo(() => monthExpenses.filter((e) => (e.category || "Otro") === "Insumos"), [monthExpenses]);
+  const prevInsumosMonthList = useMemo(() => prevMonthExpensesList.filter((e) => (e.category || "Otro") === "Insumos"), [prevMonthExpensesList]);
+  const insumosByProduct = useMemo(() => groupByProduct(insumosMonthList), [insumosMonthList]);
+  const prevInsumosByProduct = useMemo(() => {
+    const map = {};
+    groupByProduct(prevInsumosMonthList).forEach((p) => { map[p.key] = p.total; });
+    return map;
+  }, [prevInsumosMonthList]);
+  const filteredInsumosByProduct = useMemo(
+    () => insumosByProduct.filter((p) => p.name.toLowerCase().includes(insumoSearch.toLowerCase())),
+    [insumosByProduct, insumoSearch]
+  );
+  const maxInsumoProductTotal = Math.max(1, ...insumosByProduct.map((p) => p.total));
+  const insumosChangePct = prevMonthInsumos > 0 ? Math.round(((monthInsumos - prevMonthInsumos) / prevMonthInsumos) * 100) : null;
+  const insumosPurchaseCount = insumosMonthList.length;
+  const insumosAvgTicket = insumosPurchaseCount > 0 ? monthInsumos / insumosPurchaseCount : 0;
+  const topInsumoProduct = insumosByProduct[0] || null;
+
   const byItem = useMemo(() => {
     const map = {};
     todaySales.forEach((s) => s.items.forEach((it) => { map[it.name] = (map[it.name] || 0) + it.qty; }));
@@ -5304,6 +5336,96 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
             </div>
           </div>
         ))}
+      </div>
+
+      <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(242,200,121,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: "#F2C879", letterSpacing: 0.5 }}>🍗 CONTROL DETALLADO DE INSUMOS — {monthLabel.toUpperCase()}</div>
+            <div style={{ fontSize: 11, color: "#A8977E", marginTop: 3 }}>Gasto real agrupado por producto comprado, para saber en qué se te va la plata.</div>
+          </div>
+          {insumosChangePct !== null && (
+            <span style={{
+              fontSize: 11.5, fontWeight: 800, padding: "4px 11px", borderRadius: 20, whiteSpace: "nowrap",
+              background: insumosChangePct <= 0 ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.15)",
+              color: insumosChangePct <= 0 ? "#4ADE80" : "#F87171",
+            }}>
+              {insumosChangePct <= 0 ? "📉 " : "📈 +"}{insumosChangePct}% vs. {prevMonthLabel}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 18 }}>
+          <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>TOTAL DEL MES</div>
+            <div style={{ fontWeight: 800, fontSize: 17, color: "#F87171" }}>{money(monthInsumos)}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>COMPRAS REGISTRADAS</div>
+            <div style={{ fontWeight: 800, fontSize: 17, color: "#F5ECD9" }}>{insumosPurchaseCount}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>PROMEDIO POR COMPRA</div>
+            <div style={{ fontWeight: 800, fontSize: 17, color: "#F5ECD9" }}>{money(insumosAvgTicket)}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 10, color: "#A8977E", fontWeight: 700, letterSpacing: 0.3 }}>PRODUCTOS DISTINTOS</div>
+            <div style={{ fontWeight: 800, fontSize: 17, color: "#F5ECD9" }}>{insumosByProduct.length}</div>
+          </div>
+        </div>
+
+        {topInsumoProduct && (
+          <div style={{ fontSize: 11.5, color: "#C9BBA3", marginBottom: 14, background: "rgba(255,255,255,0.04)", borderRadius: 10, padding: "9px 12px" }}>
+            🥇 Tu mayor gasto en insumos este mes es <strong style={{ color: "#F2C879" }}>{topInsumoProduct.name}</strong>, con {money(topInsumoProduct.total)} en {topInsumoProduct.count} compra{topInsumoProduct.count !== 1 ? "s" : ""} ({Math.round((topInsumoProduct.total / monthInsumos) * 100)}% de todo lo gastado en insumos).
+          </div>
+        )}
+
+        <input
+          placeholder="🔎 Buscar producto (ej: pollo, aceite, papas)..."
+          value={insumoSearch}
+          onChange={(e) => setInsumoSearch(e.target.value)}
+          style={{ ...inp, width: "100%", boxSizing: "border-box", marginBottom: 14, color: "#2B2118" }}
+        />
+
+        {filteredInsumosByProduct.length === 0 && (
+          <p style={{ color: "#A8977E", fontSize: 13 }}>
+            {insumosByProduct.length === 0 ? "Sin compras de insumos registradas este mes." : "Ningún producto coincide con tu búsqueda."}
+          </p>
+        )}
+
+        <div style={{ display: "grid", gap: 10 }}>
+          {filteredInsumosByProduct.map((p, i) => {
+            const prevTotal = prevInsumosByProduct[p.key] || 0;
+            const prodChangePct = prevTotal > 0 ? Math.round(((p.total - prevTotal) / prevTotal) * 100) : null;
+            const pctOfMonth = Math.round((p.total / monthInsumos) * 100);
+            return (
+              <div key={p.key} style={{ background: "rgba(255,255,255,0.045)", border: "1px solid rgba(242,200,121,0.1)", borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 13.5, color: "#F5ECD9" }}>
+                      {i === 0 ? "🥇 " : i === 1 ? "🥈 " : i === 2 ? "🥉 " : "▫️ "}{p.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#A8977E", marginTop: 2 }}>
+                      {p.count} compra{p.count !== 1 ? "s" : ""} · promedio {money(p.total / p.count)}{p.count > 1 ? ` · rango ${money(p.minPrice)}–${money(p.maxPrice)}` : ""} · última: {new Date(p.lastDate).toLocaleDateString("es-NI", { day: "numeric", month: "short" })}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: "#FF8A80" }}>{money(p.total)}</div>
+                    <div style={{ fontSize: 10.5, color: "#A8977E", marginTop: 1 }}>{pctOfMonth}% del mes</div>
+                  </div>
+                </div>
+                <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 6, height: 7, overflow: "hidden", marginBottom: prodChangePct !== null ? 6 : 0 }}>
+                  <div style={{ width: `${(p.total / maxInsumoProductTotal) * 100}%`, height: "100%", background: "linear-gradient(90deg, #E8A33D, #C1272D)", borderRadius: 6 }} />
+                </div>
+                {prodChangePct !== null && (
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: prodChangePct <= 0 ? "#4ADE80" : "#F87171" }}>
+                    {prodChangePct <= 0 ? "📉" : "📈"} {prodChangePct <= 0 ? "" : "+"}{prodChangePct}% vs. {prevMonthLabel} ({money(prevTotal)})
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63" }}>Registrar gasto</h3>
