@@ -3527,6 +3527,10 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   const isSpotlightSlide = current && current.type === "spotlight";
   const spotlightItem = isSpotlightSlide ? current.item : null;
   const spotlightCat = isSpotlightSlide ? current.cat : null;
+  const KB_VARIANTS = ["mbKB1", "mbKB2", "mbKB3", "mbKB4"];
+  const spotlightVariant = isSpotlightSlide
+    ? KB_VARIANTS[String(spotlightItem.id).split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % KB_VARIANTS.length]
+    : "mbKB1";
   const accent = (c || spotlightCat) ? avatarColor((c || spotlightCat).name) : GOLD;
   const items = c ? activeItems.filter((m) => m.cat === c.name) : [];
 
@@ -3557,9 +3561,27 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         @keyframes mbScanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
         @keyframes mbCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
         @keyframes mbSweep { 0% { left: -30%; } 100% { left: 130%; } }
-        @keyframes mbKenBurns { 0% { transform: scale(1.06) translate(0%, 0%); } 50% { transform: scale(1.2) translate(-2%, -1.4%); } 100% { transform: scale(1.1) translate(1.4%, 0.8%); } }
+        @keyframes mbKenBurns { 0% { transform: scale(1.04) translate(0%, 0%); } 50% { transform: scale(1.1) translate(-1%, -0.7%); } 100% { transform: scale(1.06) translate(0.7%, 0.4%); } }
+        @keyframes mbKB1 { 0% { transform: scale(1.03) translate(0%, 0%); } 50% { transform: scale(1.1) translate(-1.1%, -0.5%); } 100% { transform: scale(1.06) translate(0.6%, 0.3%); } }
+        @keyframes mbKB2 { 0% { transform: scale(1.1) translate(0.8%, 0.4%); } 50% { transform: scale(1.04) translate(-0.6%, -0.4%); } 100% { transform: scale(1.08) translate(0%, 0.2%); } }
+        @keyframes mbKB3 { 0% { transform: scale(1.05) translate(-1%, 0.3%); } 50% { transform: scale(1.11) translate(0.8%, -0.5%); } 100% { transform: scale(1.06) translate(-0.4%, 0.4%); } }
+        @keyframes mbKB4 { 0% { transform: scale(1.1) translate(0.7%, -0.5%); } 50% { transform: scale(1.04) translate(-0.7%, 0.4%); } 100% { transform: scale(1.08) translate(-0.2%, -0.2%); } }
         @keyframes mbSpotIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes mbSparkle { 0%,100% { opacity: 0; transform: translateY(0) scale(0.6); } 50% { opacity: 1; transform: translateY(-14px) scale(1); } }
+        @keyframes mbNameReveal { 0% { opacity: 0; transform: translateY(38px) scale(0.92); } 65% { opacity: 1; transform: translateY(-4px) scale(1.015); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes mbTextShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes mbPricePop { 0% { opacity: 0; transform: scale(0.3) rotate(-6deg); } 55% { opacity: 1; transform: scale(1.14) rotate(2deg); } 78% { transform: scale(0.96) rotate(-1deg); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
+        @keyframes mbRingSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes mbRibbonIn { 0% { opacity: 0; transform: translateX(-40px) rotate(-8deg); } 100% { opacity: 1; transform: translateX(0) rotate(0deg); } }
+        @keyframes mbBracketIn { from { opacity: 0; } to { opacity: 0.85; } }
+        @keyframes mbVignettePulse { 0%,100% { opacity: 0.85; } 50% { opacity: 1; } }
+        @keyframes mbKickerSlide { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes mbBadgeShine { 0% { transform: translateX(-120%) skewX(-18deg); } 100% { transform: translateX(220%) skewX(-18deg); } }
+        @keyframes mbOrbFloat1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(3%, -4%) scale(1.08); } }
+        @keyframes mbOrbFloat2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-4%, 3%) scale(1.06); } }
+        @keyframes mbChipIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes mbPillIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes mbSlideEnter { 0% { opacity: 0; transform: translateY(18px) scale(0.98); filter: blur(8px); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
       `}</style>
 
       {/* Rejilla tecnológica de fondo */}
@@ -3568,6 +3590,11 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         backgroundImage: "linear-gradient(rgba(242,200,121,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(242,200,121,0.6) 1px, transparent 1px)",
         backgroundSize: "42px 42px",
       }} />
+      {/* Orbes de degradado flotantes — look moderno tipo glass 2026 */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <div style={{ position: "absolute", width: "42vw", height: "42vw", borderRadius: "50%", top: "-14%", left: "-8%", background: `radial-gradient(circle, ${accent}2E, transparent 70%)`, filter: "blur(40px)", animation: "mbOrbFloat1 14s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", width: "36vw", height: "36vw", borderRadius: "50%", bottom: "-16%", right: "-6%", background: `radial-gradient(circle, ${GOLD}22, transparent 70%)`, filter: "blur(40px)", animation: "mbOrbFloat2 17s ease-in-out infinite" }} />
+      </div>
       {/* Barrido de luz superior */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, zIndex: 3, overflow: "hidden", pointerEvents: "none" }}>
         <div style={{ position: "absolute", top: 0, width: "30%", height: "100%", background: `linear-gradient(90deg, transparent, ${GOLD}, transparent)`, animation: "mbSweep 6s ease-in-out infinite" }} />
@@ -3575,7 +3602,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
 
       {/* Fondo ambientado con el color de la categoría actual */}
       <div key={"bg" + slide} style={{
-        position: "absolute", inset: 0, zIndex: 0, animation: "mbBgFade 0.8s ease",
+        position: "absolute", inset: 0, zIndex: 0, animation: "mbBgFade 0.9s ease",
         background: `radial-gradient(ellipse 90% 60% at 50% 0%, ${accent}38, transparent 65%), radial-gradient(ellipse 70% 50% at 100% 100%, ${accent}1E, transparent 60%), ${INK}`,
       }} />
       {/* Marca de agua grande del ícono de la categoría */}
@@ -3587,27 +3614,38 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         }}>{c.icon}</div>
       )}
 
-      {/* Barra superior — logo + reloj en vivo estilo panel inteligente */}
+      {/* Barra superior — panel de vidrio moderno */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "clamp(14px, 2vh, 22px) clamp(24px, 3.2vw, 48px) clamp(6px, 1vh, 10px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, background: "rgba(255,255,255,0.04)", backdropFilter: "blur(10px)",
+          border: "1px solid rgba(255,255,255,0.08)", borderRadius: 30, padding: "clamp(6px,0.9vh,10px) clamp(14px,1.8vw,20px)",
+          animation: "mbPillIn 0.5s ease both",
+        }}>
           <span style={{ fontSize: "clamp(19px, 2vw, 27px)" }}>🍔🍗</span>
           <div>
             <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: "clamp(14px, 1.5vw, 20px)", color: CREAM, letterSpacing: 0.2 }}>{RESTAURANT_NAME}</div>
             <div style={{ fontSize: "clamp(7.5px, 0.7vw, 9.5px)", color: "#8A7A62", letterSpacing: 2.5, fontWeight: 700 }}>MASATEPE · MASAYA · NICARAGUA</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(15px, 1.5vw, 20px)", color: GOLD, letterSpacing: 1, lineHeight: 1 }}>
-              {clock.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 14, background: "rgba(255,255,255,0.04)", backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.08)", borderRadius: 30, padding: "clamp(6px,0.9vh,10px) clamp(14px,1.8vw,20px)",
+            animation: "mbPillIn 0.5s ease 0.08s both",
+          }}>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontFamily: "'Anton', sans-serif", fontSize: "clamp(15px, 1.5vw, 20px)", color: GOLD, letterSpacing: 1, lineHeight: 1 }}>
+                {clock.toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+              <div style={{ fontSize: "clamp(7px, 0.65vw, 9px)", color: "#8A7A62", letterSpacing: 1, textTransform: "capitalize" }}>
+                {clock.toLocaleDateString("es-NI", { weekday: "short", day: "numeric", month: "short" })}
+              </div>
             </div>
-            <div style={{ fontSize: "clamp(7px, 0.65vw, 9px)", color: "#8A7A62", letterSpacing: 1, textTransform: "capitalize" }}>
-              {clock.toLocaleDateString("es-NI", { weekday: "short", day: "numeric", month: "short" })}
+            <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", animation: "mbPulse 1.6s infinite" }} />
+              <span style={{ fontSize: "clamp(8px, 0.72vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 1.5 }}>EN VIVO</span>
             </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.25)", borderRadius: 20, padding: "5px 12px" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", animation: "mbPulse 1.6s infinite" }} />
-            <span style={{ fontSize: "clamp(8px, 0.72vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 1.5 }}>EN VIVO</span>
           </div>
           {!kiosk && onManage && (
             <button
@@ -3638,43 +3676,95 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
           }} />
         ))}
 
+        <div key={"slide-wrap" + slide} style={{ animation: "mbSlideEnter 0.6s cubic-bezier(0.22,1,0.36,1) both", height: isSpotlightSlide ? "100%" : "auto" }}>
         {isSpotlightSlide ? (
-          <div key={"spot" + slide} style={{ position: "relative", height: "100%", width: "100%", borderRadius: "clamp(14px,1.6vw,22px)", overflow: "hidden", boxShadow: `0 24px 60px ${accent}40`, animation: "mbBgFade 0.7s ease" }}>
+          <div key={"spot" + slide} style={{ position: "relative", height: "100%", width: "100%", borderRadius: "clamp(14px,1.6vw,22px)", overflow: "hidden", boxShadow: `0 24px 60px ${accent}40` }}>
             <img
               src={spotlightItem.photoUrl}
               alt={spotlightItem.name}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", animation: `mbKenBurns ${SLIDE_SECONDS + 1}s ease-in-out both`, transformOrigin: "center center" }}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", animation: `${spotlightVariant} ${SLIDE_SECONDS + 1}s ease-in-out both`, transformOrigin: "center center" }}
             />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,8,6,0.05) 22%, rgba(10,8,6,0.55) 62%, rgba(10,8,6,0.94) 100%)" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.10) 50%, transparent 60%)", backgroundSize: "250% 100%", animation: "mbShine 4.2s linear infinite" }} />
-            {[["18%", "10%"], ["30%", "78%"], ["62%", "16%"], ["70%", "68%"]].map(([top, left], i) => (
-              <span key={i} style={{ position: "absolute", top, left, fontSize: "clamp(10px,1.1vw,16px)", color: GOLD, animation: `mbSparkle ${2.6 + i * 0.4}s ease-in-out ${i * 0.5}s infinite` }}>✦</span>
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,8,6,0.10) 20%, rgba(10,8,6,0.5) 60%, rgba(10,8,6,0.94) 100%)", animation: "mbVignettePulse 5s ease-in-out infinite" }} />
+            <div style={{ position: "absolute", inset: 0, boxShadow: "inset 0 0 clamp(40px,8vw,120px) rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, transparent 42%, rgba(255,255,255,0.08) 50%, transparent 58%)", backgroundSize: "260% 100%", animation: "mbShine 5.5s linear infinite" }} />
+
+            {/* Marco de esquinas doradas estilo "toma destacada" */}
+            {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v, h], i) => (
+              <div key={i} style={{
+                position: "absolute", [v]: "clamp(12px,1.6vh,22px)", [h]: "clamp(12px,1.8vw,26px)",
+                width: "clamp(22px,2.6vw,38px)", height: "clamp(22px,2.6vh,38px)",
+                borderTop: v === "top" ? `2px solid ${GOLD}` : "none",
+                borderBottom: v === "bottom" ? `2px solid ${GOLD}` : "none",
+                borderLeft: h === "left" ? `2px solid ${GOLD}` : "none",
+                borderRight: h === "right" ? `2px solid ${GOLD}` : "none",
+                animation: "mbBracketIn 0.8s ease 0.2s both", pointerEvents: "none",
+              }} />
             ))}
-            <div style={{ position: "absolute", left: "clamp(20px,4vw,56px)", right: "clamp(20px,4vw,56px)", bottom: "clamp(20px,3.4vh,44px)", animation: "mbSpotIn 0.6s ease 0.15s both" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 9, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 3.5, marginBottom: 8 }}>
+
+            {/* Listón "Recomendado" */}
+            <div style={{
+              position: "absolute", top: "clamp(16px,2.4vh,28px)", left: "clamp(16px,2.6vw,32px)",
+              display: "flex", alignItems: "center", gap: 7, background: "linear-gradient(120deg, #7A1216, #C1272D)",
+              padding: "clamp(5px,0.8vh,8px) clamp(12px,1.6vw,18px) clamp(5px,0.8vh,8px) clamp(10px,1.4vw,14px)",
+              borderRadius: "3px 12px 12px 3px", boxShadow: "0 8px 18px rgba(0,0,0,0.4)",
+              animation: "mbRibbonIn 0.6s ease 0.1s both",
+            }}>
+              <span style={{ fontSize: "clamp(11px,1.1vw,15px)" }}>⭐</span>
+              <span style={{ fontSize: "clamp(9px,0.8vw,11.5px)", fontWeight: 800, color: "#fff", letterSpacing: 2 }}>RECOMENDADO</span>
+            </div>
+
+            {/* Sello de la casa, esquina superior derecha */}
+            <div style={{
+              position: "absolute", top: "clamp(16px,2.4vh,28px)", right: "clamp(16px,2.6vw,32px)",
+              display: "flex", alignItems: "center", gap: 6, background: "rgba(10,8,6,0.45)", backdropFilter: "blur(4px)",
+              border: `1px solid ${GOLD}55`, borderRadius: 20, padding: "clamp(5px,0.7vh,7px) clamp(10px,1.4vw,14px)",
+              animation: "mbBracketIn 0.8s ease 0.3s both",
+            }}>
+              <span style={{ fontSize: "clamp(10px,1vw,13px)" }}>🔥</span>
+              <span style={{ fontSize: "clamp(8px,0.72vw,10px)", fontWeight: 800, color: GOLD, letterSpacing: 1.5 }}>SABOR DE LO NUESTRO</span>
+            </div>
+
+            <div style={{ position: "absolute", left: "clamp(20px,4vw,56px)", right: "clamp(20px,4vw,56px)", bottom: "clamp(22px,3.6vh,46px)" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 9, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 3.5, marginBottom: 10, animation: "mbKickerSlide 0.6s ease 0.25s both" }}>
                 <span style={{ fontSize: "clamp(14px, 1.4vw, 19px)" }}>{spotlightCat.icon}</span> ESPECIALIDAD DE LA CASA
               </div>
               <div style={{
                 fontFamily: "'Anton', sans-serif", fontSize: "clamp(30px, 4.8vw, 66px)", letterSpacing: 0.5, textTransform: "uppercase", lineHeight: 1.02,
-                color: CREAM, filter: "drop-shadow(0 6px 22px rgba(0,0,0,0.55))",
+                animation: "mbNameReveal 0.75s cubic-bezier(0.22,1,0.36,1) 0.15s both",
+                backgroundImage: `linear-gradient(100deg, ${CREAM} 25%, ${GOLD} 50%, ${CREAM} 75%)`, backgroundSize: "250% 100%",
+                WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
+                filter: "drop-shadow(0 6px 22px rgba(0,0,0,0.6))",
+                animationName: "mbNameReveal, mbTextShimmer", animationDuration: "0.75s, 6s", animationTimingFunction: "cubic-bezier(0.22,1,0.36,1), linear",
+                animationDelay: "0.15s, 1s", animationIterationCount: "1, infinite", animationFillMode: "both, none",
               }}>
                 {spotlightItem.name}
               </div>
-              <div style={{
-                display: "inline-block", marginTop: 14, fontFamily: "'Anton', sans-serif", fontSize: "clamp(18px, 2.2vw, 28px)", color: "#fff",
-                background: `linear-gradient(135deg, ${AMBER}, ${EMBER})`, padding: "clamp(8px,1vh,12px) clamp(18px,2vw,26px)", borderRadius: 14,
-                animation: "mbBadgeGlow 2.4s infinite", boxShadow: "0 10px 24px rgba(0,0,0,0.35)",
-              }}>
-                {money(spotlightItem.price)}
+              <div style={{ position: "relative", display: "inline-block", marginTop: 16, animation: "mbPricePop 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.55s both" }}>
+                <div style={{
+                  position: "relative", overflow: "hidden", fontFamily: "'Anton', sans-serif", fontSize: "clamp(18px, 2.2vw, 28px)", color: "#fff",
+                  background: `linear-gradient(135deg, ${AMBER}, ${EMBER})`, padding: "clamp(8px,1vh,12px) clamp(20px,2.4vw,30px)", borderRadius: 14,
+                  boxShadow: `0 10px 26px rgba(0,0,0,0.4), 0 0 0 1px ${GOLD}66`,
+                }}>
+                  {money(spotlightItem.price)}
+                  <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent)", animation: "mbBadgeShine 3s ease-in-out infinite" }} />
+                </div>
               </div>
             </div>
+
+            {[["18%", "10%"], ["30%", "78%"], ["66%", "16%"]].map(([top, left], i) => (
+              <span key={i} style={{ position: "absolute", top, left, fontSize: "clamp(10px,1.1vw,16px)", color: GOLD, animation: `mbSparkle ${2.8 + i * 0.5}s ease-in-out ${i * 0.6}s infinite` }}>✦</span>
+            ))}
           </div>
         ) : isPromoSlide ? (
           <div key="promo-slide">
             <div style={{ textAlign: "center", marginBottom: "clamp(18px, 3vh, 36px)" }}>
-              <div style={{ fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 4, animation: "mbKickerIn 0.6s ease both" }}>OFERTAS ESPECIALES</div>
               <div style={{
-                fontFamily: "'Anton', sans-serif", fontSize: "clamp(28px, 4.2vw, 58px)", letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 6,
+                display: "inline-flex", alignItems: "center", gap: 8, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 3,
+                background: "rgba(242,200,121,0.1)", border: "1px solid rgba(242,200,121,0.25)", borderRadius: 30, padding: "clamp(5px,0.7vh,7px) clamp(14px,1.6vw,18px)",
+                animation: "mbPillIn 0.55s ease both",
+              }}>🏷️ OFERTAS ESPECIALES</div>
+              <div style={{
+                fontFamily: "'Anton', sans-serif", fontSize: "clamp(28px, 4.2vw, 58px)", letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 10,
                 animation: "mbTitleIn 0.6s ease 0.08s both",
                 backgroundImage: `linear-gradient(100deg, ${CREAM} 30%, ${GOLD} 45%, ${CREAM} 60%)`, backgroundSize: "250% 100%",
                 WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
@@ -3682,7 +3772,6 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
               }}>
                 Combos <span style={{ WebkitTextFillColor: EMBER, color: EMBER }}>de Hoy</span>
               </div>
-              <div style={{ "--rule-w": "100px", height: 3, width: 100, background: `linear-gradient(90deg, ${EMBER}, ${AMBER})`, margin: "clamp(10px, 1.6vh, 16px) auto 0", borderRadius: 3, animation: "mbRuleIn 0.6s ease 0.2s both" }} />
             </div>
 
             <div style={{
@@ -3729,11 +3818,15 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         ) : c && (
           <div key={c.name}>
             <div style={{ textAlign: "center", marginBottom: "clamp(18px, 3.1vh, 38px)" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: accent, letterSpacing: 4, animation: "mbKickerIn 0.6s ease both" }}>
-                <span style={{ fontSize: "clamp(16px, 1.6vw, 22px)" }}>{c.icon}</span> CATEGORÍA DESTACADA
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 9, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: accent, letterSpacing: 3,
+                background: `${accent}14`, border: `1px solid ${accent}33`, borderRadius: 30, padding: "clamp(5px,0.7vh,7px) clamp(14px,1.6vw,18px)",
+                animation: "mbPillIn 0.55s ease both",
+              }}>
+                <span style={{ fontSize: "clamp(15px, 1.5vw, 20px)" }}>{c.icon}</span> CATEGORÍA DESTACADA
               </div>
               <div style={{
-                fontFamily: "'Anton', sans-serif", fontSize: "clamp(30px, 4.6vw, 64px)", letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 8,
+                fontFamily: "'Anton', sans-serif", fontSize: "clamp(30px, 4.6vw, 64px)", letterSpacing: 1, textTransform: "uppercase", lineHeight: 1.02, marginTop: 10,
                 backgroundImage: `linear-gradient(100deg, ${CREAM} 30%, ${GOLD} 45%, ${CREAM} 60%)`, backgroundSize: "250% 100%",
                 WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
                 animationName: "mbTitleIn, mbTitleShimmer", animationDuration: "0.6s, 4.5s", animationTimingFunction: "ease, linear", animationIterationCount: "1, infinite", animationFillMode: "both, none", animationDelay: "0.08s, 0.6s",
@@ -3741,46 +3834,52 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
               }}>
                 {c.name}
               </div>
-              <div style={{ "--rule-w": "90px", height: 3, width: 90, background: `linear-gradient(90deg, ${accent}, ${GOLD})`, margin: "clamp(10px, 1.6vh, 16px) auto 0", borderRadius: 3, animation: "mbRuleIn 0.6s ease 0.2s both" }} />
             </div>
 
             <div style={{
               display: "grid",
-              gridTemplateColumns: items.length > 5 ? "1fr 1fr" : "1fr",
-              gap: "0 clamp(32px, 4.2vw, 64px)",
-              maxWidth: items.length > 5 ? 1140 : 760,
+              gridTemplateColumns: `repeat(auto-fit, minmax(${items.length > 6 ? 250 : 300}px, 1fr))`,
+              gap: "clamp(10px, 1.3vw, 16px)",
+              maxWidth: 1180,
               margin: "0 auto", width: "100%",
             }}>
               {items.map((m, i) => (
                 <div key={m.id} style={{
-                  display: "flex", alignItems: "baseline", gap: 12,
-                  padding: "clamp(8px, 1.35vh, 14px) clamp(6px,0.8vw,10px)",
-                  borderBottom: "1px solid rgba(255,255,255,0.06)",
-                  animation: `mbRowIn 0.45s ease ${0.2 + i * 0.05}s both`,
+                  position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                  padding: "clamp(12px, 1.7vh, 17px) clamp(14px,1.6vw,18px)",
+                  background: "rgba(255,255,255,0.035)", backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14,
+                  animation: `mbChipIn 0.5s cubic-bezier(0.22,1,0.36,1) ${0.18 + i * 0.05}s both`,
                 }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: "clamp(15px, 1.75vw, 23px)", color: CREAM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</span>
-                  <span style={{ flex: 1, borderBottom: "2px dotted rgba(242,200,121,0.2)", marginBottom: 6, minWidth: 12 }} />
+                  <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: `linear-gradient(180deg, ${accent}, transparent)` }} />
                   <span style={{
-                    fontFamily: "'Anton', sans-serif", fontSize: "clamp(14px, 1.6vw, 21px)", color: GOLD, whiteSpace: "nowrap",
-                    padding: "2px 10px", borderRadius: 8, background: "rgba(242,200,121,0.06)", border: "1px solid rgba(242,200,121,0.15)",
+                    fontFamily: "'Fraunces', serif", fontWeight: 500, fontSize: "clamp(14.5px, 1.55vw, 19px)", color: CREAM,
+                    whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1,
+                  }}>{m.name}</span>
+                  <span style={{
+                    fontFamily: "'Anton', sans-serif", fontSize: "clamp(13.5px, 1.45vw, 18px)", color: GOLD, whiteSpace: "nowrap", flexShrink: 0,
+                    padding: "3px 11px", borderRadius: 8, background: "rgba(242,200,121,0.08)", border: "1px solid rgba(242,200,121,0.18)",
                   }}>{money(m.price)}</span>
                 </div>
               ))}
             </div>
           </div>
         )}
+        </div>
       </div>
-
-      {/* Indicador de progreso */}
       <div style={{ padding: "clamp(9px, 1.4vh, 16px) clamp(24px, 3.2vw, 48px) clamp(5px, 0.9vh, 9px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
-        <div style={{ display: "flex", gap: 6, maxWidth: 640, margin: "0 auto" }}>
+        <div style={{
+          display: "flex", gap: 7, maxWidth: 640, margin: "0 auto",
+          background: "rgba(255,255,255,0.04)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: 20, padding: "8px 12px",
+        }}>
           {slides.map((sl, i) => (
-            <div key={i} style={{ flex: 1, height: 3, borderRadius: 3, background: "rgba(255,255,255,0.10)", overflow: "hidden" }}>
+            <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: "rgba(255,255,255,0.10)", overflow: "hidden" }}>
               <div style={{
-                height: "100%", borderRadius: 3, background: sl.type === "promo" ? EMBER : GOLD,
+                height: "100%", borderRadius: 4, background: sl.type === "promo" ? `linear-gradient(90deg, ${EMBER}, ${AMBER})` : `linear-gradient(90deg, ${GOLD}, #FFE3A0)`,
                 width: i < slide ? "100%" : i === slide ? `${tick}%` : "0%",
                 transition: i === slide ? "none" : "width 0.3s ease",
-                boxShadow: i === slide ? `0 0 8px ${sl.type === "promo" ? EMBER : GOLD}` : "none",
+                boxShadow: i === slide ? `0 0 10px ${sl.type === "promo" ? EMBER : GOLD}` : "none",
               }} />
             </div>
           ))}
