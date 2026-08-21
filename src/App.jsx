@@ -85,12 +85,16 @@ function orderTotal(items) {
 function methodLabel(s) {
   return s.method + (s.bank ? ` (${s.bank})` : "");
 }
+const DEFAULT_SECTIONS = [
+  { name: "Salón Principal", icon: "🍽️" },
+];
 function emptyTables() {
-  return Array.from({ length: 5 }, (_, i) => ({ id: i + 1, status: "libre", kitchenStatus: null, items: [] }));
+  return Array.from({ length: 5 }, (_, i) => ({ id: i + 1, status: "libre", kitchenStatus: null, items: [], section: "Salón Principal" }));
 }
 function initialState() {
   return {
     tables: emptyTables(),
+    sections: DEFAULT_SECTIONS,
     deliveries: [],
     sales: [],
     expenses: [],
@@ -292,6 +296,7 @@ export default function App() {
   }, [loaded]);
 
   const tables = Array.isArray(state.tables) ? state.tables : emptyTables();
+  const sections = Array.isArray(state.sections) && state.sections.length ? state.sections : DEFAULT_SECTIONS;
   const deliveries = Array.isArray(state.deliveries) ? state.deliveries : [];
   const sales = Array.isArray(state.sales) ? state.sales : [];
   const expenses = Array.isArray(state.expenses) ? state.expenses : [];
@@ -346,12 +351,40 @@ export default function App() {
   function withDeliveries(fn) {
     persist({ ...state, deliveries: fn(deliveries) });
   }
-  function addTable() {
+  function addTable(section) {
     const nextId = tables.length ? Math.max(...tables.map((t) => t.id)) + 1 : 1;
-    withTables((ts) => [...ts, { id: nextId, status: "libre", kitchenStatus: null, items: [] }]);
+    withTables((ts) => [...ts, { id: nextId, status: "libre", kitchenStatus: null, items: [], section: section || sections[0]?.name || "Salón Principal" }]);
   }
   function removeTable(id) {
     withTables((ts) => ts.filter((t) => t.id !== id));
+  }
+  function setTableSection(id, sectionName) {
+    withTables((ts) => ts.map((t) => (t.id === id ? { ...t, section: sectionName } : t)));
+  }
+  function addSection(name, icon) {
+    const clean = (name || "").trim();
+    if (!clean) return;
+    if (sections.some((s) => s.name.toLowerCase() === clean.toLowerCase())) return;
+    persist({ ...state, sections: [...sections, { name: clean, icon: icon || "🍽️" }] });
+  }
+  function renameSection(oldName, newName, icon) {
+    const clean = (newName || "").trim();
+    if (!clean) return;
+    persist({
+      ...state,
+      sections: sections.map((s) => (s.name === oldName ? { name: clean, icon: icon || s.icon } : s)),
+      tables: tables.map((t) => (t.section === oldName ? { ...t, section: clean } : t)),
+    });
+  }
+  function deleteSection(name) {
+    const remaining = sections.filter((s) => s.name !== name);
+    const finalSections = remaining.length ? remaining : DEFAULT_SECTIONS;
+    const fallback = finalSections[0].name;
+    persist({
+      ...state,
+      sections: finalSections,
+      tables: tables.map((t) => (t.section === name ? { ...t, section: fallback } : t)),
+    });
   }
 
   function addItemToOrder(kind, id, menuItem) {
@@ -691,7 +724,20 @@ export default function App() {
       )}
 
       <div style={view === "menutv" ? { padding: 0, flex: 1, minHeight: 0, width: "100%", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto" }}>
-        {view === "mesas" && <MesasView tables={tables} onOpen={(id) => setActiveTable(id)} onManageMenu={() => setMenuManagerOpen(true)} onAddTable={addTable} onRemoveTable={removeTable} />}
+        {view === "mesas" && (
+          <MesasView
+            tables={tables}
+            sections={sections}
+            onOpen={(id) => setActiveTable(id)}
+            onManageMenu={() => setMenuManagerOpen(true)}
+            onAddTable={addTable}
+            onRemoveTable={removeTable}
+            onSetTableSection={setTableSection}
+            onAddSection={addSection}
+            onRenameSection={renameSection}
+            onDeleteSection={deleteSection}
+          />
+        )}
 
         {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} kiosk={kiosk} />}
 
@@ -856,13 +902,16 @@ function TableElapsed({ occupiedAt }) {
   return <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.85 }}>⏱ {mins} min ocupada</span>;
 }
 
-function MesasView({ tables, onOpen, onManageMenu, onAddTable, onRemoveTable }) {
+function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemoveTable, onSetTableSection, onAddSection, onRenameSection, onDeleteSection }) {
   const [manageMode, setManageMode] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState(null);
+  const [sectionManagerOpen, setSectionManagerOpen] = useState(false);
+  const [movingTableId, setMovingTableId] = useState(null);
   const libres = tables.filter((t) => t.items.length === 0).length;
   const ocupadas = tables.length - libres;
   const floorTotal = tables.reduce((sum, t) => sum + orderTotal(t.items), 0);
   const tableToRemove = tables.find((t) => t.id === confirmRemoveId);
+  const fallbackSection = sections[0]?.name || "Salón Principal";
 
   return (
     <div>
@@ -884,10 +933,10 @@ function MesasView({ tables, onOpen, onManageMenu, onAddTable, onRemoveTable }) 
             {manageMode ? "✓ Listo" : "🛠️ Editar mesas"}
           </button>
           <button
-            onClick={onAddTable}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #26A65B, #158A4A)", color: "#fff", boxShadow: "0 3px 10px rgba(21,138,74,0.25)" }}
+            onClick={() => setSectionManagerOpen(true)}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "1px solid #E5D9C3", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "#fff", color: "#2B2118" }}
           >
-            ➕ Agregar mesa
+            🗂️ Secciones
           </button>
           <button
             onClick={onManageMenu}
@@ -900,11 +949,11 @@ function MesasView({ tables, onOpen, onManageMenu, onAddTable, onRemoveTable }) 
 
       {manageMode && (
         <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#6b5738" }}>
-          Modo edición activo: toca la ❌ en una mesa libre (sin pedidos) para eliminarla. Las mesas ocupadas no se pueden eliminar.
+          Modo edición activo: tocá la ❌ en una mesa libre para eliminarla, o el 🗂️ para moverla de sección. Las mesas ocupadas no se pueden eliminar ni mover.
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 26 }}>
         <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 16px" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 4 }}>MESAS TOTALES</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#2B2118" }}>{tables.length}</div>
@@ -923,52 +972,103 @@ function MesasView({ tables, onOpen, onManageMenu, onAddTable, onRemoveTable }) 
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 16 }}>
-        {tables.map((t) => {
-          const st = statusStyle(t.kitchenStatus, t.items.length > 0);
-          const total = orderTotal(t.items);
-          const itemCount = t.items.reduce((s, it) => s + it.qty, 0);
-          const canRemove = manageMode && t.items.length === 0;
-          return (
-            <button
-              key={t.id}
-              onClick={() => (manageMode ? null : onOpen(t.id))}
-              style={{
-                background: st.grad, border: "none", borderRadius: 18, padding: "22px 16px", cursor: manageMode ? "default" : "pointer",
-                textAlign: "left", color: st.text, boxShadow: `0 8px 20px ${st.glow}`, position: "relative", overflow: "hidden",
-                transition: "transform 0.15s ease",
-              }}
-            >
-              <div style={{ position: "absolute", top: -18, right: -18, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
-              {canRemove ? (
-                <div
-                  onClick={(e) => { e.stopPropagation(); setConfirmRemoveId(t.id); }}
-                  style={{
-                    position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: "50%",
-                    background: "rgba(0,0,0,0.35)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 14, fontWeight: 800, cursor: "pointer", zIndex: 2,
-                  }}
-                >✕</div>
-              ) : (
-                <div style={{ fontSize: 24, position: "absolute", top: 12, right: 14, opacity: 0.9 }}>{st.icon}</div>
-              )}
-              <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85, letterSpacing: 1 }}>MESA</div>
-              <div style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.1, marginTop: -2 }}>{t.id}</div>
-              <div style={{
-                fontSize: 11, fontWeight: 800, marginTop: 10, textTransform: "uppercase", letterSpacing: 0.5,
-                display: "inline-block", background: "rgba(0,0,0,0.15)", padding: "3px 10px", borderRadius: 20,
-              }}>{st.label}</div>
-              {t.items.length > 0 && (
-                <>
-                  <div style={{ fontSize: 19, marginTop: 12, fontWeight: 800 }}>{money(total)}</div>
-                  <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{itemCount} ítem{itemCount !== 1 ? "s" : ""}</div>
-                  <div style={{ marginTop: 4 }}><TableElapsed occupiedAt={t.occupiedAt} /></div>
-                </>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {sections.map((sec) => {
+        const secTables = tables.filter((t) => (t.section || fallbackSection) === sec.name);
+        return (
+          <div key={sec.name} style={{ marginBottom: 30 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ fontSize: 19 }}>{sec.icon}</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: "#2B2118", letterSpacing: 0.3 }}>{sec.name}</span>
+                <span style={{ fontSize: 11, color: "#a8977e", fontWeight: 700, background: "#F0E8D8", borderRadius: 12, padding: "2px 9px" }}>{secTables.length} mesa{secTables.length !== 1 ? "s" : ""}</span>
+              </div>
+              <button
+                onClick={() => onAddTable(sec.name)}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12, background: "linear-gradient(135deg, #26A65B, #158A4A)", color: "#fff" }}
+              >
+                ➕ Agregar mesa aquí
+              </button>
+            </div>
+
+            {secTables.length === 0 ? (
+              <div style={{ border: "1px dashed #E5D9C3", borderRadius: 14, padding: 18, textAlign: "center", color: "#a8977e", fontSize: 12.5 }}>
+                Esta sección todavía no tiene mesas.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(175px, 1fr))", gap: 16 }}>
+                {secTables.map((t) => {
+                  const st = statusStyle(t.kitchenStatus, t.items.length > 0);
+                  const total = orderTotal(t.items);
+                  const itemCount = t.items.reduce((s, it) => s + it.qty, 0);
+                  const canRemove = manageMode && t.items.length === 0;
+                  const canMove = manageMode && t.items.length === 0 && sections.length > 1;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => (manageMode ? null : onOpen(t.id))}
+                      style={{
+                        background: st.grad, border: "none", borderRadius: 18, padding: "22px 16px", cursor: manageMode ? "default" : "pointer",
+                        textAlign: "left", color: st.text, boxShadow: `0 8px 20px ${st.glow}`, position: "relative", overflow: "hidden",
+                        transition: "transform 0.15s ease",
+                      }}
+                    >
+                      <div style={{ position: "absolute", top: -18, right: -18, width: 90, height: 90, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }} />
+                      {canRemove ? (
+                        <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6, zIndex: 2 }}>
+                          {canMove && (
+                            <div
+                              onClick={(e) => { e.stopPropagation(); setMovingTableId(movingTableId === t.id ? null : t.id); }}
+                              title="Mover a otra sección"
+                              style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(0,0,0,0.35)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, cursor: "pointer" }}
+                            >🗂️</div>
+                          )}
+                          <div
+                            onClick={(e) => { e.stopPropagation(); setConfirmRemoveId(t.id); }}
+                            style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(0,0,0,0.35)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, cursor: "pointer" }}
+                          >✕</div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 24, position: "absolute", top: 12, right: 14, opacity: 0.9 }}>{st.icon}</div>
+                      )}
+                      <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.85, letterSpacing: 1 }}>MESA</div>
+                      <div style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.1, marginTop: -2 }}>{t.id}</div>
+                      <div style={{
+                        fontSize: 11, fontWeight: 800, marginTop: 10, textTransform: "uppercase", letterSpacing: 0.5,
+                        display: "inline-block", background: "rgba(0,0,0,0.15)", padding: "3px 10px", borderRadius: 20,
+                      }}>{st.label}</div>
+                      {t.items.length > 0 && (
+                        <>
+                          <div style={{ fontSize: 19, marginTop: 12, fontWeight: 800 }}>{money(total)}</div>
+                          <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{itemCount} ítem{itemCount !== 1 ? "s" : ""}</div>
+                          <div style={{ marginTop: 4 }}><TableElapsed occupiedAt={t.occupiedAt} /></div>
+                        </>
+                      )}
+                      {movingTableId === t.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ position: "absolute", inset: 0, background: "rgba(20,15,10,0.92)", display: "flex", flexDirection: "column", padding: 12, gap: 6, zIndex: 3, overflowY: "auto" }}
+                        >
+                          <div style={{ fontSize: 10.5, fontWeight: 800, color: "#F2C879", letterSpacing: 0.5, marginBottom: 2 }}>MOVER A:</div>
+                          {sections.filter((s) => s.name !== (t.section || fallbackSection)).map((s) => (
+                            <div
+                              key={s.name}
+                              onClick={() => { onSetTableSection(t.id, s.name); setMovingTableId(null); }}
+                              style={{ background: "rgba(255,255,255,0.1)", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer" }}
+                            >
+                              {s.icon} {s.name}
+                            </div>
+                          ))}
+                          <div onClick={() => setMovingTableId(null)} style={{ fontSize: 11, color: "#C9BBA3", textAlign: "center", marginTop: 4, cursor: "pointer" }}>Cancelar</div>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {tableToRemove && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 80, padding: 16 }}>
@@ -988,6 +1088,109 @@ function MesasView({ tables, onOpen, onManageMenu, onAddTable, onRemoveTable }) 
           </div>
         </div>
       )}
+
+      {sectionManagerOpen && (
+        <SectionManagerModal
+          sections={sections}
+          tables={tables}
+          onAdd={onAddSection}
+          onRename={onRenameSection}
+          onDelete={onDeleteSection}
+          onClose={() => setSectionManagerOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SectionManagerModal({ sections, tables, onAdd, onRename, onDelete, onClose }) {
+  const [newName, setNewName] = useState("");
+  const [newIcon, setNewIcon] = useState("🍽️");
+  const [editingName, setEditingName] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [editIcon, setEditIcon] = useState("🍽️");
+
+  const SECTION_ICON_IDEAS = ["🍽️", "🍸", "❄️", "☀️", "🌟", "🌿", "🎉", "🔥", "🛋️"];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 85, padding: 16 }}>
+      <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 480, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
+        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>🗂️ Secciones del restaurante</h3>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: 18, overflow: "auto" }}>
+          <div style={{ fontSize: 12.5, color: "#8a7a63", marginBottom: 14 }}>
+            Organizá tu piso en zonas: por ejemplo Barra, Salón VIP, Sala con aire, Terraza. Cada mesa pertenece a una sección.
+          </div>
+
+          <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, marginBottom: 18 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 8 }}>➕ Nueva sección</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              {SECTION_ICON_IDEAS.map((ic) => (
+                <button key={ic} onClick={() => setNewIcon(ic)} style={{ fontSize: 16, padding: "5px 9px", borderRadius: 8, border: newIcon === ic ? "2px solid #C1272D" : "1px solid #E5D9C3", background: newIcon === ic ? "rgba(193,39,45,0.08)" : "#fff", cursor: "pointer" }}>{ic}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input placeholder="Nombre (ej: Salón VIP, Barra, Sala con aire)" value={newName} onChange={(e) => setNewName(e.target.value)} style={{ ...inp, maxWidth: 260 }} />
+              <button
+                disabled={!newName.trim()}
+                onClick={() => { onAdd(newName, newIcon); setNewName(""); setNewIcon("🍽️"); }}
+                style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", opacity: newName.trim() ? 1 : 0.5 }}
+              >
+                Crear
+              </button>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 12, textTransform: "uppercase", color: "#8a7a63", fontWeight: 700, marginBottom: 8 }}>Secciones actuales ({sections.length})</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {sections.map((s) => {
+              const count = tables.filter((t) => (t.section || sections[0]?.name) === s.name).length;
+              const isEditing = editingName === s.name;
+              return (
+                <div key={s.name} style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: "10px 12px" }}>
+                  {isEditing ? (
+                    <div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                        {SECTION_ICON_IDEAS.map((ic) => (
+                          <button key={ic} onClick={() => setEditIcon(ic)} style={{ fontSize: 15, padding: "4px 8px", borderRadius: 7, border: editIcon === ic ? "2px solid #C1272D" : "1px solid #E5D9C3", background: editIcon === ic ? "rgba(193,39,45,0.08)" : "#fff", cursor: "pointer" }}>{ic}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input value={editVal} onChange={(e) => setEditVal(e.target.value)} style={{ ...inp, padding: 7 }} autoFocus />
+                        <button onClick={() => { onRename(s.name, editVal, editIcon); setEditingName(null); }} style={{ fontSize: 11, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>Guardar</button>
+                        <button onClick={() => setEditingName(null)} style={{ fontSize: 11, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "6px 10px", cursor: "pointer" }}>Cancelar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div>
+                        <span style={{ fontSize: 15 }}>{s.icon}</span> <span style={{ fontWeight: 700, fontSize: 13.5 }}>{s.name}</span>
+                        <span style={{ fontSize: 11, color: "#a8977e", marginLeft: 8 }}>{count} mesa{count !== 1 ? "s" : ""}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => { setEditingName(s.name); setEditVal(s.name); setEditIcon(s.icon); }} style={{ fontSize: 11, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "5px 9px", cursor: "pointer", color: "#5a4c3a", fontWeight: 700 }}>✏️ Editar</button>
+                        {sections.length > 1 && (
+                          <button
+                            onClick={() => { if (window.confirm(`¿Eliminar la sección "${s.name}"? Las mesas ahí pasarán a otra sección.`)) onDelete(s.name); }}
+                            style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", borderRadius: 6, padding: "5px 9px", cursor: "pointer", color: "#C1272D", fontWeight: 700 }}
+                          >Eliminar</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ padding: 14, borderTop: "1px solid #E5D9C3", background: "#fff" }}>
+          <button onClick={onClose} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #E5D9C3", background: "#fff", fontWeight: 700, cursor: "pointer" }}>Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }
