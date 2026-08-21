@@ -3531,6 +3531,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   const spotlightVariant = isSpotlightSlide
     ? KB_VARIANTS[String(spotlightItem.id).split("").reduce((a, ch) => a + ch.charCodeAt(0), 0) % KB_VARIANTS.length]
     : "mbKB1";
+  const ENTER_VARIANTS = ["mbSlideEnter", "mbEnterSlideRight", "mbEnterZoomCenter", "mbEnterSlideLeft", "mbEnterWipeDown", "mbEnterRise"];
+  const enterVariant = ENTER_VARIANTS[slide % ENTER_VARIANTS.length];
   const accent = (c || spotlightCat) ? avatarColor((c || spotlightCat).name) : GOLD;
   const items = c ? activeItems.filter((m) => m.cat === c.name) : [];
 
@@ -3582,6 +3584,11 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         @keyframes mbChipIn { from { opacity: 0; transform: translateY(14px) scale(0.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes mbPillIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes mbSlideEnter { 0% { opacity: 0; transform: translateY(18px) scale(0.98); filter: blur(8px); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
+        @keyframes mbEnterSlideRight { 0% { opacity: 0; transform: translateX(70px) scale(0.99); filter: blur(4px); } 100% { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); } }
+        @keyframes mbEnterSlideLeft { 0% { opacity: 0; transform: translateX(-70px) scale(0.99); filter: blur(4px); } 100% { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); } }
+        @keyframes mbEnterZoomCenter { 0% { opacity: 0; transform: scale(0.88); filter: blur(6px); } 100% { opacity: 1; transform: scale(1); filter: blur(0); } }
+        @keyframes mbEnterWipeDown { 0% { clip-path: inset(0 0 100% 0); opacity: 0.4; } 55% { opacity: 1; } 100% { clip-path: inset(0 0 0% 0); opacity: 1; } }
+        @keyframes mbEnterRise { 0% { opacity: 0; transform: translateY(48px); filter: blur(5px); } 100% { opacity: 1; transform: translateY(0); filter: blur(0); } }
       `}</style>
 
       {/* Rejilla tecnológica de fondo */}
@@ -3676,7 +3683,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
           }} />
         ))}
 
-        <div key={"slide-wrap" + slide} style={{ animation: "mbSlideEnter 0.6s cubic-bezier(0.22,1,0.36,1) both", height: isSpotlightSlide ? "100%" : "auto" }}>
+        <div key={"slide-wrap" + slide} style={{ animation: `${enterVariant} 0.65s cubic-bezier(0.22,1,0.36,1) both`, height: isSpotlightSlide ? "100%" : "auto" }}>
         {isSpotlightSlide ? (
           <div key={"spot" + slide} style={{ position: "relative", height: "100%", width: "100%", borderRadius: "clamp(14px,1.6vw,22px)", overflow: "hidden", boxShadow: `0 24px 60px ${accent}40` }}>
             <img
