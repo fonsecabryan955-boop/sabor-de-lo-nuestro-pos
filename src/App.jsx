@@ -1351,6 +1351,24 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
 }
 
 function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategory, onUpdateItem, onSetShowPromos, onClose }) {
+  const [uploadingVideoId, setUploadingVideoId] = useState(null);
+  const [videoError, setVideoError] = useState(null);
+
+  async function uploadVideo(file, itemId) {
+    if (!file) return;
+    if (!file.type.startsWith("video/")) { setVideoError("Ese archivo no es un video."); return; }
+    if (file.size > 60 * 1024 * 1024) { setVideoError("El video pesa más de 60MB — comprimilo o grabá algo más corto."); return; }
+    setVideoError(null);
+    setUploadingVideoId(itemId);
+    const ext = (file.name.split(".").pop() || "mp4").toLowerCase();
+    const path = `item-${itemId}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("menu-videos").upload(path, file, { upsert: true, cacheControl: "3600" });
+    setUploadingVideoId(null);
+    if (error) { setVideoError("No se pudo subir el video: " + error.message + " — asegurate de haber creado el bucket público 'menu-videos' en Supabase Storage."); return; }
+    const { data } = supabase.storage.from("menu-videos").getPublicUrl(path);
+    if (data?.publicUrl) onUpdateItem(itemId, { videoUrl: data.publicUrl });
+  }
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 75, padding: 16 }}>
       <div style={{ background: "#15100B", borderRadius: 18, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
@@ -1364,6 +1382,12 @@ function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategor
             Por cada categoría elegí cómo aparece en el Menú TV: solo como lista de precios, solo como video con fotos, ambas cosas, o que no aparezca.
           </div>
 
+          {videoError && (
+            <div style={{ background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.35)", color: "#F87171", borderRadius: 10, padding: "10px 14px", fontSize: 12, marginBottom: 14, fontWeight: 600 }}>
+              ⚠️ {videoError}
+            </div>
+          )}
+
           <div style={{ background: "linear-gradient(175deg, #1E1611, #251C15)", border: "1px solid rgba(242,200,121,0.14)", borderRadius: 12, padding: "12px 16px", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ fontWeight: 700, fontSize: 13.5 }}>🏷️ Mostrar diapositiva de promociones</span>
             <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
@@ -1374,7 +1398,7 @@ function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategor
           {menuCats.map((c) => {
             const items = menuItems.filter((m) => m.cat === c.name);
             if (!items.length) return null;
-            const itemsWithPhoto = items.filter((m) => m.photoUrl);
+            const itemsWithPhoto = items.filter((m) => m.photoUrl || m.videoUrl);
             const mode = c.tvHidden === true ? "oculta" : (c.tvMode || "ambos");
             const modeOptions = [
               { id: "ambos", label: "Lista + Video", icon: "📋🎬" },
@@ -1414,12 +1438,25 @@ function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategor
                           <div style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 6, background: "rgba(255,255,255,0.06)" }} />
                         )}
                         <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</span>
-                        {m.photoUrl && mode !== "lista" ? (
+
+                        {m.videoUrl && (
+                          <span style={{ fontSize: 9.5, fontWeight: 800, color: "#4ADE80", background: "rgba(74,222,128,0.12)", padding: "3px 8px", borderRadius: 20, letterSpacing: 0.3 }}>🎬 VIDEO REAL</span>
+                        )}
+
+                        <label style={{ fontSize: 10.5, fontWeight: 700, color: "#F2C879", cursor: uploadingVideoId === m.id ? "wait" : "pointer", border: "1px solid rgba(242,200,121,0.25)", borderRadius: 8, padding: "5px 9px", whiteSpace: "nowrap" }}>
+                          {uploadingVideoId === m.id ? "Subiendo…" : m.videoUrl ? "Reemplazar" : "+ Video"}
+                          <input type="file" accept="video/*" style={{ display: "none" }} disabled={uploadingVideoId === m.id} onChange={(e) => uploadVideo(e.target.files?.[0], m.id)} />
+                        </label>
+                        {m.videoUrl && (
+                          <button onClick={() => onUpdateItem(m.id, { videoUrl: null })} title="Quitar video, volver a foto animada" style={{ background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.3)", color: "#F87171", borderRadius: 8, padding: "5px 8px", cursor: "pointer", fontSize: 11 }}>✕</button>
+                        )}
+
+                        {(m.photoUrl || m.videoUrl) && mode !== "lista" ? (
                           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: m.tvSpotlightHidden ? "#A8977E" : "#4ADE80", cursor: "pointer" }}>
-                            {m.tvSpotlightHidden ? "Video oculto" : "Video activo"}
+                            {m.tvSpotlightHidden ? "Oculto" : "Activo"}
                             <input type="checkbox" checked={m.tvSpotlightHidden !== true} onChange={(e) => onUpdateItem(m.id, { tvSpotlightHidden: !e.target.checked })} style={{ width: 15, height: 15 }} />
                           </label>
-                        ) : !m.photoUrl ? (
+                        ) : !m.photoUrl && !m.videoUrl ? (
                           <span style={{ fontSize: 10.5, color: "#C9BBA3" }}>sin foto</span>
                         ) : null}
                       </div>
@@ -3496,7 +3533,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   const AMBER = "#E8A33D";
   const tickerMsgs = ["HECHO AL MOMENTO", "PÍDELO PICANTE", "DELIVERY DISPONIBLE", "MASATEPE · MASAYA", "SABOR CASERO DE VERDAD"];
 
-  const itemsWithPhotos = activeItems.filter((m) => m.photoUrl && m.tvSpotlightHidden !== true);
+  const itemsWithPhotos = activeItems.filter((m) => (m.photoUrl || m.videoUrl) && m.tvSpotlightHidden !== true);
   const slides = [];
   catsWithItems.forEach((cat) => {
     const mode = cat.tvMode || "ambos";
@@ -3566,6 +3603,10 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         @keyframes mbCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
         @keyframes mbSweep { 0% { left: -30%; } 100% { left: 130%; } }
         @keyframes mbKenBurns { 0% { transform: scale(1.04) translate(0%, 0%); } 50% { transform: scale(1.1) translate(-1%, -0.7%); } 100% { transform: scale(1.06) translate(0.7%, 0.4%); } }
+        @keyframes mbVideoPush { 0% { transform: scale(1); } 100% { transform: scale(1.06); } }
+        @keyframes mbFocusFade { 0% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes mbSteamRise { 0% { transform: translateY(0) scaleX(1); opacity: 0; } 20% { opacity: 0.8; } 100% { transform: translateY(-140%) scaleX(1.4); opacity: 0; } }
+        @keyframes mbBokehFloat { 0%,100% { transform: translate(0,0) scale(1); opacity: 0.5; } 50% { transform: translate(2.5%, -3.5%) scale(1.25); opacity: 0.9; } }
         @keyframes mbKB1 { 0% { transform: scale(1.03) translate(0%, 0%); } 50% { transform: scale(1.1) translate(-1.1%, -0.5%); } 100% { transform: scale(1.06) translate(0.6%, 0.3%); } }
         @keyframes mbKB2 { 0% { transform: scale(1.1) translate(0.8%, 0.4%); } 50% { transform: scale(1.04) translate(-0.6%, -0.4%); } 100% { transform: scale(1.08) translate(0%, 0.2%); } }
         @keyframes mbKB3 { 0% { transform: scale(1.05) translate(-1%, 0.3%); } 50% { transform: scale(1.11) translate(0.8%, -0.5%); } 100% { transform: scale(1.06) translate(-0.4%, 0.4%); } }
@@ -3575,6 +3616,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         @keyframes mbNameReveal { 0% { opacity: 0; transform: translateY(38px) scale(0.92); } 65% { opacity: 1; transform: translateY(-4px) scale(1.015); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes mbTextShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         @keyframes mbPricePop { 0% { opacity: 0; transform: scale(0.3) rotate(-6deg); } 55% { opacity: 1; transform: scale(1.14) rotate(2deg); } 78% { transform: scale(0.96) rotate(-1deg); } 100% { opacity: 1; transform: scale(1) rotate(0deg); } }
+        @keyframes mbPriceReveal { 0% { opacity: 0; transform: translateY(10px) scale(0.94); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
         @keyframes mbRingSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes mbRibbonIn { 0% { opacity: 0; transform: translateX(-40px) rotate(-8deg); } 100% { opacity: 1; transform: translateX(0) rotate(0deg); } }
         @keyframes mbBracketIn { from { opacity: 0; } to { opacity: 0.85; } }
@@ -3688,14 +3730,76 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         <div key={"slide-wrap" + slide} style={{ animation: `${enterVariant} 0.65s cubic-bezier(0.22,1,0.36,1) both`, height: isSpotlightSlide ? "100%" : "auto" }}>
         {isSpotlightSlide ? (
           <div key={"spot" + slide} style={{ position: "relative", height: "100%", width: "100%", borderRadius: "clamp(14px,1.6vw,22px)", overflow: "hidden", boxShadow: `0 24px 60px ${accent}40` }}>
-            <img
-              src={spotlightItem.photoUrl}
-              alt={spotlightItem.name}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", animation: `${spotlightVariant} ${SLIDE_SECONDS + 1}s ease-in-out both`, transformOrigin: "center center" }}
-            />
+            {spotlightItem.videoUrl ? (
+              <video
+                key={spotlightItem.videoUrl}
+                src={spotlightItem.videoUrl}
+                autoPlay muted loop playsInline
+                style={{
+                  position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
+                  animation: `mbVideoPush ${SLIDE_SECONDS + 3}s ease-in-out both`, transformOrigin: "center center",
+                  filter: "contrast(1.08) saturate(1.18) brightness(1.02)",
+                }}
+              />
+            ) : (
+              <>
+                {/* Capa de fondo desenfocada — simula profundidad de campo real (bokeh de fondo) */}
+                <img
+                  src={spotlightItem.photoUrl}
+                  alt=""
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute", inset: "-4%", width: "108%", height: "108%", objectFit: "cover",
+                    filter: "blur(18px) saturate(1.3) brightness(0.75)", opacity: 0.55,
+                    animation: `${spotlightVariant} ${(SLIDE_SECONDS + 3) * 1.3}s cubic-bezier(0.25,0.1,0.25,1) both`, transformOrigin: "center center",
+                  }}
+                />
+                {/* Capa nítida principal, con pull de foco cinematográfico al entrar */}
+                <img
+                  src={spotlightItem.photoUrl}
+                  alt={spotlightItem.name}
+                  style={{
+                    position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
+                    animation: `${spotlightVariant} ${SLIDE_SECONDS + 3}s cubic-bezier(0.25,0.1,0.25,1) both`, transformOrigin: "center center",
+                    filter: "contrast(1.1) saturate(1.22) brightness(1.03) sepia(0.06)",
+                  }}
+                />
+              </>
+            )}
+
+            {/* Vapor de calor sutil subiendo — sensación de "recién hecho" */}
+            <div style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", mixBlendMode: "screen", opacity: 0.35 }}>
+              {[["18%", 0], ["46%", 1.4], ["72%", 0.6]].map(([left, delay], i) => (
+                <div key={i} style={{
+                  position: "absolute", bottom: "-10%", left, width: "26%", height: "70%",
+                  background: "radial-gradient(ellipse at center, rgba(255,255,255,0.5) 0%, transparent 70%)",
+                  filter: "blur(14px)", animation: `mbSteamRise ${5 + i}s ease-in-out ${delay}s infinite`,
+                }} />
+              ))}
+            </div>
+
+            {/* Bokeh flotante — partículas de luz suaves, look de cámara real */}
+            {[["14%", "8%", 5], ["78%", "14%", 3.5], ["24%", "82%", 4], ["66%", "76%", 6]].map(([top, left, size], i) => (
+              <div key={i} style={{
+                position: "absolute", top, left, width: `${size}vw`, maxWidth: 70, aspectRatio: "1", borderRadius: "50%",
+                background: `radial-gradient(circle, ${GOLD}55 0%, transparent 70%)`, filter: "blur(3px)", pointerEvents: "none",
+                animation: `mbBokehFloat ${6 + i}s ease-in-out ${i * 0.8}s infinite`,
+              }} />
+            ))}
+
+            {/* Foco cinematográfico de entrada — desenfoque que se disuelve, sin tocar el color de la imagen */}
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)", background: "rgba(10,8,6,0.1)", animation: "mbFocusFade 1.05s ease-out both" }} />
+
+            {/* Grano de película sutil para dar textura "real", no digital plano */}
+            <div style={{
+              position: "absolute", inset: 0, opacity: 0.05, mixBlendMode: "overlay", pointerEvents: "none",
+              backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+            }} />
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.38) 100%)", pointerEvents: "none" }} />
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,8,6,0.10) 20%, rgba(10,8,6,0.5) 60%, rgba(10,8,6,0.94) 100%)", animation: "mbVignettePulse 5s ease-in-out infinite" }} />
             <div style={{ position: "absolute", inset: 0, boxShadow: "inset 0 0 clamp(40px,8vw,120px) rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, transparent 42%, rgba(255,255,255,0.08) 50%, transparent 58%)", backgroundSize: "260% 100%", animation: "mbShine 5.5s linear infinite" }} />
+            {/* Barrido de luz volumétrico diagonal, más ancho y con brillo dorado real */}
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.05) 46%, rgba(255,244,214,0.22) 50%, rgba(255,255,255,0.05) 54%, transparent 62%)", backgroundSize: "300% 100%", animation: "mbShine 6.5s linear infinite", mixBlendMode: "screen" }} />
 
             {/* Marco de esquinas doradas estilo "toma destacada" */}
             {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v, h], i) => (
@@ -3710,26 +3814,26 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
               }} />
             ))}
 
-            {/* Listón "Recomendado" */}
+            {/* Listón "Recomendado" — insignia tipográfica, sin emoji */}
             <div style={{
               position: "absolute", top: "clamp(16px,2.4vh,28px)", left: "clamp(16px,2.6vw,32px)",
-              display: "flex", alignItems: "center", gap: 7, background: "linear-gradient(120deg, #7A1216, #C1272D)",
-              padding: "clamp(5px,0.8vh,8px) clamp(12px,1.6vw,18px) clamp(5px,0.8vh,8px) clamp(10px,1.4vw,14px)",
-              borderRadius: "3px 12px 12px 3px", boxShadow: "0 8px 18px rgba(0,0,0,0.4)",
+              display: "flex", alignItems: "center", gap: 8, background: "rgba(10,8,6,0.55)", backdropFilter: "blur(6px)",
+              padding: "clamp(6px,0.9vh,9px) clamp(14px,1.8vw,20px) clamp(6px,0.9vh,9px) clamp(12px,1.6vw,16px)",
+              borderRadius: 3, borderLeft: `3px solid ${AMBER}`,
+              boxShadow: "0 8px 18px rgba(0,0,0,0.4)",
               animation: "mbRibbonIn 0.6s ease 0.1s both",
             }}>
-              <span style={{ fontSize: "clamp(11px,1.1vw,15px)" }}>⭐</span>
-              <span style={{ fontSize: "clamp(9px,0.8vw,11.5px)", fontWeight: 800, color: "#fff", letterSpacing: 2 }}>RECOMENDADO</span>
+              <span style={{ fontSize: "clamp(9px,0.8vw,11.5px)", fontWeight: 800, color: GOLD, letterSpacing: 3 }}>RECOMENDADO</span>
             </div>
 
             {/* Sello de la casa, esquina superior derecha */}
             <div style={{
               position: "absolute", top: "clamp(16px,2.4vh,28px)", right: "clamp(16px,2.6vw,32px)",
-              display: "flex", alignItems: "center", gap: 6, background: "rgba(10,8,6,0.45)", backdropFilter: "blur(4px)",
-              border: `1px solid ${GOLD}55`, borderRadius: 20, padding: "clamp(5px,0.7vh,7px) clamp(10px,1.4vw,14px)",
+              display: "flex", alignItems: "center", gap: 6, background: "rgba(10,8,6,0.45)", backdropFilter: "blur(6px)",
+              border: `1px solid ${GOLD}55`, borderRadius: 20, padding: "clamp(5px,0.7vh,7px) clamp(12px,1.6vw,16px)",
               animation: "mbBracketIn 0.8s ease 0.3s both",
             }}>
-              <span style={{ fontSize: "clamp(10px,1vw,13px)" }}>🔥</span>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: GOLD, display: "inline-block", boxShadow: `0 0 6px ${GOLD}` }} />
               <span style={{ fontSize: "clamp(8px,0.72vw,10px)", fontWeight: 800, color: GOLD, letterSpacing: 1.5 }}>SABOR DE LO NUESTRO</span>
             </div>
 
@@ -3748,21 +3852,17 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
               }}>
                 {spotlightItem.name}
               </div>
-              <div style={{ position: "relative", display: "inline-block", marginTop: 16, animation: "mbPricePop 0.7s cubic-bezier(0.34,1.56,0.64,1) 0.55s both" }}>
+              <div style={{ position: "relative", display: "inline-block", marginTop: 16, animation: "mbPriceReveal 0.6s cubic-bezier(0.22,1,0.36,1) 0.5s both" }}>
                 <div style={{
                   position: "relative", overflow: "hidden", fontFamily: "'Anton', sans-serif", fontSize: "clamp(18px, 2.2vw, 28px)", color: "#fff",
                   background: `linear-gradient(135deg, ${AMBER}, ${EMBER})`, padding: "clamp(8px,1vh,12px) clamp(20px,2.4vw,30px)", borderRadius: 14,
                   boxShadow: `0 10px 26px rgba(0,0,0,0.4), 0 0 0 1px ${GOLD}66`,
                 }}>
                   {money(spotlightItem.price)}
-                  <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent)", animation: "mbBadgeShine 3s ease-in-out infinite" }} />
+                  <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(100deg, transparent, rgba(255,255,255,0.5), transparent)", animation: "mbBadgeShine 4s ease-in-out infinite" }} />
                 </div>
               </div>
             </div>
-
-            {[["18%", "10%"], ["30%", "78%"], ["66%", "16%"]].map(([top, left], i) => (
-              <span key={i} style={{ position: "absolute", top, left, fontSize: "clamp(10px,1.1vw,16px)", color: GOLD, animation: `mbSparkle ${2.8 + i * 0.5}s ease-in-out ${i * 0.6}s infinite` }}>✦</span>
-            ))}
           </div>
         ) : isPromoSlide ? (
           <div key="promo-slide">
