@@ -3526,6 +3526,7 @@ function PromoView({ promotions, onAdd, onDelete }) {
 function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, onManage }) {
   const activeItems = menuItems.filter((m) => m.active !== false);
   const catsWithItems = menuCats.filter((c) => c.tvHidden !== true && activeItems.some((m) => m.cat === c.name));
+  const emergencyCats = catsWithItems.length > 0 ? catsWithItems : menuCats.filter((c) => activeItems.some((m) => m.cat === c.name));
   const GOLD = "#F2C879";
   const CREAM = "#F7F0E4";
   const INK = "#0A0806";
@@ -3537,10 +3538,15 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   const slides = [];
   catsWithItems.forEach((cat) => {
     const mode = cat.tvMode || "ambos";
-    if (mode !== "video") slides.push({ type: "cat", cat });
-    if (mode !== "lista") itemsWithPhotos.filter((m) => m.cat === cat.name).forEach((m) => slides.push({ type: "spotlight", item: m, cat }));
+    const catSpotlights = itemsWithPhotos.filter((m) => m.cat === cat.name);
+    // Si la categoría es "solo video" pero no hay fotos/videos válidos, mostramos la lista de precios como respaldo — nunca dejar la categoría sin nada.
+    const effectiveMode = mode === "video" && catSpotlights.length === 0 ? "lista" : mode;
+    if (effectiveMode !== "video") slides.push({ type: "cat", cat });
+    if (effectiveMode !== "lista") catSpotlights.forEach((m) => slides.push({ type: "spotlight", item: m, cat }));
   });
   if (promotions && promotions.length > 0 && tvShowPromos !== false) slides.push({ type: "promo" });
+  // Último respaldo: si por alguna razón no quedó ninguna diapositiva, mostramos categorías como lista de precios en vez de dejar la pantalla vacía.
+  if (slides.length === 0) emergencyCats.forEach((cat) => slides.push({ type: "cat", cat }));
 
   const SLIDE_SECONDS = 9;
   const [slide, setSlide] = useState(0);
@@ -3585,6 +3591,19 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   }, []);
   const isPortrait = screenSize.h > screenSize.w;
   const isUltraWide = screenSize.w / screenSize.h > 2.1;
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  useEffect(() => {
+    function handleFsChange() { setIsFullscreen(!!document.fullscreenElement); }
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.();
+    }
+  }
 
   return (
     <div style={{
@@ -3711,6 +3730,17 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
               <span style={{ fontSize: "clamp(8px, 0.72vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 1.5 }}>EN VIVO</span>
             </div>
           </div>
+          {kiosk && !isFullscreen && (
+            <button
+              onClick={toggleFullscreen}
+              title="Poner en pantalla completa (oculta la barra del navegador)"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: "clamp(28px,2.4vw,34px)",
+                padding: "0 clamp(10px,1.2vw,14px)", borderRadius: 20, border: `1px solid ${GOLD}55`, background: "rgba(242,200,121,0.1)",
+                color: GOLD, cursor: "pointer", fontSize: "clamp(10px,0.9vw,12.5px)", fontWeight: 800, letterSpacing: 0.5,
+              }}
+            >⛶ PANTALLA COMPLETA</button>
+          )}
           {!kiosk && onManage && (
             <button
               onClick={onManage}
@@ -4011,7 +4041,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       {/* Ticker inferior */}
       <div style={{ borderTop: "1px solid rgba(242,200,121,0.12)", background: "rgba(0,0,0,0.45)", padding: "clamp(6px, 1vh, 11px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", width: "max-content", animation: "mbTicker 24s linear infinite" }}>
-          {[...tickerMsgs, ...tickerMsgs, ...tickerMsgs].map((msg, i) => (
+          {[...tickerMsgs, ...tickerMsgs].map((msg, i) => (
             <span key={i} style={{ display: "flex", alignItems: "center", gap: "clamp(16px, 2vw, 34px)", fontSize: "clamp(9.5px, 0.9vw, 12.5px)", color: "#A8977E", letterSpacing: 2.5, fontWeight: 700, paddingRight: "clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>
               {msg} <span style={{ color: GOLD }}>◆</span>
             </span>
