@@ -3575,6 +3575,17 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
   const accent = (c || spotlightCat) ? avatarColor((c || spotlightCat).name) : GOLD;
   const items = c ? activeItems.filter((m) => m.cat === c.name) : [];
 
+  // Detecta el tamaño real de la pantalla para adaptar el diseño a cualquier TV/monitor
+  const [screenSize, setScreenSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  useEffect(() => {
+    function handleResize() { setScreenSize({ w: window.innerWidth, h: window.innerHeight }); }
+    window.addEventListener("resize", handleResize);
+    window.addEventListener("orientationchange", handleResize);
+    return () => { window.removeEventListener("resize", handleResize); window.removeEventListener("orientationchange", handleResize); };
+  }, []);
+  const isPortrait = screenSize.h > screenSize.w;
+  const isUltraWide = screenSize.w / screenSize.h > 2.1;
+
   return (
     <div style={{
       background: INK,
@@ -3584,6 +3595,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       overflow: "hidden", boxSizing: "border-box",
       fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
       position: "relative",
+      // Margen de seguridad contra el "overscan" — muchas TVs recortan 3-5% de los bordes
+      padding: kiosk ? "clamp(6px, 1.5vmin, 20px)" : 0,
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
@@ -3659,7 +3672,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       {/* Marca de agua grande del ícono de la categoría */}
       {c && (
         <div key={"wm" + slide} style={{
-          position: "absolute", right: "-6%", top: "8%", fontSize: "min(46vh, 40vw)", opacity: 0.045, zIndex: 0,
+          position: "absolute", right: "-6%", top: "8%", fontSize: isPortrait ? "min(30vh, 55vw)" : "min(46vh, 40vw)", opacity: 0.045, zIndex: 0,
           animation: "mbWatermarkDrift 9s ease-in-out infinite alternate, mbBgFade 1s ease",
           filter: "grayscale(1) brightness(2)",
         }}>{c.icon}</div>
@@ -3885,7 +3898,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
 
             <div style={{
               display: "grid",
-              gridTemplateColumns: promotions.length > 3 ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(300px, 1fr))",
+              gridTemplateColumns: isPortrait ? "1fr" : promotions.length > 3 ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(300px, 1fr))",
               gap: "clamp(12px, 1.8vw, 20px)",
               maxWidth: 1080, margin: "0 auto", width: "100%",
             }}>
@@ -3947,7 +3960,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
 
             <div style={{
               display: "grid",
-              gridTemplateColumns: `repeat(auto-fit, minmax(${items.length > 6 ? 250 : 300}px, 1fr))`,
+              gridTemplateColumns: isPortrait ? "1fr" : `repeat(auto-fit, minmax(${items.length > 6 ? 250 : 300}px, 1fr))`,
               gap: "clamp(10px, 1.3vw, 16px)",
               maxWidth: 1180,
               margin: "0 auto", width: "100%",
