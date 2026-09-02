@@ -97,7 +97,12 @@ function orderTotal(items) {
   return items.reduce((sum, it) => sum + it.price * it.qty, 0);
 }
 function methodLabel(s) {
+  if (s.method === "Fiado") return `Fiado — ${s.fiadoPerson || "sin nombre"}${s.fiadoPaid ? " (ya pagado)" : " (pendiente)"}`;
   return s.method + (s.bank ? ` (${s.bank})` : "");
+}
+function markFiadoPaid(state, saleId) {
+  const mark = (arr) => arr.map((s) => (s.id === saleId ? { ...s, fiadoPaid: true, fiadoPaidAt: new Date().toISOString() } : s));
+  return { ...state, sales: mark(state.sales || []), salesLog: mark(state.salesLog || []) };
 }
 const DEFAULT_SECTIONS = [
   { name: "Salón Principal", icon: "🍽️" },
@@ -489,10 +494,11 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
-  function closeTicket(kind, id, method, discount, tip, itemMenuIds, bank) {
+  function closeTicket(kind, id, method, discount, tip, itemMenuIds, bank, fiadoPersonName) {
     const disc = discount && discount.value > 0 ? discount : null;
     const tipAmount = Number(tip) || 0;
     const bankInfo = (method === "Tarjeta" || method === "Transferencia") && bank ? bank : null;
+    const fiadoInfo = method === "Fiado" ? { fiadoPerson: (fiadoPersonName || "").trim(), fiadoPaid: false } : {};
     function computeTotal(items) {
       const sub = orderTotal(items);
       if (!disc) return { subtotal: sub, discountAmount: 0, total: sub };
@@ -507,7 +513,7 @@ export default function App() {
       const remainingItems = splitting ? t.items.filter((it) => !itemMenuIds.includes(it.menuId)) : [];
       if (!chargedItems.length) return;
       const { subtotal, discountAmount, total } = computeTotal(chargedItems);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, bank: bankInfo, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "mesa", ref: `Mesa ${t.id}${splitting ? " (parte)" : ""}`, items: chargedItems, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, bank: bankInfo, ...fiadoInfo, time: new Date().toISOString() };
       const invResult = deductInventoryForSale(chargedItems);
       const next = {
         ...state,
@@ -523,7 +529,7 @@ export default function App() {
       const d = deliveries.find((d) => d.id === id);
       if (!d.items.length) return;
       const { subtotal, discountAmount, total } = computeTotal(d.items);
-      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, bank: bankInfo, time: new Date().toISOString() };
+      const sale = { id: Date.now(), folio: salesLog.length + 1, kind: "delivery", ref: d.customer, phone: d.phone, items: d.items, subtotal, discountAmount, discountLabel: disc ? (disc.type === "percent" ? `${disc.value}%` : money(disc.value)) : null, total, tip: tipAmount, method, bank: bankInfo, ...fiadoInfo, time: new Date().toISOString() };
       const invResult = deductInventoryForSale(d.items);
       const next = {
         ...state,
@@ -660,6 +666,9 @@ export default function App() {
   }
   function deleteSale(id) {
     persist({ ...state, sales: sales.filter((s) => s.id !== id) });
+  }
+  function markFiadoAsPaid(id) {
+    persist(markFiadoPaid(state, id));
   }
   function deleteSalesLogEntry(id) {
     persist({ ...state, salesLog: salesLog.filter((s) => s.id !== id) });
@@ -850,7 +859,7 @@ export default function App() {
           />
         )}
 
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} />}
+        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} onMarkFiadoPaid={markFiadoAsPaid} />}
 
         {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
 
@@ -2704,6 +2713,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   ];
   const [method, setMethod] = useState({});
   const [bank, setBank] = useState({});
+  const [fiadoPerson, setFiadoPerson] = useState({});
   const [discountOpen, setDiscountOpen] = useState({});
   const [discountType, setDiscountType] = useState({});
   const [discountValue, setDiscountValue] = useState({});
@@ -3045,21 +3055,21 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
 
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 10.5, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 8 }}>MÉTODO DE PAGO</div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    {[{ id: "Efectivo", icon: "💵" }, { id: "Tarjeta", icon: "💳" }, { id: "Transferencia", icon: "🏦" }].map((opt) => (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    {[{ id: "Efectivo", icon: "💵" }, { id: "Tarjeta", icon: "💳" }, { id: "Transferencia", icon: "🏦" }, { id: "Fiado", icon: "📓" }].map((opt) => (
                       <button
                         key={opt.id}
                         onClick={() => setMethod((s) => ({ ...s, [key]: opt.id }))}
                         className="caja-pay-btn"
                         style={{
-                          flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "13px 10px", borderRadius: 14, cursor: "pointer",
-                          border: m === opt.id ? `2px solid ${GOLD}` : `1px solid ${LINE}`,
-                          background: m === opt.id ? "rgba(242,200,121,0.10)" : "rgba(255,255,255,0.02)",
-                          boxShadow: m === opt.id ? "0 6px 16px rgba(242,200,121,0.15)" : "none",
+                          flex: "1 1 21%", minWidth: 78, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "13px 10px", borderRadius: 14, cursor: "pointer",
+                          border: m === opt.id ? `2px solid ${opt.id === "Fiado" ? "#E8A33D" : GOLD}` : `1px solid ${LINE}`,
+                          background: m === opt.id ? (opt.id === "Fiado" ? "rgba(232,163,61,0.12)" : "rgba(242,200,121,0.10)") : "rgba(255,255,255,0.02)",
+                          boxShadow: m === opt.id ? `0 6px 16px ${opt.id === "Fiado" ? "rgba(232,163,61,0.2)" : "rgba(242,200,121,0.15)"}` : "none",
                         }}
                       >
                         <span style={{ fontSize: 21 }}>{opt.icon}</span>
-                        <span style={{ fontWeight: 800, fontSize: 12.5, color: m === opt.id ? GOLD : CREAM }}>{opt.id}</span>
+                        <span style={{ fontWeight: 800, fontSize: 12.5, color: m === opt.id ? (opt.id === "Fiado" ? "#E8A33D" : GOLD) : CREAM }}>{opt.id}</span>
                       </button>
                     ))}
                   </div>
@@ -3085,6 +3095,19 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {m === "Fiado" && (
+                  <div style={{ marginBottom: 16, background: "rgba(232,163,61,0.08)", border: "1px solid rgba(232,163,61,0.3)", borderRadius: 14, padding: 14 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: "#E8A33D", letterSpacing: 1, marginBottom: 8 }}>¿A NOMBRE DE QUIÉN QUEDA FIADO?</div>
+                    <input
+                      placeholder="Nombre del empleado o familiar"
+                      value={fiadoPerson[key] || ""}
+                      onChange={(ev) => setFiadoPerson((s) => ({ ...s, [key]: ev.target.value }))}
+                      style={{ ...cajaInp(LINE, CREAM), width: "100%", boxSizing: "border-box" }}
+                    />
+                    <div style={{ fontSize: 11, color: MUTED, marginTop: 8 }}>Esta venta no se contará como efectivo recibido — queda pendiente de cobro hasta que la marques como pagada en Reportes.</div>
                   </div>
                 )}
 
@@ -3149,8 +3172,8 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
 
                 {isSplitting ? (
                   <button
-                    disabled={selectedIds.length === 0 || ((m === "Tarjeta" || m === "Transferencia") && !bank[key])}
-                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, null, null, selectedIds, bank[key]); setSplitSelected((s) => ({ ...s, [key]: [] })); setSplitMode((s) => ({ ...s, [key]: false })); }}
+                    disabled={selectedIds.length === 0 || ((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())}
+                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, null, null, selectedIds, bank[key], fiadoPerson[key]); setSplitSelected((s) => ({ ...s, [key]: [] })); setSplitMode((s) => ({ ...s, [key]: false })); }}
                     className="caja-charge-btn"
                     style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: selectedIds.length ? `linear-gradient(135deg, ${BLUE}, #2A5FB0)` : "rgba(255,255,255,0.08)", color: "#fff", fontWeight: 800, cursor: selectedIds.length ? "pointer" : "not-allowed", fontSize: 14.5, letterSpacing: 0.3 }}
                   >
@@ -3158,12 +3181,17 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                   </button>
                 ) : (
                   <button
-                    disabled={(m === "Tarjeta" || m === "Transferencia") && !bank[key]}
-                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key], undefined, bank[key]); }}
+                    disabled={((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())}
+                    onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, getDiscount(key), tipValue[key], undefined, bank[key], fiadoPerson[key]); }}
                     className="caja-charge-btn"
-                    style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: ((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "rgba(255,255,255,0.08)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: ((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "not-allowed" : "pointer", fontSize: 14.5, letterSpacing: 0.3, boxShadow: "0 8px 20px rgba(193,39,45,0.3)" }}
+                    style={{
+                      width: "100%", padding: 15, border: "none", borderRadius: 14, color: "#fff", fontWeight: 800, fontSize: 14.5, letterSpacing: 0.3,
+                      background: (((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())) ? "rgba(255,255,255,0.08)" : (m === "Fiado" ? "linear-gradient(135deg, #E8A33D, #C1272D)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`),
+                      cursor: (((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())) ? "not-allowed" : "pointer",
+                      boxShadow: "0 8px 20px rgba(193,39,45,0.3)",
+                    }}
                   >
-                    {((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "Selecciona el banco" : `✓ Cobrar y cerrar${tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}`}
+                    {((m === "Tarjeta" || m === "Transferencia") && !bank[key]) ? "Selecciona el banco" : (m === "Fiado" && !fiadoPerson[key]?.trim()) ? "Escribí a nombre de quién" : m === "Fiado" ? `📓 Dejar fiado${tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}` : `✓ Cobrar y cerrar${tipValue[key] ? ` (+${money(Number(tipValue[key]))} propina)` : ""}`}
                   </button>
                 )}
               </div>
@@ -5229,7 +5257,84 @@ function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insum
   w.print();
 }
 
-function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords }) {
+function FiadosPendientesCard({ sales, onMarkPaid }) {
+  const [showPaid, setShowPaid] = useState(false);
+  const allFiados = sales.filter((s) => s.method === "Fiado");
+  const pending = allFiados.filter((s) => !s.fiadoPaid).sort((a, b) => new Date(a.time) - new Date(b.time));
+  const paid = allFiados.filter((s) => s.fiadoPaid).sort((a, b) => new Date(b.fiadoPaidAt || b.time) - new Date(a.fiadoPaidAt || a.time));
+  const totalPending = pending.reduce((sum, s) => sum + s.total, 0);
+  const byPerson = useMemo(() => {
+    const map = {};
+    pending.forEach((s) => {
+      const name = s.fiadoPerson || "Sin nombre";
+      map[name] = (map[name] || 0) + s.total;
+    });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [pending]);
+
+  if (allFiados.length === 0) return null;
+
+  return (
+    <div style={{ background: "#fff", border: "2px solid #E8A33D", borderRadius: 18, padding: 20, marginBottom: 22 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#8a5a00" }}>📓 FIADOS — VENTAS PENDIENTES DE COBRO</div>
+        <div style={{ fontWeight: 800, fontSize: 20, color: "#C1272D" }}>{money(totalPending)}</div>
+      </div>
+
+      {byPerson.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+          {byPerson.map(([name, amount]) => (
+            <div key={name} style={{ background: "rgba(232,163,61,0.1)", border: "1px solid rgba(232,163,61,0.3)", borderRadius: 10, padding: "8px 14px" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#8a5a00" }}>👤 {name}</div>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#C1272D" }}>{money(amount)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {pending.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: "#2E7D32", fontWeight: 700 }}>✅ No hay fiados pendientes de cobro.</p>
+      ) : (
+        <div style={{ display: "grid", gap: 6 }}>
+          {pending.map((s) => (
+            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#FBF6EC", borderRadius: 10, padding: "9px 12px", flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>👤 {s.fiadoPerson || "Sin nombre"}</div>
+                <div style={{ fontSize: 11, color: "#8a7a63" }}>{s.ref} · {new Date(s.time).toLocaleDateString("es-NI", { day: "numeric", month: "short" })}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontWeight: 800, fontSize: 14, color: "#C1272D" }}>{money(s.total)}</span>
+                <button onClick={() => onMarkPaid(s.id)} style={{ fontSize: 11.5, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
+                  ✓ Marcar pagado
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {paid.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <button onClick={() => setShowPaid((s) => !s)} style={{ fontSize: 11.5, background: "none", border: "1px solid #E5D9C3", borderRadius: 7, padding: "6px 12px", cursor: "pointer", color: "#8a7a63", fontWeight: 700 }}>
+            {showPaid ? "Ocultar" : "Ver"} fiados ya pagados ({paid.length})
+          </button>
+          {showPaid && (
+            <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
+              {paid.map((s) => (
+                <div key={s.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", padding: "6px 10px", borderBottom: "1px solid #F0E8D8" }}>
+                  <span>👤 {s.fiadoPerson || "Sin nombre"} · {s.ref}</span>
+                  <span>{money(s.total)} — pagado {s.fiadoPaidAt ? new Date(s.fiadoPaidAt).toLocaleDateString("es-NI") : ""}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddExpense, onDeleteSale, onDeleteExpense, onClearDay, onClearMonth, clockRecords, onMarkFiadoPaid }) {
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
     const tz = d.getTimezoneOffset() * 60000;
@@ -5657,8 +5762,11 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         </span>
       </div>
 
+      <FiadosPendientesCard sales={sales} onMarkPaid={onMarkFiadoPaid} />
+
       <div style={{ background: "linear-gradient(160deg, #2B2118, #1a140e)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(242,200,121,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
         <div style={{ fontWeight: 800, fontSize: 14, color: "#F2C879", letterSpacing: 0.5, marginBottom: 14 }}>📊 GASTOS POR CATEGORÍA — {isToday ? "HOY" : new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { day: "numeric", month: "short" }).toUpperCase()}</div>
+
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 18 }}>
           <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #F2C879" }}>
