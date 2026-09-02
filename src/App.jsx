@@ -385,7 +385,7 @@ export default function App() {
       fulfillment: data.fulfillment || "recoge",
       address: data.address || "",
       description: data.description || "",
-      items: [],
+      items: Array.isArray(data.items) ? data.items : [],
       manualTotal: data.manualTotal ? Number(data.manualTotal) : 0,
       deposit: Number(data.deposit) || 0,
       depositPaid: !!data.deposit,
@@ -3281,6 +3281,26 @@ function EncargoMenuItemRow({ menuItem, onAdd }) {
   );
 }
 
+function EncargoSpecialItemForm({ onAdd }) {
+  const [name, setName] = useState("");
+  const [price, setPrice] = useState("");
+  const [qty, setQty] = useState(1);
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <input placeholder="Nombre (ej: torta 3 leches x40)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7, fontSize: 12 }} />
+      <input placeholder="Precio" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inp, maxWidth: 90, padding: 7, fontSize: 12 }} />
+      <input placeholder="Cant." type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...inp, maxWidth: 65, padding: 7, fontSize: 12 }} />
+      <button
+        disabled={!name.trim() || !price}
+        onClick={() => { onAdd(name.trim(), Number(price), qty); setName(""); setPrice(""); setQty(1); }}
+        style={{ fontSize: 11.5, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: name.trim() && price ? 1 : 0.5 }}
+      >
+        + Agregar especial
+      </button>
+    </div>
+  );
+}
+
 function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete, onAddItem, onChangeItemQty }) {
   const [formOpen, setFormOpen] = useState(false);
   const [customer, setCustomer] = useState("");
@@ -3299,6 +3319,13 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   const [notes, setNotes] = useState("");
   const [statusFilter, setStatusFilter] = useState("activos");
   const [itemPickerFor, setItemPickerFor] = useState(null);
+  const [customItemFor, setCustomItemFor] = useState(null);
+
+  // Carrito del nuevo encargo (se arma con el menú antes de guardar)
+  const [newItems, setNewItems] = useState([]);
+  const [specialName, setSpecialName] = useState("");
+  const [specialPrice, setSpecialPrice] = useState("");
+  const [specialQty, setSpecialQty] = useState(1);
 
   const todayStr = new Date().toDateString();
   const in7days = new Date(); in7days.setDate(in7days.getDate() + 7);
@@ -3306,6 +3333,23 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   function encargoTotal(e) {
     return e.items && e.items.length ? orderTotal(e.items) : (Number(e.manualTotal) || 0);
   }
+  function addToNewCart(menuItem, qty) {
+    const addQty = Math.max(1, Number(qty) || 1);
+    setNewItems((items) => {
+      const existing = items.find((it) => it.menuId === menuItem.id);
+      if (existing) return items.map((it) => (it.menuId === menuItem.id ? { ...it, qty: it.qty + addQty } : it));
+      return [...items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: addQty, special: !!menuItem.special }];
+    });
+  }
+  function changeNewCartQty(menuId, delta) {
+    setNewItems((items) => items.map((it) => (it.menuId === menuId ? { ...it, qty: it.qty + delta } : it)).filter((it) => it.qty > 0));
+  }
+  function addSpecialToNewCart() {
+    if (!specialName.trim() || !specialPrice) return;
+    addToNewCart({ id: `special-${Date.now()}`, name: specialName.trim(), price: Number(specialPrice), special: true }, specialQty);
+    setSpecialName(""); setSpecialPrice(""); setSpecialQty(1);
+  }
+  const newCartTotal = orderTotal(newItems);
 
   const activeList = encargos.filter((e) => e.status !== "entregado" && e.status !== "cancelado");
   const pendientesCount = encargos.filter((e) => e.status === "pendiente").length;
@@ -3328,8 +3372,8 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
 
   function submitNew() {
     if (!customer.trim() || !eventDate) return;
-    onAdd({ customer: customer.trim(), phone: phone.trim(), eventDate, eventTime, fulfillment, address: address.trim(), description: description.trim(), manualTotal, deposit, notes: notes.trim() });
-    setCustomer(""); setPhone(""); setEventTime(""); setAddress(""); setDescription(""); setManualTotal(""); setDeposit(""); setNotes(""); setFormOpen(false);
+    onAdd({ customer: customer.trim(), phone: phone.trim(), eventDate, eventTime, fulfillment, address: address.trim(), description: description.trim(), items: newItems, manualTotal, deposit, notes: notes.trim() });
+    setCustomer(""); setPhone(""); setEventTime(""); setAddress(""); setDescription(""); setManualTotal(""); setDeposit(""); setNotes(""); setNewItems([]); setFormOpen(false);
   }
 
   return (
@@ -3369,13 +3413,14 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
       {formOpen && (
         <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
           <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>➕ Registrar nuevo encargo</div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 6 }}>1. Datos del cliente</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
             <input placeholder="Nombre del cliente" value={customer} onChange={(e) => setCustomer(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
             <input placeholder="Teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
             <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} title="Fecha del encargo" style={{ ...inp, maxWidth: 150 }} />
             <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} title="Hora aproximada" style={{ ...inp, maxWidth: 120 }} />
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => setFulfillment("recoge")} style={{ padding: "9px 14px", borderRadius: 8, border: fulfillment === "recoge" ? "2px solid #2B2118" : "1px solid #E5D9C3", background: fulfillment === "recoge" ? "rgba(43,33,24,0.06)" : "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🏪 Cliente recoge</button>
               <button onClick={() => setFulfillment("entrega")} style={{ padding: "9px 14px", borderRadius: 8, border: fulfillment === "entrega" ? "2px solid #2B2118" : "1px solid #E5D9C3", background: fulfillment === "entrega" ? "rgba(43,33,24,0.06)" : "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🛵 Se entrega</button>
@@ -3384,22 +3429,85 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
               <input placeholder="Dirección de entrega" value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
             )}
           </div>
+
+          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 6 }}>2. Armá el pedido con el menú</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginBottom: 16 }}>
+            <div style={{ background: "#FBF6EC", border: "1px solid #F0E8D8", borderRadius: 10, padding: 10, maxHeight: 320, overflowY: "auto" }}>
+              {menuCats.map((cat) => {
+                const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
+                if (!items.length) return null;
+                return (
+                  <div key={cat.name} style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8a7a63", marginBottom: 4 }}>{cat.icon} {cat.name}</div>
+                    <div style={{ display: "grid", gap: 5 }}>
+                      {items.map((m) => (
+                        <EncargoMenuItemRow key={m.id} menuItem={m} onAdd={(qty) => addToNewCart(m, qty)} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 6, paddingTop: 10, borderTop: "1px dashed #E5D9C3" }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: "#C1272D", marginBottom: 6 }}>⭐ COMIDA ESPECIAL (fuera del menú)</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <input placeholder="Nombre (ej: torta 3 leches x40)" value={specialName} onChange={(e) => setSpecialName(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7, fontSize: 12 }} />
+                  <input placeholder="Precio" type="number" value={specialPrice} onChange={(e) => setSpecialPrice(e.target.value)} style={{ ...inp, maxWidth: 90, padding: 7, fontSize: 12 }} />
+                  <input placeholder="Cant." type="number" min="1" value={specialQty} onChange={(e) => setSpecialQty(e.target.value)} style={{ ...inp, maxWidth: 65, padding: 7, fontSize: 12 }} />
+                  <button
+                    disabled={!specialName.trim() || !specialPrice}
+                    onClick={addSpecialToNewCart}
+                    style={{ fontSize: 11.5, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: specialName.trim() && specialPrice ? 1 : 0.5 }}
+                  >
+                    + Agregar especial
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: "#2B2118", borderRadius: 10, padding: 12, color: "#F5ECD9", display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#F2C879", letterSpacing: 0.5, marginBottom: 8 }}>🧾 PEDIDO DEL ENCARGO</div>
+              {newItems.length === 0 ? (
+                <div style={{ fontSize: 12, color: "#A8977E", flex: 1 }}>Todavía no agregaste platillos. Elegí del menú a la izquierda, o metelé un especial.</div>
+              ) : (
+                <div style={{ flex: 1, overflowY: "auto", maxHeight: 220 }}>
+                  {newItems.map((it) => (
+                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                      <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontWeight: 700 }}>{money(it.price * it.qty)}</span>
+                        <button onClick={() => changeNewCartQty(it.menuId, -1)} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 5, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>−</button>
+                        <button onClick={() => changeNewCartQty(it.menuId, 1)} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 5, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>+</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#C9BBA3" }}>TOTAL DEL MENÚ</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: "#F2C879" }}>{money(newCartTotal)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 6 }}>3. Detalles adicionales (opcional)</div>
           <textarea
-            placeholder="Descripción del pedido (ej: 60 porciones de pollo frito con papas, 3 tortas de chocolate para 30 personas, servilletas y vasos incluidos)"
+            placeholder="Notas del pedido, aclaraciones, decoración, etc."
             value={description} onChange={(e) => setDescription(e.target.value)}
-            style={{ ...inp, minHeight: 60, marginBottom: 8, fontFamily: "inherit" }}
+            style={{ ...inp, minHeight: 50, marginBottom: 8, fontFamily: "inherit" }}
           />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            <input placeholder="Total estimado (C$)" type="number" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} style={{ ...inp, maxWidth: 170 }} title="Podés ajustarlo después, o dejarlo en 0 y sumarlo con platillos del menú" />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+            {newItems.length === 0 && (
+              <input placeholder="Total estimado (C$) — si no usás el menú" type="number" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+            )}
             <input placeholder="Anticipo recibido (C$)" type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
-            <input placeholder="Notas internas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+            <input placeholder="Notas internas" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
           </div>
           <button
             disabled={!customer.trim() || !eventDate}
             onClick={submitNew}
-            style={{ padding: "10px 20px", border: "none", borderRadius: 8, background: "#2B2118", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: customer.trim() && eventDate ? 1 : 0.5 }}
+            style={{ padding: "11px 22px", border: "none", borderRadius: 8, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", opacity: customer.trim() && eventDate ? 1 : 0.5, fontSize: 13.5 }}
           >
-            Guardar encargo
+            Guardar encargo{(newItems.length > 0 || manualTotal) ? ` — ${money(newItems.length ? newCartTotal : (Number(manualTotal) || 0))}` : ""}
           </button>
         </div>
       )}
@@ -3468,7 +3576,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                 <div style={{ marginBottom: 10 }}>
                   {e.items.map((it) => (
                     <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "4px 0", borderBottom: "1px solid #F5EEE0" }}>
-                      <span>{it.qty}x {it.name}</span>
+                      <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontWeight: 700 }}>{money(it.price * it.qty)}</span>
                         <button onClick={() => onChangeItemQty(e.id, it.menuId, -1)} style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 5, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>−</button>
@@ -3502,6 +3610,10 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                       </div>
                     );
                   })}
+                  <div style={{ marginTop: 6, paddingTop: 10, borderTop: "1px dashed #E5D9C3" }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: "#C1272D", marginBottom: 6 }}>⭐ COMIDA ESPECIAL (fuera del menú)</div>
+                    <EncargoSpecialItemForm onAdd={(name, price, qty) => onAddItem(e.id, { id: `special-${Date.now()}`, name, price, special: true }, qty)} />
+                  </div>
                 </div>
               )}
 
