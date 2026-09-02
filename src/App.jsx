@@ -396,13 +396,14 @@ export default function App() {
   function deleteEncargo(id) {
     withEncargos((es) => es.filter((e) => e.id !== id));
   }
-  function addEncargoItem(id, menuItem) {
+  function addEncargoItem(id, menuItem, qty) {
+    const addQty = Math.max(1, Number(qty) || 1);
     withEncargos((es) => es.map((e) => {
       if (e.id !== id) return e;
       const existing = e.items.find((it) => it.menuId === menuItem.id);
       const items = existing
-        ? e.items.map((it) => (it.menuId === menuItem.id ? { ...it, qty: it.qty + 1 } : it))
-        : [...e.items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: 1 }];
+        ? e.items.map((it) => (it.menuId === menuItem.id ? { ...it, qty: it.qty + addQty } : it))
+        : [...e.items, { menuId: menuItem.id, name: menuItem.name, price: menuItem.price, qty: addQty }];
       return { ...e, items };
     }));
   }
@@ -3231,6 +3232,27 @@ const ENCARGO_STATUS = {
   cancelado: { label: "Cancelado", icon: "🚫", color: "#C1272D", bg: "rgba(193,39,45,0.1)" },
 };
 
+function EncargoMenuItemRow({ menuItem, onAdd }) {
+  const [qty, setQty] = useState(1);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 8px" }}>
+      <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{menuItem.name}</span>
+      <span style={{ fontSize: 11.5, color: "#8a7a63" }}>{money(menuItem.price)} c/u</span>
+      <input
+        type="number" min="1" value={qty}
+        onChange={(ev) => setQty(ev.target.value)}
+        style={{ width: 55, padding: "5px 6px", borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 12, textAlign: "center" }}
+      />
+      <button
+        onClick={() => { onAdd(qty); setQty(1); }}
+        style={{ fontSize: 11.5, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap" }}
+      >
+        + Agregar
+      </button>
+    </div>
+  );
+}
+
 function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete, onAddItem, onChangeItemQty }) {
   const [formOpen, setFormOpen] = useState(false);
   const [customer, setCustomer] = useState("");
@@ -3436,18 +3458,17 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
               </div>
 
               {itemPickerFor === e.id && (
-                <div style={{ background: "#FBF6EC", border: "1px solid #F0E8D8", borderRadius: 10, padding: 10, marginBottom: 12, maxHeight: 220, overflowY: "auto" }}>
+                <div style={{ background: "#FBF6EC", border: "1px solid #F0E8D8", borderRadius: 10, padding: 10, marginBottom: 12, maxHeight: 260, overflowY: "auto" }}>
+                  <div style={{ fontSize: 11, color: "#8a7a63", marginBottom: 8 }}>Poné la cantidad que encargaron de cada platillo y tocá "Agregar" — el sistema calcula el total con el precio del menú.</div>
                   {menuCats.map((cat) => {
                     const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
                     if (!items.length) return null;
                     return (
-                      <div key={cat.name} style={{ marginBottom: 8 }}>
+                      <div key={cat.name} style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8a7a63", marginBottom: 4 }}>{cat.icon} {cat.name}</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <div style={{ display: "grid", gap: 5 }}>
                           {items.map((m) => (
-                            <button key={m.id} onClick={() => onAddItem(e.id, m)} style={{ fontSize: 11.5, background: "#fff", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 700 }}>
-                              {m.name} · {money(m.price)}
-                            </button>
+                            <EncargoMenuItemRow key={m.id} menuItem={m} onAdd={(qty) => onAddItem(e.id, m, qty)} />
                           ))}
                         </div>
                       </div>
