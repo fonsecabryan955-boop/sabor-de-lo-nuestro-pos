@@ -625,7 +625,7 @@ export default function App() {
     let nextInventory = inventory;
     const newLogs = [];
     items.forEach((soldItem) => {
-      const menuDef = menuItems.find((m) => m.id === soldItem.menuId || soldItem.menuId.startsWith(String(m.id) + "-"));
+      const menuDef = menuItems.find((m) => m.id === soldItem.menuId || String(soldItem.menuId).startsWith(String(m.id) + "-"));
       if (!menuDef || !menuDef.recipe || !menuDef.recipe.length) return;
       menuDef.recipe.forEach((r) => {
         const invItem = nextInventory.find((i) => i.id === r.invId);
@@ -3253,27 +3253,96 @@ function DeliveryElapsed({ createdAtMs }) {
 }
 
 const ENCARGO_STATUS = {
-  pendiente: { label: "Pendiente", icon: "🕓", color: "#E8A33D", bg: "rgba(232,163,61,0.12)" },
-  confirmado: { label: "Confirmado", icon: "✅", color: "#3E7FD9", bg: "rgba(62,127,217,0.12)" },
-  listo: { label: "Listo para entregar", icon: "📦", color: "#2E7D32", bg: "rgba(46,125,50,0.12)" },
-  entregado: { label: "Entregado", icon: "🏁", color: "#5a4c3a", bg: "rgba(90,76,58,0.1)" },
-  cancelado: { label: "Cancelado", icon: "🚫", color: "#C1272D", bg: "rgba(193,39,45,0.1)" },
+  pendiente: { label: "Pendiente", icon: "🕓", color: "#E8A33D", bg: "rgba(232,163,61,0.14)" },
+  confirmado: { label: "Confirmado", icon: "✅", color: "#3E7FD9", bg: "rgba(62,127,217,0.14)" },
+  listo: { label: "Listo para entregar", icon: "📦", color: "#4ADE80", bg: "rgba(74,222,128,0.14)" },
+  entregado: { label: "Entregado", icon: "🏁", color: "#A8977E", bg: "rgba(168,151,126,0.14)" },
+  cancelado: { label: "Cancelado", icon: "🚫", color: "#F87171", bg: "rgba(248,113,113,0.14)" },
 };
+
+function printEncargoReceipt(e, total, balance) {
+  const deposit = Number(e.deposit) || 0;
+  const eventDateObj = new Date(e.eventDate + "T12:00:00");
+  const fechaLabel = eventDateObj.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const itemsHtml = e.items && e.items.length
+    ? e.items.map((it) => `<div class="row"><span>${it.special ? "⭐ " : ""}${it.qty}x ${it.name}</span><span>${money(it.price * it.qty)}</span></div>`).join("")
+    : `<div class="row"><span>Total estimado del encargo</span><span>${money(total)}</span></div>`;
+
+  const html = `
+    <html><head><title>Comprobante de Encargo</title><style>
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 26px; color: #2B2118; }
+      .header { text-align: center; margin-bottom: 2px; }
+      .logo { font-size: 36px; }
+      .name { font-size: 18px; font-weight: 800; color: #C1272D; margin-top: 4px; }
+      .sub { text-align: center; font-size: 11px; color: #666; letter-spacing: 1px; margin-bottom: 18px; }
+      .title { text-align: center; background: #2B2118; color: #F2C879; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
+      .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #ddd; font-size: 13px; }
+      .row strong { font-weight: 800; }
+      .section-title { font-weight: 800; font-size: 11px; text-transform: uppercase; color: #8a7a63; margin: 18px 0 4px; letter-spacing: 0.5px; }
+      .pos { color: #2E7D32; font-weight: 700; }
+      .neg { color: #C1272D; font-weight: 700; }
+      .big { font-size: 20px; font-weight: 800; text-align: center; margin: 18px 0; background: #F2C879; padding: 16px; border-radius: 10px; letter-spacing: 0.5px; }
+      .note { margin-top: 14px; font-size: 12px; color: #5a4c3a; background: #FBF6EC; border-radius: 8px; padding: 10px 12px; }
+      .sign { margin-top: 55px; display: flex; justify-content: space-between; gap: 24px; }
+      .sign div { flex: 1; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; color: #5a4c3a; }
+      @page { margin: 14mm; }
+    </style></head><body>
+      <div class="header">
+        <div class="logo">🍔🍗</div>
+        <div class="name">${RESTAURANT_NAME}</div>
+      </div>
+      <div class="sub">MASATEPE · MASAYA · NICARAGUA</div>
+      <div class="title">COMPROBANTE DE ENCARGO</div>
+
+      <div class="row"><span>Cliente</span><strong>${e.customer}</strong></div>
+      ${e.phone ? `<div class="row"><span>Teléfono</span><span>${e.phone}</span></div>` : ""}
+      <div class="row"><span>Fecha del encargo</span><span>${fechaLabel}${e.eventTime ? ` · ${e.eventTime}` : ""}</span></div>
+      <div class="row"><span>Entrega</span><span>${e.fulfillment === "entrega" ? `Se entrega${e.address ? ` — ${e.address}` : ""}` : "Cliente recoge"}</span></div>
+
+      <div class="section-title">Pedido</div>
+      ${itemsHtml}
+      ${e.description ? `<div class="note">📝 ${e.description}</div>` : ""}
+
+      <div class="section-title">Pago</div>
+      <div class="row"><span>Total</span><strong>${money(total)}</strong></div>
+      <div class="row"><span>Anticipo recibido</span><span class="pos">${money(deposit)}</span></div>
+      <div class="row"><span>Saldo pendiente</span><span class="${balance > 0 ? "neg" : "pos"}">${money(balance)}</span></div>
+
+      <div class="big">SALDO A COBRAR: ${money(balance)}</div>
+
+      ${e.notes ? `<div class="note">Notas internas: ${e.notes}</div>` : ""}
+
+      <div class="sign">
+        <div>Firma del cliente</div>
+        <div>Firma del negocio</div>
+      </div>
+
+      <div style="text-align:center;font-size:10px;color:#888;margin-top:26px;">Generado el ${new Date().toLocaleString("es-NI")}</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=400,height=680");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
 
 function EncargoMenuItemRow({ menuItem, onAdd }) {
   const [qty, setQty] = useState(1);
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const LINE = "rgba(242,200,121,0.14)";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #E5D9C3", borderRadius: 8, padding: "6px 8px" }}>
-      <span style={{ flex: 1, fontSize: 12, fontWeight: 600 }}>{menuItem.name}</span>
-      <span style={{ fontSize: 11.5, color: "#8a7a63" }}>{money(menuItem.price)} c/u</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.03)", border: `1px solid ${LINE}`, borderRadius: 10, padding: "7px 10px" }}>
+      <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: CREAM }}>{menuItem.name}</span>
+      <span style={{ fontSize: 11.5, color: MUTED }}>{money(menuItem.price)} c/u</span>
       <input
         type="number" min="1" value={qty}
         onChange={(ev) => setQty(ev.target.value)}
-        style={{ width: 55, padding: "5px 6px", borderRadius: 6, border: "1px solid #E5D9C3", fontSize: 12, textAlign: "center" }}
+        style={{ width: 52, padding: "5px 6px", borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, fontSize: 12, textAlign: "center" }}
       />
       <button
         onClick={() => { onAdd(qty); setQty(1); }}
-        style={{ fontSize: 11.5, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap" }}
+        style={{ fontSize: 11.5, background: "linear-gradient(135deg, #2E7D32, #26A65B)", color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap" }}
       >
         + Agregar
       </button>
@@ -3285,15 +3354,18 @@ function EncargoSpecialItemForm({ onAdd }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState(1);
+  const CREAM = "#F5ECD9";
+  const LINE = "rgba(242,200,121,0.14)";
+  const fs = { padding: 7, fontSize: 12, borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, boxSizing: "border-box" };
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      <input placeholder="Nombre (ej: torta 3 leches x40)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7, fontSize: 12 }} />
-      <input placeholder="Precio" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...inp, maxWidth: 90, padding: 7, fontSize: 12 }} />
-      <input placeholder="Cant." type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...inp, maxWidth: 65, padding: 7, fontSize: 12 }} />
+      <input placeholder="Nombre (ej: torta 3 leches x40)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...fs, maxWidth: 180 }} />
+      <input placeholder="Precio" type="number" value={price} onChange={(e) => setPrice(e.target.value)} style={{ ...fs, maxWidth: 90 }} />
+      <input placeholder="Cant." type="number" min="1" value={qty} onChange={(e) => setQty(e.target.value)} style={{ ...fs, maxWidth: 65 }} />
       <button
         disabled={!name.trim() || !price}
         onClick={() => { onAdd(name.trim(), Number(price), qty); setName(""); setPrice(""); setQty(1); }}
-        style={{ fontSize: 11.5, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: name.trim() && price ? 1 : 0.5 }}
+        style={{ fontSize: 11.5, background: "linear-gradient(135deg, #C1272D, #E8A33D)", color: "#fff", border: "none", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: name.trim() && price ? 1 : 0.5 }}
       >
         + Agregar especial
       </button>
@@ -3326,6 +3398,18 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   const [specialName, setSpecialName] = useState("");
   const [specialPrice, setSpecialPrice] = useState("");
   const [specialQty, setSpecialQty] = useState(1);
+
+  const INK = "#15100B";
+  const CARD = "#1E1611";
+  const CARD2 = "#251C15";
+  const GOLD = "#F2C879";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const LINE = "rgba(242,200,121,0.14)";
+  const BLUE = "#3E7FD9";
+  const fieldStyle = { padding: 9, fontSize: 13, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, boxSizing: "border-box" };
 
   const todayStr = new Date().toDateString();
   const in7days = new Date(); in7days.setDate(in7days.getDate() + 7);
@@ -3377,69 +3461,81 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>📅 Encargos y pedidos anticipados</h2>
-          <p style={{ fontSize: 12, color: "#8a7a63", marginTop: 4, marginBottom: 0 }}>Pedidos que un cliente reserva con anticipación: cumpleaños, eventos, catering, o retiros para otro día.</p>
-        </div>
-        <button
-          onClick={() => setFormOpen((f) => !f)}
-          style={{ padding: "10px 18px", border: "none", borderRadius: 10, background: "linear-gradient(135deg, #26A65B, #158A4A)", color: "#fff", fontWeight: 800, cursor: "pointer", fontSize: 13, boxShadow: "0 3px 10px rgba(21,138,74,0.25)" }}
-        >
-          {formOpen ? "✕ Cerrar" : "➕ Nuevo encargo"}
-        </button>
-      </div>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        @keyframes encFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .enc-card { animation: encFadeUp 0.35s ease; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .enc-card:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0,0,0,0.4); }
+      `}</style>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, borderLeft: "4px solid #E8A33D" }}>
-          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>PENDIENTES DE CONFIRMAR</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#E8A33D" }}>{pendientesCount}</div>
+      <div style={{
+        background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`,
+        borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
+        boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
+      }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.10), transparent 70%)" }} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 2.5, color: AMBER, textTransform: "uppercase" }}>Reservas y catering</span>
+            </div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 28, margin: 0, color: CREAM, letterSpacing: 0.2 }}>📅 Encargos y pedidos anticipados</h2>
+            <div style={{ fontSize: 12.5, color: MUTED, marginTop: 5, maxWidth: 480 }}>Pedidos que un cliente reserva con anticipación: cumpleaños, eventos, catering, o retiros para otro día.</div>
+          </div>
+          <button
+            onClick={() => setFormOpen((f) => !f)}
+            style={{ padding: "12px 20px", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 13.5, background: formOpen ? "rgba(255,255,255,0.06)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: formOpen ? CREAM : "#fff", boxShadow: formOpen ? "none" : "0 8px 20px rgba(193,39,45,0.3)", border: formOpen ? `1px solid ${LINE}` : "none" }}
+          >
+            {formOpen ? "✕ Cerrar" : "➕ Nuevo encargo"}
+          </button>
         </div>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, borderLeft: "4px solid #C1272D" }}>
-          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>PARA HOY</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#C1272D" }}>{hoyCount}</div>
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, borderLeft: "4px solid #3E7FD9" }}>
-          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>PRÓXIMOS 7 DÍAS</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#3E7FD9" }}>{semanaCount}</div>
-        </div>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: 14, borderLeft: "4px solid #2E7D32" }}>
-          <div style={{ fontSize: 10.5, color: "#8a7a63", fontWeight: 700, letterSpacing: 0.4 }}>SALDO POR COBRAR (ACTIVOS)</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#2E7D32" }}>{money(pendingBalance)}</div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginTop: 22, position: "relative" }}>
+          {[
+            { label: "PENDIENTES DE CONFIRMAR", value: pendientesCount, accent: AMBER },
+            { label: "PARA HOY", value: hoyCount, accent: EMBER },
+            { label: "PRÓXIMOS 7 DÍAS", value: semanaCount, accent: BLUE },
+            { label: "SALDO POR COBRAR (ACTIVOS)", value: money(pendingBalance), accent: "#4ADE80" },
+          ].map((s, i) => (
+            <div key={i} style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: CREAM }}>{s.value}</div>
+            </div>
+          ))}
         </div>
       </div>
 
       {formOpen && (
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
-          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12 }}>➕ Registrar nuevo encargo</div>
-          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 6 }}>1. Datos del cliente</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-            <input placeholder="Nombre del cliente" value={customer} onChange={(e) => setCustomer(e.target.value)} style={{ ...inp, maxWidth: 200 }} />
-            <input placeholder="Teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...inp, maxWidth: 150 }} />
-            <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} title="Fecha del encargo" style={{ ...inp, maxWidth: 150 }} />
-            <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} title="Hora aproximada" style={{ ...inp, maxWidth: 120 }} />
+        <div style={{ background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: `1px solid ${LINE}`, borderRadius: 18, padding: 20, marginBottom: 22, boxShadow: "0 12px 30px rgba(0,0,0,0.3)" }}>
+          <div style={{ fontWeight: 800, fontSize: 15, marginBottom: 14, color: CREAM, fontFamily: "'Fraunces', serif" }}>➕ Registrar nuevo encargo</div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: GOLD, letterSpacing: 1, marginBottom: 8 }}>1. Datos del cliente</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <input placeholder="Nombre del cliente" value={customer} onChange={(e) => setCustomer(e.target.value)} style={{ ...fieldStyle, maxWidth: 200 }} />
+            <input placeholder="Teléfono" value={phone} onChange={(e) => setPhone(e.target.value)} style={{ ...fieldStyle, maxWidth: 150 }} />
+            <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} title="Fecha del encargo" style={{ ...fieldStyle, maxWidth: 150, colorScheme: "dark" }} />
+            <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} title="Hora aproximada" style={{ ...fieldStyle, maxWidth: 120, colorScheme: "dark" }} />
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18, alignItems: "center" }}>
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setFulfillment("recoge")} style={{ padding: "9px 14px", borderRadius: 8, border: fulfillment === "recoge" ? "2px solid #2B2118" : "1px solid #E5D9C3", background: fulfillment === "recoge" ? "rgba(43,33,24,0.06)" : "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🏪 Cliente recoge</button>
-              <button onClick={() => setFulfillment("entrega")} style={{ padding: "9px 14px", borderRadius: 8, border: fulfillment === "entrega" ? "2px solid #2B2118" : "1px solid #E5D9C3", background: fulfillment === "entrega" ? "rgba(43,33,24,0.06)" : "#fff", cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🛵 Se entrega</button>
+              <button onClick={() => setFulfillment("recoge")} style={{ padding: "9px 14px", borderRadius: 10, border: fulfillment === "recoge" ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: fulfillment === "recoge" ? "rgba(242,200,121,0.10)" : "rgba(255,255,255,0.03)", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: fulfillment === "recoge" ? GOLD : CREAM }}>🏪 Cliente recoge</button>
+              <button onClick={() => setFulfillment("entrega")} style={{ padding: "9px 14px", borderRadius: 10, border: fulfillment === "entrega" ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: fulfillment === "entrega" ? "rgba(242,200,121,0.10)" : "rgba(255,255,255,0.03)", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: fulfillment === "entrega" ? GOLD : CREAM }}>🛵 Se entrega</button>
             </div>
             {fulfillment === "entrega" && (
-              <input placeholder="Dirección de entrega" value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...inp, maxWidth: 240 }} />
+              <input placeholder="Dirección de entrega" value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...fieldStyle, maxWidth: 240 }} />
             )}
           </div>
 
-          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 6 }}>2. Armá el pedido con el menú</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginBottom: 16 }}>
-            <div style={{ background: "#FBF6EC", border: "1px solid #F0E8D8", borderRadius: 10, padding: 10, maxHeight: 320, overflowY: "auto" }}>
+          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: GOLD, letterSpacing: 1, marginBottom: 8 }}>2. Armá el pedido con el menú</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginBottom: 18 }}>
+            <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, maxHeight: 320, overflowY: "auto" }}>
               {menuCats.map((cat) => {
                 const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
                 if (!items.length) return null;
                 return (
                   <div key={cat.name} style={{ marginBottom: 10 }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8a7a63", marginBottom: 4 }}>{cat.icon} {cat.name}</div>
-                    <div style={{ display: "grid", gap: 5 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: MUTED, marginBottom: 5 }}>{cat.icon} {cat.name}</div>
+                    <div style={{ display: "grid", gap: 6 }}>
                       {items.map((m) => (
                         <EncargoMenuItemRow key={m.id} menuItem={m} onAdd={(qty) => addToNewCart(m, qty)} />
                       ))}
@@ -3447,16 +3543,16 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                   </div>
                 );
               })}
-              <div style={{ marginTop: 6, paddingTop: 10, borderTop: "1px dashed #E5D9C3" }}>
-                <div style={{ fontSize: 10.5, fontWeight: 800, color: "#C1272D", marginBottom: 6 }}>⭐ COMIDA ESPECIAL (fuera del menú)</div>
+              <div style={{ marginTop: 8, paddingTop: 12, borderTop: `1px dashed ${LINE}` }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: EMBER, marginBottom: 8 }}>⭐ COMIDA ESPECIAL (fuera del menú)</div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <input placeholder="Nombre (ej: torta 3 leches x40)" value={specialName} onChange={(e) => setSpecialName(e.target.value)} style={{ ...inp, maxWidth: 180, padding: 7, fontSize: 12 }} />
-                  <input placeholder="Precio" type="number" value={specialPrice} onChange={(e) => setSpecialPrice(e.target.value)} style={{ ...inp, maxWidth: 90, padding: 7, fontSize: 12 }} />
-                  <input placeholder="Cant." type="number" min="1" value={specialQty} onChange={(e) => setSpecialQty(e.target.value)} style={{ ...inp, maxWidth: 65, padding: 7, fontSize: 12 }} />
+                  <input placeholder="Nombre (ej: torta 3 leches x40)" value={specialName} onChange={(e) => setSpecialName(e.target.value)} style={{ ...fieldStyle, maxWidth: 180, padding: 7, fontSize: 12 }} />
+                  <input placeholder="Precio" type="number" value={specialPrice} onChange={(e) => setSpecialPrice(e.target.value)} style={{ ...fieldStyle, maxWidth: 90, padding: 7, fontSize: 12 }} />
+                  <input placeholder="Cant." type="number" min="1" value={specialQty} onChange={(e) => setSpecialQty(e.target.value)} style={{ ...fieldStyle, maxWidth: 65, padding: 7, fontSize: 12 }} />
                   <button
                     disabled={!specialName.trim() || !specialPrice}
                     onClick={addSpecialToNewCart}
-                    style={{ fontSize: 11.5, background: "#C1272D", color: "#fff", border: "none", borderRadius: 6, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: specialName.trim() && specialPrice ? 1 : 0.5 }}
+                    style={{ fontSize: 11.5, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", border: "none", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: specialName.trim() && specialPrice ? 1 : 0.5 }}
                   >
                     + Agregar especial
                   </button>
@@ -3464,55 +3560,55 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
               </div>
             </div>
 
-            <div style={{ background: "#2B2118", borderRadius: 10, padding: 12, color: "#F5ECD9", display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#F2C879", letterSpacing: 0.5, marginBottom: 8 }}>🧾 PEDIDO DEL ENCARGO</div>
+            <div style={{ background: `linear-gradient(175deg, ${INK}, #1a140e)`, border: `1px solid ${LINE}`, borderRadius: 12, padding: 14, color: CREAM, display: "flex", flexDirection: "column" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: GOLD, letterSpacing: 0.5, marginBottom: 10 }}>🧾 PEDIDO DEL ENCARGO</div>
               {newItems.length === 0 ? (
-                <div style={{ fontSize: 12, color: "#A8977E", flex: 1 }}>Todavía no agregaste platillos. Elegí del menú a la izquierda, o metelé un especial.</div>
+                <div style={{ fontSize: 12, color: MUTED, flex: 1 }}>Todavía no agregaste platillos. Elegí del menú a la izquierda, o metelé un especial.</div>
               ) : (
                 <div style={{ flex: 1, overflowY: "auto", maxHeight: 220 }}>
                   {newItems.map((it) => (
-                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, padding: "6px 0", borderBottom: `1px solid ${LINE}` }}>
                       <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontWeight: 700 }}>{money(it.price * it.qty)}</span>
-                        <button onClick={() => changeNewCartQty(it.menuId, -1)} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 5, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>−</button>
-                        <button onClick={() => changeNewCartQty(it.menuId, 1)} style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 5, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>+</button>
+                        <span style={{ fontWeight: 700, color: GOLD }}>{money(it.price * it.qty)}</span>
+                        <button onClick={() => changeNewCartQty(it.menuId, -1)} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>−</button>
+                        <button onClick={() => changeNewCartQty(it.menuId, 1)} style={{ background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>+</button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.15)", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#C9BBA3" }}>TOTAL DEL MENÚ</span>
-                <span style={{ fontSize: 18, fontWeight: 800, color: "#F2C879" }}>{money(newCartTotal)}</span>
+              <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 10, paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: MUTED }}>TOTAL DEL MENÚ</span>
+                <span style={{ fontSize: 18, fontWeight: 800, color: GOLD }}>{money(newCartTotal)}</span>
               </div>
             </div>
           </div>
 
-          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 6 }}>3. Detalles adicionales (opcional)</div>
+          <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: GOLD, letterSpacing: 1, marginBottom: 8 }}>3. Detalles adicionales (opcional)</div>
           <textarea
             placeholder="Notas del pedido, aclaraciones, decoración, etc."
             value={description} onChange={(e) => setDescription(e.target.value)}
-            style={{ ...inp, minHeight: 50, marginBottom: 8, fontFamily: "inherit" }}
+            style={{ ...fieldStyle, minHeight: 55, marginBottom: 10, fontFamily: "inherit", width: "100%" }}
           />
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
             {newItems.length === 0 && (
-              <input placeholder="Total estimado (C$) — si no usás el menú" type="number" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+              <input placeholder="Total estimado (C$) — si no usás el menú" type="number" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} style={{ ...fieldStyle, maxWidth: 240 }} />
             )}
-            <input placeholder="Anticipo recibido (C$)" type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={{ ...inp, maxWidth: 170 }} />
-            <input placeholder="Notas internas" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
+            <input placeholder="Anticipo recibido (C$)" type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={{ ...fieldStyle, maxWidth: 180 }} />
+            <input placeholder="Notas internas" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...fieldStyle, maxWidth: 240 }} />
           </div>
           <button
             disabled={!customer.trim() || !eventDate}
             onClick={submitNew}
-            style={{ padding: "11px 22px", border: "none", borderRadius: 8, background: "#2B2118", color: "#F2C879", fontWeight: 800, cursor: "pointer", opacity: customer.trim() && eventDate ? 1 : 0.5, fontSize: 13.5 }}
+            style={{ padding: "12px 24px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: customer.trim() && eventDate ? 1 : 0.5, fontSize: 14, boxShadow: "0 8px 20px rgba(193,39,45,0.3)" }}
           >
             Guardar encargo{(newItems.length > 0 || manualTotal) ? ` — ${money(newItems.length ? newCartTotal : (Number(manualTotal) || 0))}` : ""}
           </button>
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
         {[
           { id: "activos", label: "Activos" },
           { id: "pendiente", label: `${ENCARGO_STATUS.pendiente.icon} Pendientes` },
@@ -3526,10 +3622,10 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
             key={f.id}
             onClick={() => setStatusFilter(f.id)}
             style={{
-              padding: "6px 13px", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer",
-              border: statusFilter === f.id ? "2px solid #2B2118" : "1px solid #E5D9C3",
-              background: statusFilter === f.id ? "#2B2118" : "#fff",
-              color: statusFilter === f.id ? "#F2C879" : "#5a4c3a",
+              padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer",
+              border: statusFilter === f.id ? `2px solid ${GOLD}` : `1px solid ${LINE}`,
+              background: statusFilter === f.id ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.03)",
+              color: statusFilter === f.id ? "#fff" : MUTED,
             }}
           >
             {f.label}
@@ -3537,9 +3633,9 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
         ))}
       </div>
 
-      {filtered.length === 0 && <p style={{ color: "#8a7a63", fontSize: 13 }}>No hay encargos en esta categoría.</p>}
+      {filtered.length === 0 && <p style={{ color: MUTED, fontSize: 13 }}>No hay encargos en esta categoría.</p>}
 
-      <div style={{ display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gap: 14 }}>
         {filtered.map((e) => {
           const st = ENCARGO_STATUS[e.status] || ENCARGO_STATUS.pendiente;
           const total = encargoTotal(e);
@@ -3548,123 +3644,132 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
           const isToday = eventDateObj.toDateString() === todayStr;
           const isPast = eventDateObj < new Date(new Date().toDateString()) && e.status !== "entregado" && e.status !== "cancelado";
           return (
-            <div key={e.id} style={{ background: "#fff", border: isPast ? "2px solid #C1272D" : "1px solid #E5D9C3", borderRadius: 14, padding: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 800, fontSize: 15 }}>{e.customer}</span>
-                    {e.phone && <span style={{ fontSize: 11.5, color: "#8a7a63" }}>📞 {e.phone}</span>}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color: isToday ? "#C1272D" : "#5a4c3a" }}>
-                      📅 {eventDateObj.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}{e.eventTime ? ` · ${e.eventTime}` : ""}
-                      {isToday && " (HOY)"}{isPast && " — ¡ya pasó!"}
-                    </span>
-                    <span style={{ fontSize: 11, background: "#F0E8D8", borderRadius: 8, padding: "2px 8px", fontWeight: 700, color: "#5a4c3a" }}>
-                      {e.fulfillment === "entrega" ? `🛵 Entrega${e.address ? `: ${e.address}` : ""}` : "🏪 Cliente recoge"}
-                    </span>
-                  </div>
-                </div>
-                <span style={{ background: st.bg, color: st.color, borderRadius: 10, padding: "5px 12px", fontWeight: 800, fontSize: 11.5, whiteSpace: "nowrap" }}>
-                  {st.icon} {st.label}
-                </span>
-              </div>
-
-              {e.description && <div style={{ fontSize: 13, color: "#4a3d2e", background: "#FBF6EC", borderRadius: 8, padding: "8px 12px", marginBottom: 10 }}>{e.description}</div>}
-
-              {e.items.length > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  {e.items.map((it) => (
-                    <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "4px 0", borderBottom: "1px solid #F5EEE0" }}>
-                      <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontWeight: 700 }}>{money(it.price * it.qty)}</span>
-                        <button onClick={() => onChangeItemQty(e.id, it.menuId, -1)} style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 5, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>−</button>
-                        <button onClick={() => onChangeItemQty(e.id, it.menuId, 1)} style={{ background: "none", border: "1px solid #E5D9C3", borderRadius: 5, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>+</button>
-                      </div>
+            <div key={e.id} className="enc-card" style={{
+              background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: isPast ? `2px solid ${EMBER}` : `1px solid ${LINE}`,
+              borderRadius: 18, overflow: "hidden", boxShadow: "0 10px 24px rgba(0,0,0,0.25)",
+            }}>
+              <div style={{ height: 4, background: `linear-gradient(90deg, ${st.color}, ${AMBER})` }} />
+              <div style={{ padding: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: CREAM, fontFamily: "'Fraunces', serif" }}>{e.customer}</span>
+                      {e.phone && <span style={{ fontSize: 11.5, color: MUTED }}>📞 {e.phone}</span>}
                     </div>
-                  ))}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 5 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: isToday ? "#F87171" : MUTED }}>
+                        📅 {eventDateObj.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}{e.eventTime ? ` · ${e.eventTime}` : ""}
+                        {isToday && " (HOY)"}{isPast && " — ¡ya pasó!"}
+                      </span>
+                      <span style={{ fontSize: 11, background: "rgba(255,255,255,0.05)", border: `1px solid ${LINE}`, borderRadius: 8, padding: "2px 8px", fontWeight: 700, color: CREAM }}>
+                        {e.fulfillment === "entrega" ? `🛵 Entrega${e.address ? `: ${e.address}` : ""}` : "🏪 Cliente recoge"}
+                      </span>
+                    </div>
+                  </div>
+                  <span style={{ background: st.bg, color: st.color, borderRadius: 10, padding: "6px 13px", fontWeight: 800, fontSize: 11.5, whiteSpace: "nowrap" }}>
+                    {st.icon} {st.label}
+                  </span>
                 </div>
-              )}
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                <button onClick={() => setItemPickerFor(itemPickerFor === e.id ? null : e.id)} style={{ fontSize: 11.5, background: "none", border: "1px solid #E5D9C3", borderRadius: 6, padding: "5px 10px", cursor: "pointer", color: "#5a4c3a", fontWeight: 700 }}>
-                  🍽️ {itemPickerFor === e.id ? "Cerrar menú" : "Agregar platillos del menú"}
-                </button>
-              </div>
+                {e.description && <div style={{ fontSize: 13, color: CREAM, background: "rgba(255,255,255,0.03)", border: `1px solid ${LINE}`, borderRadius: 10, padding: "9px 13px", marginBottom: 12 }}>{e.description}</div>}
 
-              {itemPickerFor === e.id && (
-                <div style={{ background: "#FBF6EC", border: "1px solid #F0E8D8", borderRadius: 10, padding: 10, marginBottom: 12, maxHeight: 260, overflowY: "auto" }}>
-                  <div style={{ fontSize: 11, color: "#8a7a63", marginBottom: 8 }}>Poné la cantidad que encargaron de cada platillo y tocá "Agregar" — el sistema calcula el total con el precio del menú.</div>
-                  {menuCats.map((cat) => {
-                    const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
-                    if (!items.length) return null;
-                    return (
-                      <div key={cat.name} style={{ marginBottom: 10 }}>
-                        <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8a7a63", marginBottom: 4 }}>{cat.icon} {cat.name}</div>
-                        <div style={{ display: "grid", gap: 5 }}>
-                          {items.map((m) => (
-                            <EncargoMenuItemRow key={m.id} menuItem={m} onAdd={(qty) => onAddItem(e.id, m, qty)} />
-                          ))}
+                {e.items.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    {e.items.map((it) => (
+                      <div key={it.menuId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "5px 0", borderBottom: `1px solid ${LINE}`, color: CREAM }}>
+                        <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontWeight: 700, color: GOLD }}>{money(it.price * it.qty)}</span>
+                          <button onClick={() => onChangeItemQty(e.id, it.menuId, -1)} style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${LINE}`, borderRadius: 6, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1, color: CREAM }}>−</button>
+                          <button onClick={() => onChangeItemQty(e.id, it.menuId, 1)} style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${LINE}`, borderRadius: 6, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1, color: CREAM }}>+</button>
                         </div>
                       </div>
-                    );
-                  })}
-                  <div style={{ marginTop: 6, paddingTop: 10, borderTop: "1px dashed #E5D9C3" }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 800, color: "#C1272D", marginBottom: 6 }}>⭐ COMIDA ESPECIAL (fuera del menú)</div>
-                    <EncargoSpecialItemForm onAdd={(name, price, qty) => onAddItem(e.id, { id: `special-${Date.now()}`, name, price, special: true }, qty)} />
+                    ))}
                   </div>
-                </div>
-              )}
+                )}
 
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, borderTop: "1px solid #F0E8D8", paddingTop: 10 }}>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700 }}>TOTAL</div>
-                    <div style={{ fontWeight: 800, fontSize: 15 }}>{money(total)}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700 }}>ANTICIPO</div>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: "#2E7D32" }}>
-                      {money(Number(e.deposit) || 0)}
-                      <input
-                        type="number" defaultValue={e.deposit || ""} placeholder="0"
-                        onBlur={(ev) => onUpdate(e.id, { deposit: Number(ev.target.value) || 0 })}
-                        style={{ width: 70, marginLeft: 6, fontSize: 11, padding: 3, borderRadius: 4, border: "1px solid #E5D9C3" }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700 }}>SALDO PENDIENTE</div>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: balance > 0 ? "#C1272D" : "#2E7D32" }}>{money(balance)}</div>
-                  </div>
-                  {!e.items.length && (
-                    <div>
-                      <div style={{ fontSize: 10, color: "#8a7a63", fontWeight: 700 }}>AJUSTAR TOTAL</div>
-                      <input
-                        type="number" defaultValue={e.manualTotal || ""} placeholder="0"
-                        onBlur={(ev) => onUpdate(e.id, { manualTotal: Number(ev.target.value) || 0 })}
-                        style={{ width: 90, fontSize: 12, padding: 4, borderRadius: 4, border: "1px solid #E5D9C3" }}
-                      />
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {Object.keys(ENCARGO_STATUS).filter((s) => s !== e.status).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => onUpdate(e.id, { status: s })}
-                      style={{ fontSize: 11, background: ENCARGO_STATUS[s].bg, color: ENCARGO_STATUS[s].color, border: "none", borderRadius: 7, padding: "6px 10px", cursor: "pointer", fontWeight: 700 }}
-                    >
-                      {ENCARGO_STATUS[s].icon} {ENCARGO_STATUS[s].label}
-                    </button>
-                  ))}
-                  <button onClick={() => { if (window.confirm(`¿Eliminar el encargo de ${e.customer}?`)) onDelete(e.id); }} style={{ fontSize: 11, background: "none", border: "1px solid #C1272D", borderRadius: 7, padding: "6px 10px", cursor: "pointer", color: "#C1272D", fontWeight: 700 }}>
-                    Eliminar
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                  <button onClick={() => setItemPickerFor(itemPickerFor === e.id ? null : e.id)} style={{ fontSize: 11.5, background: "rgba(255,255,255,0.04)", border: `1px solid ${LINE}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: CREAM, fontWeight: 700 }}>
+                    🍽️ {itemPickerFor === e.id ? "Cerrar menú" : "Agregar platillos del menú"}
                   </button>
                 </div>
+
+                {itemPickerFor === e.id && (
+                  <div style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, marginBottom: 14, maxHeight: 260, overflowY: "auto" }}>
+                    <div style={{ fontSize: 11, color: MUTED, marginBottom: 10 }}>Poné la cantidad que encargaron de cada platillo y tocá "Agregar" — el sistema calcula el total con el precio del menú.</div>
+                    {menuCats.map((cat) => {
+                      const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
+                      if (!items.length) return null;
+                      return (
+                        <div key={cat.name} style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 10.5, fontWeight: 800, color: MUTED, marginBottom: 5 }}>{cat.icon} {cat.name}</div>
+                          <div style={{ display: "grid", gap: 6 }}>
+                            {items.map((m) => (
+                              <EncargoMenuItemRow key={m.id} menuItem={m} onAdd={(qty) => onAddItem(e.id, m, qty)} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{ marginTop: 8, paddingTop: 12, borderTop: `1px dashed ${LINE}` }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: EMBER, marginBottom: 8 }}>⭐ COMIDA ESPECIAL (fuera del menú)</div>
+                      <EncargoSpecialItemForm onAdd={(name, price, qty) => onAddItem(e.id, { id: `special-${Date.now()}`, name, price, special: true }, qty)} />
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, borderTop: `1px solid ${LINE}`, paddingTop: 14 }}>
+                  <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>TOTAL</div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: CREAM }}>{money(total)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>ANTICIPO</div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: "#4ADE80", display: "flex", alignItems: "center" }}>
+                        {money(Number(e.deposit) || 0)}
+                        <input
+                          type="number" defaultValue={e.deposit || ""} placeholder="0"
+                          onBlur={(ev) => onUpdate(e.id, { deposit: Number(ev.target.value) || 0 })}
+                          style={{ width: 70, marginLeft: 8, fontSize: 11, padding: 4, borderRadius: 6, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>SALDO PENDIENTE</div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: balance > 0 ? "#F87171" : "#4ADE80" }}>{money(balance)}</div>
+                    </div>
+                    {!e.items.length && (
+                      <div>
+                        <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>AJUSTAR TOTAL</div>
+                        <input
+                          type="number" defaultValue={e.manualTotal || ""} placeholder="0"
+                          onBlur={(ev) => onUpdate(e.id, { manualTotal: Number(ev.target.value) || 0 })}
+                          style={{ width: 90, fontSize: 12, padding: 5, borderRadius: 6, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {Object.keys(ENCARGO_STATUS).filter((s) => s !== e.status).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => onUpdate(e.id, { status: s })}
+                        style={{ fontSize: 11, background: ENCARGO_STATUS[s].bg, color: ENCARGO_STATUS[s].color, border: "none", borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontWeight: 700 }}
+                      >
+                        {ENCARGO_STATUS[s].icon} {ENCARGO_STATUS[s].label}
+                      </button>
+                    ))}
+                    <button onClick={() => printEncargoReceipt(e, total, balance)} style={{ fontSize: 11, background: "rgba(242,200,121,0.1)", border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: GOLD, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                      <Printer size={12} /> Imprimir comprobante
+                    </button>
+                    <button onClick={() => { if (window.confirm(`¿Eliminar el encargo de ${e.customer}?`)) onDelete(e.id); }} style={{ fontSize: 11, background: "rgba(248,113,113,0.1)", border: "1px solid #F87171", borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: "#F87171", fontWeight: 700 }}>
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+                {e.notes && <div style={{ fontSize: 11, color: MUTED, marginTop: 10 }}>📝 {e.notes}</div>}
               </div>
-              {e.notes && <div style={{ fontSize: 11, color: "#8a7a63", marginTop: 8 }}>📝 {e.notes}</div>}
             </div>
           );
         })}
