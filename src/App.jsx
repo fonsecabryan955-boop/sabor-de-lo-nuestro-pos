@@ -155,7 +155,7 @@ export default function App() {
   const [showNewDelivery, setShowNewDelivery] = useState(false);
   const [menuManagerOpen, setMenuManagerOpen] = useState(false);
   const [tvManagerOpen, setTvManagerOpen] = useState(false);
-  const [cajaUnlocked, setCajaUnlocked] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [receiptFor, setReceiptFor] = useState(null);
   const [connStatus, setConnStatus] = useState("Conectando…");
   const [connError, setConnError] = useState(null);
@@ -869,10 +869,10 @@ export default function App() {
         {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} kiosk={kiosk} />}
 
         {view === "caja" &&
-          (cajaUnlocked ? (
+          (adminUnlocked ? (
             <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} onAddExpense={addExpense} onDeleteExpense={deleteExpense} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
           ) : (
-            <PinGate pin={pin} onUnlock={() => setCajaUnlocked(true)} />
+            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} />
           ))}
 
         {view === "delivery" && (
@@ -916,9 +916,19 @@ export default function App() {
           />
         )}
 
-        {view === "reportes" && <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} onMarkFiadoPaid={markFiadoAsPaid} />}
+        {view === "reportes" &&
+          (adminUnlocked ? (
+            <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} onMarkFiadoPaid={markFiadoAsPaid} />
+          ) : (
+            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} />
+          ))}
 
-        {view === "historial" && <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />}
+        {view === "historial" &&
+          (adminUnlocked ? (
+            <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />
+          ) : (
+            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} />
+          ))}
 
         {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} tvShowPromos={state.tvShowPromos} onManage={() => setTvManagerOpen(true)} />}
       </div>
@@ -3402,6 +3412,58 @@ function printEncargoReceipt(e, total, balance) {
   w.print();
 }
 
+function printEncargoCancelReceipt(e, total, paid, refunded) {
+  const eventDateObj = new Date(e.eventDate + "T12:00:00");
+  const fechaLabel = eventDateObj.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const html = `
+    <html><head><title>Comprobante de Cancelación</title><style>
+      body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 26px; color: #2B2118; }
+      .header { text-align: center; margin-bottom: 2px; }
+      .logo { font-size: 36px; }
+      .name { font-size: 18px; font-weight: 800; color: #C1272D; margin-top: 4px; }
+      .sub { text-align: center; font-size: 11px; color: #666; letter-spacing: 1px; margin-bottom: 18px; }
+      .title { text-align: center; background: #8a1010; color: #fff; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
+      .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #ddd; font-size: 13px; }
+      .row strong { font-weight: 800; }
+      .section-title { font-weight: 800; font-size: 11px; text-transform: uppercase; color: #8a7a63; margin: 18px 0 4px; letter-spacing: 0.5px; }
+      .pos { color: #2E7D32; font-weight: 700; }
+      .neg { color: #C1272D; font-weight: 700; }
+      .big { font-size: 18px; font-weight: 800; text-align: center; margin: 18px 0; background: #F5ECD9; padding: 16px; border-radius: 10px; letter-spacing: 0.3px; }
+      .note { margin-top: 14px; font-size: 12px; color: #5a4c3a; background: #FBF6EC; border-radius: 8px; padding: 10px 12px; }
+      .sign { margin-top: 55px; display: flex; justify-content: space-between; gap: 24px; }
+      .sign div { flex: 1; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; color: #5a4c3a; }
+      @page { margin: 14mm; }
+    </style></head><body>
+      <div class="header">
+        <div class="logo">🍔🍗</div>
+        <div class="name">${RESTAURANT_NAME}</div>
+      </div>
+      <div class="sub">MASATEPE · MASAYA · NICARAGUA</div>
+      <div class="title">⚠️ COMPROBANTE DE CANCELACIÓN</div>
+
+      <div class="row"><span>Cliente</span><strong>${e.customer}</strong></div>
+      ${e.phone ? `<div class="row"><span>Teléfono</span><span>${e.phone}</span></div>` : ""}
+      <div class="row"><span>Fecha que tenía el encargo</span><span>${fechaLabel}${e.eventTime ? ` · ${e.eventTime}` : ""}</span></div>
+      <div class="row"><span>Total del pedido</span><span>${money(total)}</span></div>
+      <div class="row"><span>Anticipo pagado</span><span class="pos">${money(paid)}</span></div>
+      ${e.cancelReason ? `<div class="note">Motivo de cancelación: ${e.cancelReason}</div>` : ""}
+
+      <div class="big">${paid > 0 ? (refunded ? `ANTICIPO DEVUELTO AL CLIENTE: ${money(paid)}` : `ANTICIPO RETENIDO POR EL NEGOCIO: ${money(paid)}`) : "SIN ANTICIPO PAGADO"}</div>
+
+      <div class="sign">
+        <div>Firma del cliente</div>
+        <div>Firma del negocio</div>
+      </div>
+
+      <div style="text-align:center;font-size:10px;color:#888;margin-top:26px;">Generado el ${new Date().toLocaleString("es-NI")}</div>
+    </body></html>`;
+  const w = window.open("", "_blank", "width=400,height=650");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  w.print();
+}
+
 function EncargoMenuItemRow({ menuItem, onAdd }) {
   const [qty, setQty] = useState(1);
   const CREAM = "#F5ECD9";
@@ -3508,6 +3570,9 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   const [paymentFormFor, setPaymentFormFor] = useState(null);
   const [deliverFor, setDeliverFor] = useState(null);
   const [deliverMethod, setDeliverMethod] = useState("Efectivo");
+  const [cancelFor, setCancelFor] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [refundDeposit, setRefundDeposit] = useState(false);
 
   // Carrito del nuevo encargo (se arma con el menú antes de guardar)
   const [newItems, setNewItems] = useState([]);
@@ -3961,7 +4026,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {Object.keys(ENCARGO_STATUS).filter((s) => s !== e.status).map((s) => {
+                    {Object.keys(ENCARGO_STATUS).filter((s) => s !== e.status && s !== "cancelado").map((s) => {
                       if (s === "entregado") {
                         return (
                           <button
@@ -3986,8 +4051,13 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                     <button onClick={() => printEncargoReceipt(e, total, balance)} style={{ fontSize: 11, background: "rgba(242,200,121,0.1)", border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: GOLD, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
                       <Printer size={12} /> Imprimir comprobante
                     </button>
-                    <button onClick={() => { if (window.confirm(`¿Eliminar el encargo de ${e.customer}?`)) onDelete(e.id); }} style={{ fontSize: 11, background: "rgba(248,113,113,0.1)", border: "1px solid #F87171", borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: "#F87171", fontWeight: 700 }}>
-                      Eliminar
+                    {e.status !== "cancelado" && e.status !== "entregado" && (
+                      <button onClick={() => { setCancelFor(cancelFor === e.id ? null : e.id); setCancelReason(""); setRefundDeposit(false); }} style={{ fontSize: 11, background: ENCARGO_STATUS.cancelado.bg, border: `1px solid ${ENCARGO_STATUS.cancelado.color}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: ENCARGO_STATUS.cancelado.color, fontWeight: 700 }}>
+                        🚫 Cancelar pedido
+                      </button>
+                    )}
+                    <button onClick={() => { if (window.confirm(`¿Eliminar por completo el registro del encargo de ${e.customer}? Esto no se puede deshacer.`)) onDelete(e.id); }} style={{ fontSize: 11, background: "rgba(248,113,113,0.1)", border: "1px solid #F87171", borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: "#F87171", fontWeight: 700 }}>
+                      Eliminar registro
                     </button>
                   </div>
                 </div>
@@ -4008,6 +4078,39 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                         Confirmar entrega y cobro
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {cancelFor === e.id && (
+                  <div style={{ marginTop: 12, padding: 12, background: ENCARGO_STATUS.cancelado.bg, border: `1px solid ${ENCARGO_STATUS.cancelado.color}`, borderRadius: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: ENCARGO_STATUS.cancelado.color, marginBottom: 8 }}>
+                      🚫 Cancelar el encargo de {e.customer}{paid > 0 ? ` — tiene ${money(paid)} de anticipo pagado.` : "."}
+                    </div>
+                    <input
+                      placeholder="Motivo de la cancelación (opcional)"
+                      value={cancelReason} onChange={(ev) => setCancelReason(ev.target.value)}
+                      style={{ width: "100%", boxSizing: "border-box", padding: 8, fontSize: 12, borderRadius: 8, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, marginBottom: 10 }}
+                    />
+                    {paid > 0 && (
+                      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                        <button onClick={() => setRefundDeposit(false)} style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: !refundDeposit ? `2px solid ${ENCARGO_STATUS.cancelado.color}` : `1px solid ${LINE}`, background: !refundDeposit ? "rgba(248,113,113,0.12)" : "transparent", color: !refundDeposit ? ENCARGO_STATUS.cancelado.color : CREAM, fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>
+                          Se retiene el anticipo
+                        </button>
+                        <button onClick={() => setRefundDeposit(true)} style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: refundDeposit ? "2px solid #4ADE80" : `1px solid ${LINE}`, background: refundDeposit ? "rgba(74,222,128,0.12)" : "transparent", color: refundDeposit ? "#4ADE80" : CREAM, fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>
+                          Se devuelve al cliente
+                        </button>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        onUpdate(e.id, { status: "cancelado", cancelReason: cancelReason.trim(), depositRefunded: refundDeposit });
+                        printEncargoCancelReceipt(e, total, paid, refundDeposit);
+                        setCancelFor(null);
+                      }}
+                      style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${ENCARGO_STATUS.cancelado.color}, #8a1010)`, color: "#fff", fontWeight: 800, fontSize: 12, cursor: "pointer" }}
+                    >
+                      Confirmar cancelación{paid > 0 ? " e imprimir comprobante" : ""}
+                    </button>
                   </div>
                 )}
                 {e.notes && <div style={{ fontSize: 11, color: MUTED, marginTop: 10 }}>📝 {e.notes}</div>}
