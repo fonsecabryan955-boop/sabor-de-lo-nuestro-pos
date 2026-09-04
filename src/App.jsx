@@ -872,7 +872,7 @@ export default function App() {
           (adminUnlocked ? (
             <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} onAddExpense={addExpense} onDeleteExpense={deleteExpense} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
           ) : (
-            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} />
+            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} title="Caja protegida" subtitle="Ingresá el PIN para abrir la caja" />
           ))}
 
         {view === "delivery" && (
@@ -920,14 +920,14 @@ export default function App() {
           (adminUnlocked ? (
             <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} onMarkFiadoPaid={markFiadoAsPaid} />
           ) : (
-            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} />
+            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} title="Reportes protegidos" subtitle="Ingresá el PIN para ver los reportes" />
           ))}
 
         {view === "historial" &&
           (adminUnlocked ? (
             <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />
           ) : (
-            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} />
+            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} title="Historial protegido" subtitle="Ingresá el PIN para ver el historial" />
           ))}
 
         {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} tvShowPromos={state.tvShowPromos} onManage={() => setTvManagerOpen(true)} />}
@@ -1018,28 +1018,103 @@ function statusStyle(kitchenStatus, hasItems) {
   return { grad: "linear-gradient(135deg, #26A65B, #158A4A)", text: "#fff", label: "Libre", icon: "🟢", glow: "rgba(38,166,91,0.4)" };
 }
 
-function PinGate({ pin, onUnlock }) {
+function PinGate({ pin, onUnlock, title, subtitle }) {
   const [val, setVal] = useState("");
   const [err, setErr] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  function tryUnlock(v) {
+    if (v === pin) {
+      onUnlock();
+    } else {
+      setErr(true);
+      setShake(true);
+      setTimeout(() => { setVal(""); setShake(false); }, 380);
+    }
+  }
+  function press(d) {
+    setErr(false);
+    setVal((v) => (v.length >= 8 ? v : v + d));
+  }
+  function backspace() {
+    setErr(false);
+    setVal((v) => v.slice(0, -1));
+  }
+
+  const GOLD = "#F2C879";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const INK = "#15100B";
+  const LINE = "rgba(242,200,121,0.14)";
+
   return (
-    <div style={{ maxWidth: 320, margin: "60px auto", textAlign: "center" }}>
-      <Lock size={32} style={{ marginBottom: 12 }} />
-      <h3 style={{ marginTop: 0 }}>Caja protegida</h3>
-      <p style={{ fontSize: 13, color: "#8a7a63" }}>Ingresa el PIN para acceder</p>
-      <input
-        type="password"
-        inputMode="numeric"
-        value={val}
-        onChange={(e) => { setVal(e.target.value); setErr(false); }}
-        style={{ width: "100%", padding: 12, fontSize: 20, textAlign: "center", letterSpacing: 6, borderRadius: 8, border: "1px solid #E5D9C3", boxSizing: "border-box" }}
-      />
-      {err && <p style={{ color: "#C1272D", fontSize: 12, marginTop: 6 }}>PIN incorrecto</p>}
-      <button
-        onClick={() => (val === pin ? onUnlock() : setErr(true))}
-        style={{ marginTop: 12, width: "100%", padding: 12, border: "none", borderRadius: 8, background: "#C1272D", color: "#fff", fontWeight: 700, cursor: "pointer" }}
-      >
-        Entrar
-      </button>
+    <div style={{
+      maxWidth: 340, margin: "40px auto", textAlign: "center", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
+      background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`, borderRadius: 24, padding: "32px 26px",
+      border: `1px solid ${LINE}`, boxShadow: "0 20px 44px rgba(0,0,0,0.4)", position: "relative", overflow: "hidden",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+        @keyframes pgShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(6px); } }
+        @keyframes pgPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .pg-dot { transition: all 0.15s ease; }
+        .pg-key { transition: transform 0.1s ease, background 0.15s ease; }
+        .pg-key:active { transform: scale(0.92); background: rgba(242,200,121,0.18) !important; }
+      `}</style>
+      <div style={{ position: "absolute", top: -70, right: -70, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.10), transparent 70%)" }} />
+
+      <div style={{ position: "relative" }}>
+        <div style={{ width: 56, height: 56, borderRadius: "50%", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", boxShadow: "0 8px 20px rgba(193,39,45,0.35)" }}>
+          <Lock size={24} color="#fff" />
+        </div>
+        <h3 style={{ margin: 0, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 19, color: CREAM }}>{title || "Acceso restringido"}</h3>
+        <p style={{ fontSize: 12.5, color: MUTED, margin: "6px 0 22px" }}>{subtitle || "Ingresá el PIN para continuar"}</p>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, marginBottom: 22, animation: shake ? "pgShake 0.38s ease" : "none" }}>
+          {Array.from({ length: Math.max(pin ? pin.length : 4, 4) }).map((_, i) => (
+            <div key={i} className="pg-dot" style={{
+              width: 14, height: 14, borderRadius: "50%",
+              background: val.length > i ? (err ? EMBER : GOLD) : "rgba(255,255,255,0.08)",
+              border: `1px solid ${val.length > i ? (err ? EMBER : GOLD) : LINE}`,
+              animation: val.length === i + 1 && !shake ? "pgPop 0.15s ease" : "none",
+            }} />
+          ))}
+        </div>
+
+        {err && <p style={{ color: EMBER, fontSize: 12, fontWeight: 700, marginTop: -14, marginBottom: 16 }}>❌ PIN incorrecto, intentá de nuevo</p>}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 8 }}>
+          {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
+            <button key={d} className="pg-key" onClick={() => press(d)} style={{ padding: "14px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.03)", color: CREAM, cursor: "pointer" }}>
+              {d}
+            </button>
+          ))}
+          <button className="pg-key" onClick={() => setVal("")} style={{ padding: "14px 0", fontSize: 12, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.03)", color: MUTED, cursor: "pointer" }}>
+            Borrar
+          </button>
+          <button className="pg-key" onClick={() => press("0")} style={{ padding: "14px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.03)", color: CREAM, cursor: "pointer" }}>
+            0
+          </button>
+          <button className="pg-key" onClick={backspace} style={{ padding: "14px 0", fontSize: 16, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.03)", color: MUTED, cursor: "pointer" }}>
+            ⌫
+          </button>
+        </div>
+
+        <button
+          onClick={() => tryUnlock(val)}
+          disabled={val.length < (pin ? pin.length : 4)}
+          style={{
+            marginTop: 8, width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14,
+            background: val.length >= (pin ? pin.length : 4) ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.06)",
+            color: val.length >= (pin ? pin.length : 4) ? "#fff" : MUTED, fontWeight: 800, cursor: val.length >= (pin ? pin.length : 4) ? "pointer" : "default",
+            boxShadow: val.length >= (pin ? pin.length : 4) ? "0 8px 20px rgba(193,39,45,0.3)" : "none",
+          }}
+        >
+          🔓 Desbloquear
+        </button>
+      </div>
     </div>
   );
 }
