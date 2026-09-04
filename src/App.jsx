@@ -100,9 +100,15 @@ function methodLabel(s) {
   if (s.method === "Fiado") return `Fiado — ${s.fiadoPerson || "sin nombre"}${s.fiadoPaid ? " (ya pagado)" : " (pendiente)"}`;
   return s.method + (s.bank ? ` (${s.bank})` : "");
 }
-function markFiadoPaid(state, saleId) {
-  const mark = (arr) => arr.map((s) => (s.id === saleId ? { ...s, fiadoPaid: true, fiadoPaidAt: new Date().toISOString() } : s));
+function markFiadoPaid(state, saleId, method, bank) {
+  const mark = (arr) => arr.map((s) => (s.id === saleId ? { ...s, fiadoPaid: true, fiadoPaidAt: new Date().toISOString(), fiadoPaidMethod: method || "Efectivo", fiadoPaidBank: bank || null } : s));
   return { ...state, sales: mark(state.sales || []), salesLog: mark(state.salesLog || []) };
+}
+// Cobros de fiados anteriores que entraron como dinero real dentro de un rango de tiempo (por método).
+function fiadoCollections(sales, start, end) {
+  const inRange = sales.filter((s) => s.method === "Fiado" && s.fiadoPaid && s.fiadoPaidAt && new Date(s.fiadoPaidAt) >= start && new Date(s.fiadoPaidAt) <= end);
+  const byMethod = (m) => inRange.filter((s) => (s.fiadoPaidMethod || "Efectivo") === m).reduce((sum, s) => sum + s.total, 0);
+  return { efectivo: byMethod("Efectivo"), tarjeta: byMethod("Tarjeta"), transferencia: byMethod("Transferencia"), count: inRange.length };
 }
 const DEFAULT_SECTIONS = [
   { name: "Salón Principal", icon: "🍽️" },
@@ -376,6 +382,7 @@ export default function App() {
     persist({ ...state, encargos: fn(encargos) });
   }
   function addEncargo(data) {
+    const initialDeposit = Number(data.deposit) || 0;
     const encargo = {
       id: Date.now(),
       customer: data.customer || "",
@@ -387,7 +394,8 @@ export default function App() {
       description: data.description || "",
       items: Array.isArray(data.items) ? data.items : [],
       manualTotal: data.manualTotal ? Number(data.manualTotal) : 0,
-      deposit: Number(data.deposit) || 0,
+      deposit: initialDeposit,
+      payments: initialDeposit > 0 ? [{ id: Date.now(), amount: initialDeposit, method: data.depositMethod || "Efectivo", note: "Anticipo inicial", time: new Date().toISOString() }] : [],
       depositPaid: !!data.deposit,
       status: "pendiente",
       notes: data.notes || "",
@@ -400,6 +408,52 @@ export default function App() {
   }
   function deleteEncargo(id) {
     withEncargos((es) => es.filter((e) => e.id !== id));
+  }
+  function addEncargoPayment(id, amount, method, note) {
+    const amt = Number(amount) || 0;
+    if (amt <= 0) return;
+    withEncargos((es) => es.map((e) => {
+      if (e.id !== id) return e;
+      const payments = [...(e.payments || []), { id: Date.now(), amount: amt, method: method || "Efectivo", note: note || "", time: new Date().toISOString() }];
+      return { ...e, payments, deposit: payments.reduce((s, p) => s + p.amount, 0) };
+    }));
+  }
+  function deleteEncargoPayment(id, paymentId) {
+    withEncargos((es) => es.map((e) => {
+      if (e.id !== id) return e;
+      const payments = (e.payments || []).filter((p) => p.id !== paymentId);
+      return { ...e, payments, deposit: payments.reduce((s, p) => s + p.amount, 0) };
+    }));
+  }
+  // Al marcar un encargo como "entregado": registra la venta real en Caja/Reportes,
+  // descuenta el inventario de insumos usado, y deja constancia del método con que se liquidó el saldo.
+  function completeEncargoDelivery(id, settleMethod, settleBank) {
+    const e = encargos.find((x) => x.id === id);
+    if (!e) return;
+    const total = e.items && e.items.length ? orderTotal(e.items) : (Number(e.manualTotal) || 0);
+    const alreadyPaid = (e.payments || []).reduce((s, p) => s + p.amount, 0) || Number(e.deposit) || 0;
+    const balance = Math.max(0, total - alreadyPaid);
+    let payments = e.payments || [];
+    if (balance > 0) {
+      payments = [...payments, { id: Date.now(), amount: balance, method: settleMethod || "Efectivo", note: "Liquidación al entregar", time: new Date().toISOString() }];
+    }
+    const finalMethod = balance > 0 ? settleMethod : (payments.length ? payments[payments.length - 1].method : "Efectivo");
+    const sale = {
+      id: Date.now(), folio: salesLog.length + 1, kind: "encargo", ref: e.customer,
+      items: e.items && e.items.length ? e.items : [{ menuId: `encargo-${e.id}`, name: e.description || "Encargo especial", price: total, qty: 1 }],
+      subtotal: total, discountAmount: 0, discountLabel: null, total, tip: 0,
+      method: finalMethod, bank: (finalMethod === "Tarjeta" || finalMethod === "Transferencia") && settleBank ? settleBank : null,
+      time: new Date().toISOString(),
+    };
+    const invResult = e.items && e.items.length ? deductInventoryForSale(e.items) : null;
+    const next = {
+      ...state,
+      encargos: encargos.map((x) => (x.id === id ? { ...x, status: "entregado", payments, deposit: total, deliveredSaleId: sale.id } : x)),
+      sales: [...sales, sale],
+      salesLog: [...salesLog, sale],
+      ...(invResult || {}),
+    };
+    persist(next);
   }
   function addEncargoItem(id, menuItem, qty) {
     const addQty = Math.max(1, Number(qty) || 1);
@@ -667,8 +721,8 @@ export default function App() {
   function deleteSale(id) {
     persist({ ...state, sales: sales.filter((s) => s.id !== id) });
   }
-  function markFiadoAsPaid(id) {
-    persist(markFiadoPaid(state, id));
+  function markFiadoAsPaid(id, method, bank) {
+    persist(markFiadoPaid(state, id, method, bank));
   }
   function deleteSalesLogEntry(id) {
     persist({ ...state, salesLog: salesLog.filter((s) => s.id !== id) });
@@ -835,6 +889,9 @@ export default function App() {
             onDelete={deleteEncargo}
             onAddItem={addEncargoItem}
             onChangeItemQty={changeEncargoItemQty}
+            onAddPayment={addEncargoPayment}
+            onDeletePayment={deleteEncargoPayment}
+            onCompleteDelivery={completeEncargoDelivery}
           />
         )}
 
@@ -2355,9 +2412,13 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
     );
   }
 
-  const cashSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cardSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const transferSales = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
+  const cashSalesDirect = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
+  const cardSalesDirect = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
+  const transferSalesDirect = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt) && s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
+  const fiadoCollected = fiadoCollections(sales, new Date(active.openedAt), new Date());
+  const cashSales = cashSalesDirect + fiadoCollected.efectivo;
+  const cardSales = cardSalesDirect + fiadoCollected.tarjeta;
+  const transferSales = transferSalesDirect + fiadoCollected.transferencia;
   const sessionSalesCount = sales.filter((s) => new Date(s.time) >= new Date(active.openedAt)).length;
   const sessionExpensesAll = expenses.filter((e) => new Date(e.time) >= new Date(active.openedAt));
   const sessionExpenses = sessionExpensesAll.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -2386,15 +2447,16 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, margin: "12px 0" }}>
         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #26A65B" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💵 Ventas efectivo</div>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💵 Ventas efectivo{fiadoCollected.efectivo > 0 ? " + cobros fiado" : ""}</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cashSales)}</div>
+          {fiadoCollected.efectivo > 0 && <div style={{ fontSize: 9.5, color: "#8a5a00" }}>incluye {money(fiadoCollected.efectivo)} de fiados cobrados</div>}
         </div>
         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #1565C0" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💳 Ventas tarjeta</div>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>💳 Ventas tarjeta{fiadoCollected.tarjeta > 0 ? " + cobros fiado" : ""}</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cardSales)}</div>
         </div>
         <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #6A4FB6" }}>
-          <div style={{ fontSize: 10, color: "#C9BBA3" }}>🏦 Ventas transferencia</div>
+          <div style={{ fontSize: 10, color: "#C9BBA3" }}>🏦 Ventas transferencia{fiadoCollected.transferencia > 0 ? " + cobros fiado" : ""}</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(transferSales)}</div>
         </div>
         {sessionByCat.map((c) => (
@@ -2407,6 +2469,17 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           <div style={{ fontSize: 10, color: "#2B2118", fontWeight: 700 }}>💰 EFECTIVO ESPERADO</div>
           <div style={{ fontWeight: 800, fontSize: 17, color: "#2B2118" }}>{money(expectedCash)}</div>
         </div>
+      </div>
+
+      <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(242,200,121,0.15)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 11.5 }}>
+        <div style={{ fontWeight: 800, color: "#F2C879", marginBottom: 6, letterSpacing: 0.5 }}>📋 DESGLOSE DEL EFECTIVO ESPERADO</div>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#C9BBA3" }}><span>Fondo inicial</span><span style={{ color: "#fff" }}>{money(active.openingAmount)}</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#C9BBA3" }}><span>+ Ventas en efectivo</span><span style={{ color: "#26A65B" }}>{money(cashSalesDirect)}</span></div>
+        {fiadoCollected.efectivo > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#C9BBA3" }}><span>+ Cobros de fiados (efectivo)</span><span style={{ color: "#26A65B" }}>{money(fiadoCollected.efectivo)}</span></div>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#C9BBA3" }}><span>− Gastos del turno</span><span style={{ color: "#FF8A80" }}>{money(sessionExpenses)}</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0 0", marginTop: 4, borderTop: "1px dashed rgba(255,255,255,0.15)", fontWeight: 800, color: "#F2C879" }}><span>= Efectivo esperado en caja</span><span>{money(expectedCash)}</span></div>
       </div>
       <div style={{ fontSize: 11, color: "#C9BBA3", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#F2C879" }}>{money(cashSales + cardSales + transferSales)}</strong> · Gastado en total: <strong style={{ color: "#FF8A80" }}>-{money(sessionExpenses)}</strong></div>
 
@@ -2512,9 +2585,11 @@ function printSessionReport(session, sales, expenses) {
   const end = session.closedAt ? new Date(session.closedAt) : new Date();
   const sessionSales = sales.filter((s) => new Date(s.time) >= start && new Date(s.time) <= end);
   const sessionExpenses = expenses.filter((e) => new Date(e.time) >= start && new Date(e.time) <= end);
-  const cash = sessionSales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
+  const cashDirect = sessionSales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
   const card = sessionSales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
   const transfer = sessionSales.filter((s) => s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
+  const fiadoCollected = fiadoCollections(sales, start, end);
+  const cash = cashDirect + fiadoCollected.efectivo;
   const expensesTotal = sessionExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
   const rows = sessionSales.map((s) => `
@@ -2553,7 +2628,8 @@ function printSessionReport(session, sales, expenses) {
       <hr/>
       <table class="totals">
         <tr><td>Fondo inicial</td><td colspan="2"></td><td style="text-align:right">${money(session.openingAmount)}</td></tr>
-        <tr><td>Ventas efectivo</td><td colspan="2"></td><td style="text-align:right">${money(cash)}</td></tr>
+        <tr><td>Ventas efectivo</td><td colspan="2"></td><td style="text-align:right">${money(cashDirect)}</td></tr>
+        ${fiadoCollected.efectivo > 0 ? `<tr><td>Cobros de fiados (efectivo)</td><td colspan="2"></td><td style="text-align:right">${money(fiadoCollected.efectivo)}</td></tr>` : ""}
         <tr><td>Ventas tarjeta</td><td colspan="2"></td><td style="text-align:right">${money(card)}</td></tr>
         <tr><td>Ventas transferencia</td><td colspan="2"></td><td style="text-align:right">${money(transfer)}</td></tr>
         <tr><td>Gastos</td><td colspan="2"></td><td style="text-align:right">-${money(expensesTotal)}</td></tr>
@@ -3350,6 +3426,31 @@ function EncargoMenuItemRow({ menuItem, onAdd }) {
   );
 }
 
+function EncargoPaymentForm({ onAdd }) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("Efectivo");
+  const CREAM = "#F5ECD9";
+  const LINE = "rgba(242,200,121,0.14)";
+  const fs = { padding: 7, fontSize: 12, borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, boxSizing: "border-box" };
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...fs, maxWidth: 100 }} />
+      <select value={method} onChange={(e) => setMethod(e.target.value)} style={{ ...fs, maxWidth: 130 }}>
+        <option>Efectivo</option>
+        <option>Tarjeta</option>
+        <option>Transferencia</option>
+      </select>
+      <button
+        disabled={!amount || Number(amount) <= 0}
+        onClick={() => { onAdd(amount, method); setAmount(""); }}
+        style={{ fontSize: 11.5, background: "linear-gradient(135deg, #2E7D32, #26A65B)", color: "#fff", border: "none", borderRadius: 7, padding: "7px 12px", cursor: "pointer", fontWeight: 700, opacity: amount && Number(amount) > 0 ? 1 : 0.5 }}
+      >
+        + Registrar abono
+      </button>
+    </div>
+  );
+}
+
 function EncargoSpecialItemForm({ onAdd }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -3373,7 +3474,9 @@ function EncargoSpecialItemForm({ onAdd }) {
   );
 }
 
-function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete, onAddItem, onChangeItemQty }) {
+const ENCARGO_MIN_DEPOSIT_PCT = 30;
+
+function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete, onAddItem, onChangeItemQty, onAddPayment, onDeletePayment, onCompleteDelivery }) {
   const [formOpen, setFormOpen] = useState(false);
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
@@ -3388,10 +3491,14 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   const [description, setDescription] = useState("");
   const [manualTotal, setManualTotal] = useState("");
   const [deposit, setDeposit] = useState("");
+  const [depositMethod, setDepositMethod] = useState("Efectivo");
   const [notes, setNotes] = useState("");
   const [statusFilter, setStatusFilter] = useState("activos");
   const [itemPickerFor, setItemPickerFor] = useState(null);
   const [customItemFor, setCustomItemFor] = useState(null);
+  const [paymentFormFor, setPaymentFormFor] = useState(null);
+  const [deliverFor, setDeliverFor] = useState(null);
+  const [deliverMethod, setDeliverMethod] = useState("Efectivo");
 
   // Carrito del nuevo encargo (se arma con el menú antes de guardar)
   const [newItems, setNewItems] = useState([]);
@@ -3416,6 +3523,9 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
 
   function encargoTotal(e) {
     return e.items && e.items.length ? orderTotal(e.items) : (Number(e.manualTotal) || 0);
+  }
+  function paidAmount(e) {
+    return (e.payments && e.payments.length) ? e.payments.reduce((s, p) => s + p.amount, 0) : (Number(e.deposit) || 0);
   }
   function addToNewCart(menuItem, qty) {
     const addQty = Math.max(1, Number(qty) || 1);
@@ -3443,7 +3553,13 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
     const d = new Date(e.eventDate + "T12:00:00");
     return d >= new Date(new Date().toDateString()) && d <= in7days;
   }).length;
-  const pendingBalance = activeList.reduce((sum, e) => sum + Math.max(0, encargoTotal(e) - (Number(e.deposit) || 0)), 0);
+  const pendingBalance = activeList.reduce((sum, e) => sum + Math.max(0, encargoTotal(e) - paidAmount(e)), 0);
+
+  const in3days = new Date(); in3days.setDate(in3days.getDate() + 3); in3days.setHours(23, 59, 59, 999);
+  const proximosPorCobrar = activeList
+    .filter((e) => Math.max(0, encargoTotal(e) - paidAmount(e)) > 0 && new Date(e.eventDate + "T12:00:00") <= in3days)
+    .slice()
+    .sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate));
 
   const filtered = encargos
     .filter((e) => {
@@ -3456,9 +3572,12 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
 
   function submitNew() {
     if (!customer.trim() || !eventDate) return;
-    onAdd({ customer: customer.trim(), phone: phone.trim(), eventDate, eventTime, fulfillment, address: address.trim(), description: description.trim(), items: newItems, manualTotal, deposit, notes: notes.trim() });
-    setCustomer(""); setPhone(""); setEventTime(""); setAddress(""); setDescription(""); setManualTotal(""); setDeposit(""); setNotes(""); setNewItems([]); setFormOpen(false);
+    onAdd({ customer: customer.trim(), phone: phone.trim(), eventDate, eventTime, fulfillment, address: address.trim(), description: description.trim(), items: newItems, manualTotal, deposit, depositMethod, notes: notes.trim() });
+    setCustomer(""); setPhone(""); setEventTime(""); setAddress(""); setDescription(""); setManualTotal(""); setDeposit(""); setDepositMethod("Efectivo"); setNotes(""); setNewItems([]); setFormOpen(false);
   }
+
+  const newFormTotal = newItems.length ? newCartTotal : (Number(manualTotal) || 0);
+  const suggestedMinDeposit = Math.ceil((newFormTotal * ENCARGO_MIN_DEPOSIT_PCT) / 100);
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
@@ -3505,6 +3624,24 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
           ))}
         </div>
       </div>
+
+      {proximosPorCobrar.length > 0 && (
+        <div style={{ background: "rgba(232,163,61,0.08)", border: `1px solid ${AMBER}`, borderRadius: 16, padding: "14px 18px", marginBottom: 20 }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: AMBER, marginBottom: 8 }}>🔔 Saldos por cobrar — evento en 3 días o menos</div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {proximosPorCobrar.map((e) => {
+              const bal = Math.max(0, encargoTotal(e) - paidAmount(e));
+              const d = new Date(e.eventDate + "T12:00:00");
+              return (
+                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, flexWrap: "wrap", gap: 6 }}>
+                  <span style={{ color: CREAM }}><strong>{e.customer}</strong> · {d.toLocaleDateString("es-NI", { day: "numeric", month: "short" })}{e.eventTime ? ` · ${e.eventTime}` : ""}{e.phone ? ` · 📞 ${e.phone}` : ""}</span>
+                  <span style={{ fontWeight: 800, color: "#F87171" }}>{money(bal)} pendiente</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {formOpen && (
         <div style={{ background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: `1px solid ${LINE}`, borderRadius: 18, padding: 20, marginBottom: 22, boxShadow: "0 12px 30px rgba(0,0,0,0.3)" }}>
@@ -3595,15 +3732,27 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
             {newItems.length === 0 && (
               <input placeholder="Total estimado (C$) — si no usás el menú" type="number" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} style={{ ...fieldStyle, maxWidth: 240 }} />
             )}
-            <input placeholder="Anticipo recibido (C$)" type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={{ ...fieldStyle, maxWidth: 180 }} />
+            <input placeholder="Anticipo recibido (C$)" type="number" value={deposit} onChange={(e) => setDeposit(e.target.value)} style={{ ...fieldStyle, maxWidth: 160 }} />
+            {Number(deposit) > 0 && (
+              <select value={depositMethod} onChange={(e) => setDepositMethod(e.target.value)} style={{ ...fieldStyle, maxWidth: 150 }}>
+                <option>Efectivo</option>
+                <option>Tarjeta</option>
+                <option>Transferencia</option>
+              </select>
+            )}
             <input placeholder="Notas internas" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...fieldStyle, maxWidth: 240 }} />
           </div>
+          {newFormTotal > 0 && (
+            <div style={{ fontSize: 11.5, marginBottom: 14, color: Number(deposit) >= suggestedMinDeposit ? "#4ADE80" : AMBER, fontWeight: 700 }}>
+              {Number(deposit) >= suggestedMinDeposit ? "✅" : "⚠️"} Anticipo mínimo sugerido ({ENCARGO_MIN_DEPOSIT_PCT}% del total): {money(suggestedMinDeposit)}
+            </div>
+          )}
           <button
             disabled={!customer.trim() || !eventDate}
             onClick={submitNew}
             style={{ padding: "12px 24px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: customer.trim() && eventDate ? 1 : 0.5, fontSize: 14, boxShadow: "0 8px 20px rgba(193,39,45,0.3)" }}
           >
-            Guardar encargo{(newItems.length > 0 || manualTotal) ? ` — ${money(newItems.length ? newCartTotal : (Number(manualTotal) || 0))}` : ""}
+            Guardar encargo{(newItems.length > 0 || manualTotal) ? ` — ${money(newFormTotal)}` : ""}
           </button>
         </div>
       )}
@@ -3639,7 +3788,9 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
         {filtered.map((e) => {
           const st = ENCARGO_STATUS[e.status] || ENCARGO_STATUS.pendiente;
           const total = encargoTotal(e);
-          const balance = Math.max(0, total - (Number(e.deposit) || 0));
+          const paid = paidAmount(e);
+          const balance = Math.max(0, total - paid);
+          const belowMinDeposit = e.status !== "entregado" && e.status !== "cancelado" && total > 0 && paid < Math.ceil((total * ENCARGO_MIN_DEPOSIT_PCT) / 100);
           const eventDateObj = new Date(e.eventDate + "T12:00:00");
           const isToday = eventDateObj.toDateString() === todayStr;
           const isPast = eventDateObj < new Date(new Date().toDateString()) && e.status !== "entregado" && e.status !== "cancelado";
@@ -3718,6 +3869,40 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                   </div>
                 )}
 
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 800, color: MUTED, letterSpacing: 0.5 }}>💰 ABONOS REGISTRADOS</div>
+                    {e.status !== "entregado" && e.status !== "cancelado" && (
+                      <button onClick={() => setPaymentFormFor(paymentFormFor === e.id ? null : e.id)} style={{ fontSize: 10.5, background: "rgba(74,222,128,0.1)", border: "1px solid #4ADE80", borderRadius: 7, padding: "4px 9px", cursor: "pointer", color: "#4ADE80", fontWeight: 700 }}>
+                        {paymentFormFor === e.id ? "✕ Cancelar" : "+ Registrar abono"}
+                      </button>
+                    )}
+                  </div>
+                  {(e.payments && e.payments.length > 0) ? (
+                    <div style={{ marginBottom: paymentFormFor === e.id ? 8 : 0 }}>
+                      {e.payments.map((p) => (
+                        <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "4px 0", color: MUTED }}>
+                          <span>{new Date(p.time).toLocaleDateString("es-NI", { day: "numeric", month: "short" })} · {p.method}{p.note ? ` · ${p.note}` : ""}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontWeight: 700, color: "#4ADE80" }}>{money(p.amount)}</span>
+                            {e.status !== "entregado" && (
+                              <button onClick={() => onDeletePayment(e.id, p.id)} style={{ background: "none", border: "none", color: "#F87171", cursor: "pointer", fontSize: 12, padding: 0 }}>✕</button>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (paymentFormFor !== e.id && <div style={{ fontSize: 11.5, color: MUTED, marginBottom: paymentFormFor === e.id ? 8 : 0 }}>Sin abonos todavía.</div>)}
+                  {paymentFormFor === e.id && (
+                    <EncargoPaymentForm onAdd={(amount, method) => { onAddPayment(e.id, amount, method); setPaymentFormFor(null); }} />
+                  )}
+                  {belowMinDeposit && total > 0 && (
+                    <div style={{ fontSize: 11, color: AMBER, fontWeight: 700, marginTop: 6 }}>
+                      ⚠️ Anticipo bajo el mínimo sugerido ({ENCARGO_MIN_DEPOSIT_PCT}%): faltan {money(Math.ceil((total * ENCARGO_MIN_DEPOSIT_PCT) / 100) - paid)} para llegar a {money(Math.ceil((total * ENCARGO_MIN_DEPOSIT_PCT) / 100))}
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, borderTop: `1px solid ${LINE}`, paddingTop: 14 }}>
                   <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                     <div>
@@ -3725,15 +3910,8 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                       <div style={{ fontWeight: 800, fontSize: 16, color: CREAM }}>{money(total)}</div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>ANTICIPO</div>
-                      <div style={{ fontWeight: 800, fontSize: 16, color: "#4ADE80", display: "flex", alignItems: "center" }}>
-                        {money(Number(e.deposit) || 0)}
-                        <input
-                          type="number" defaultValue={e.deposit || ""} placeholder="0"
-                          onBlur={(ev) => onUpdate(e.id, { deposit: Number(ev.target.value) || 0 })}
-                          style={{ width: 70, marginLeft: 8, fontSize: 11, padding: 4, borderRadius: 6, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM }}
-                        />
-                      </div>
+                      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>ABONADO</div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: "#4ADE80" }}>{money(paid)}</div>
                     </div>
                     <div>
                       <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 0.5 }}>SALDO PENDIENTE</div>
@@ -3751,15 +3929,28 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {Object.keys(ENCARGO_STATUS).filter((s) => s !== e.status).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => onUpdate(e.id, { status: s })}
-                        style={{ fontSize: 11, background: ENCARGO_STATUS[s].bg, color: ENCARGO_STATUS[s].color, border: "none", borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontWeight: 700 }}
-                      >
-                        {ENCARGO_STATUS[s].icon} {ENCARGO_STATUS[s].label}
-                      </button>
-                    ))}
+                    {Object.keys(ENCARGO_STATUS).filter((s) => s !== e.status).map((s) => {
+                      if (s === "entregado") {
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => (balance > 0 ? setDeliverFor(deliverFor === e.id ? null : e.id) : onCompleteDelivery(e.id))}
+                            style={{ fontSize: 11, background: ENCARGO_STATUS[s].bg, color: ENCARGO_STATUS[s].color, border: "none", borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontWeight: 700 }}
+                          >
+                            {ENCARGO_STATUS[s].icon} {ENCARGO_STATUS[s].label}
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => onUpdate(e.id, { status: s })}
+                          style={{ fontSize: 11, background: ENCARGO_STATUS[s].bg, color: ENCARGO_STATUS[s].color, border: "none", borderRadius: 8, padding: "6px 11px", cursor: "pointer", fontWeight: 700 }}
+                        >
+                          {ENCARGO_STATUS[s].icon} {ENCARGO_STATUS[s].label}
+                        </button>
+                      );
+                    })}
                     <button onClick={() => printEncargoReceipt(e, total, balance)} style={{ fontSize: 11, background: "rgba(242,200,121,0.1)", border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: GOLD, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
                       <Printer size={12} /> Imprimir comprobante
                     </button>
@@ -3768,6 +3959,25 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                     </button>
                   </div>
                 </div>
+
+                {deliverFor === e.id && (
+                  <div style={{ marginTop: 12, padding: 12, background: "rgba(232,163,61,0.08)", border: `1px solid ${AMBER}`, borderRadius: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: AMBER, marginBottom: 8 }}>
+                      Quedan {money(balance)} pendientes de este encargo. Al entregar, esto se registra como venta real y descuenta inventario. ¿Con qué método se liquida el saldo?
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {["Efectivo", "Tarjeta", "Transferencia"].map((m) => (
+                        <button key={m} onClick={() => setDeliverMethod(m)} style={{ padding: "6px 12px", borderRadius: 8, border: deliverMethod === m ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: deliverMethod === m ? "rgba(242,200,121,0.12)" : "transparent", color: deliverMethod === m ? GOLD : CREAM, fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>{m}</button>
+                      ))}
+                      <button
+                        onClick={() => { onCompleteDelivery(e.id, deliverMethod); setDeliverFor(null); }}
+                        style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, fontSize: 12, cursor: "pointer" }}
+                      >
+                        Confirmar entrega y cobro
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {e.notes && <div style={{ fontSize: 11, color: MUTED, marginTop: 10 }}>📝 {e.notes}</div>}
               </div>
             </div>
@@ -5476,6 +5686,8 @@ function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insum
 
 function FiadosPendientesCard({ sales, onMarkPaid }) {
   const [showPaid, setShowPaid] = useState(false);
+  const [payingId, setPayingId] = useState(null);
+  const [payMethod, setPayMethod] = useState("Efectivo");
   const allFiados = sales.filter((s) => s.method === "Fiado");
   const pending = allFiados.filter((s) => !s.fiadoPaid).sort((a, b) => new Date(a.time) - new Date(b.time));
   const paid = allFiados.filter((s) => s.fiadoPaid).sort((a, b) => new Date(b.fiadoPaidAt || b.time) - new Date(a.fiadoPaidAt || a.time));
@@ -5514,17 +5726,30 @@ function FiadosPendientesCard({ sales, onMarkPaid }) {
       ) : (
         <div style={{ display: "grid", gap: 6 }}>
           {pending.map((s) => (
-            <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#FBF6EC", borderRadius: 10, padding: "9px 12px", flexWrap: "wrap", gap: 8 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>👤 {s.fiadoPerson || "Sin nombre"}</div>
-                <div style={{ fontSize: 11, color: "#8a7a63" }}>{s.ref} · {new Date(s.time).toLocaleDateString("es-NI", { day: "numeric", month: "short" })}</div>
+            <div key={s.id} style={{ background: "#FBF6EC", borderRadius: 10, padding: "9px 12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>👤 {s.fiadoPerson || "Sin nombre"}</div>
+                  <div style={{ fontSize: 11, color: "#8a7a63" }}>{s.ref} · {new Date(s.time).toLocaleDateString("es-NI", { day: "numeric", month: "short" })}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontWeight: 800, fontSize: 14, color: "#C1272D" }}>{money(s.total)}</span>
+                  <button onClick={() => { setPayingId(payingId === s.id ? null : s.id); setPayMethod("Efectivo"); }} style={{ fontSize: 11.5, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
+                    {payingId === s.id ? "✕ Cancelar" : "✓ Marcar pagado"}
+                  </button>
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontWeight: 800, fontSize: 14, color: "#C1272D" }}>{money(s.total)}</span>
-                <button onClick={() => onMarkPaid(s.id)} style={{ fontSize: 11.5, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
-                  ✓ Marcar pagado
-                </button>
-              </div>
+              {payingId === s.id && (
+                <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #E5D9C3", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#8a7a63", fontWeight: 700 }}>¿Cómo pagó?</span>
+                  {["Efectivo", "Tarjeta", "Transferencia"].map((m) => (
+                    <button key={m} onClick={() => setPayMethod(m)} style={{ padding: "5px 11px", borderRadius: 7, border: payMethod === m ? "2px solid #E8A33D" : "1px solid #E5D9C3", background: payMethod === m ? "rgba(232,163,61,0.12)" : "#fff", color: payMethod === m ? "#8a5a00" : "#5a4c3a", fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>{m}</button>
+                  ))}
+                  <button onClick={() => { onMarkPaid(s.id, payMethod); setPayingId(null); }} style={{ fontSize: 11.5, background: "#2E7D32", color: "#fff", border: "none", borderRadius: 7, padding: "6px 14px", cursor: "pointer", fontWeight: 800 }}>
+                    Confirmar cobro
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -5540,7 +5765,7 @@ function FiadosPendientesCard({ sales, onMarkPaid }) {
               {paid.map((s) => (
                 <div key={s.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#8a7a63", padding: "6px 10px", borderBottom: "1px solid #F0E8D8" }}>
                   <span>👤 {s.fiadoPerson || "Sin nombre"} · {s.ref}</span>
-                  <span>{money(s.total)} — pagado {s.fiadoPaidAt ? new Date(s.fiadoPaidAt).toLocaleDateString("es-NI") : ""}</span>
+                  <span>{money(s.total)} — pagado en {s.fiadoPaidMethod || "Efectivo"} {s.fiadoPaidAt ? new Date(s.fiadoPaidAt).toLocaleDateString("es-NI") : ""}</span>
                 </div>
               ))}
             </div>
@@ -5648,9 +5873,10 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
   const q1Payroll = payrollInDayRange(1, 15);
   const q2Payroll = payrollInDayRange(16, lastDayOfMonth);
 
-  const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0);
-  const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0);
-  const transferToday = todaySales.filter((s) => s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0);
+  const dayFiadoCollected = fiadoCollections(salesLog || sales, new Date(selectedDate + "T00:00:00"), new Date(selectedDate + "T23:59:59"));
+  const cashToday = todaySales.filter((s) => s.method === "Efectivo").reduce((sum, s) => sum + s.total, 0) + dayFiadoCollected.efectivo;
+  const cardToday = todaySales.filter((s) => s.method === "Tarjeta").reduce((sum, s) => sum + s.total, 0) + dayFiadoCollected.tarjeta;
+  const transferToday = todaySales.filter((s) => s.method === "Transferencia").reduce((sum, s) => sum + s.total, 0) + dayFiadoCollected.transferencia;
   const avgTicket = count > 0 ? income / count : 0;
   const hourlyMap = {};
   todaySales.forEach((s) => {
