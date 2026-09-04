@@ -3475,6 +3475,15 @@ function EncargoSpecialItemForm({ onAdd }) {
 }
 
 const ENCARGO_MIN_DEPOSIT_PCT = 30;
+const ENCARGO_FILTER_DESCRIPTIONS = {
+  activos: "Encargos en curso: todavía no se entregan ni se cancelan.",
+  pendiente: "Encargos nuevos que faltan confirmar con el cliente.",
+  confirmado: "Ya confirmados con el cliente, en preparación.",
+  listo: "Listos para entregar o para que el cliente los recoja.",
+  entregado: "Ya entregados y cobrados por completo.",
+  cancelado: "El cliente canceló el pedido.",
+  all: "Todos los encargos registrados, sin filtrar.",
+};
 
 function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete, onAddItem, onChangeItemQty, onAddPayment, onDeletePayment, onCompleteDelivery }) {
   const [formOpen, setFormOpen] = useState(false);
@@ -3570,6 +3579,16 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
     .slice()
     .sort((a, b) => new Date(a.eventDate + "T" + (a.eventTime || "00:00")) - new Date(b.eventDate + "T" + (b.eventTime || "00:00")));
 
+  const filterCounts = {
+    activos: encargos.filter((e) => e.status !== "entregado" && e.status !== "cancelado").length,
+    pendiente: encargos.filter((e) => e.status === "pendiente").length,
+    confirmado: encargos.filter((e) => e.status === "confirmado").length,
+    listo: encargos.filter((e) => e.status === "listo").length,
+    entregado: encargos.filter((e) => e.status === "entregado").length,
+    cancelado: encargos.filter((e) => e.status === "cancelado").length,
+    all: encargos.length,
+  };
+
   function submitNew() {
     if (!customer.trim() || !eventDate) return;
     onAdd({ customer: customer.trim(), phone: phone.trim(), eventDate, eventTime, fulfillment, address: address.trim(), description: description.trim(), items: newItems, manualTotal, deposit, depositMethod, notes: notes.trim() });
@@ -3586,6 +3605,8 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
         @keyframes encFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .enc-card { animation: encFadeUp 0.35s ease; transition: transform 0.15s ease, box-shadow 0.15s ease; }
         .enc-card:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(0,0,0,0.4); }
+        .enc-filter-btn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .enc-filter-btn:hover { transform: translateY(-1px); }
       `}</style>
 
       <div style={{
@@ -3757,29 +3778,40 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 18 }}>
-        {[
-          { id: "activos", label: "Activos" },
-          { id: "pendiente", label: `${ENCARGO_STATUS.pendiente.icon} Pendientes` },
-          { id: "confirmado", label: `${ENCARGO_STATUS.confirmado.icon} Confirmados` },
-          { id: "listo", label: `${ENCARGO_STATUS.listo.icon} Listos` },
-          { id: "entregado", label: `${ENCARGO_STATUS.entregado.icon} Entregados` },
-          { id: "cancelado", label: `${ENCARGO_STATUS.cancelado.icon} Cancelados` },
-          { id: "all", label: "Todos" },
-        ].map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setStatusFilter(f.id)}
-            style={{
-              padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: "pointer",
-              border: statusFilter === f.id ? `2px solid ${GOLD}` : `1px solid ${LINE}`,
-              background: statusFilter === f.id ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(255,255,255,0.03)",
-              color: statusFilter === f.id ? "#fff" : MUTED,
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div style={{ background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: `1px solid ${LINE}`, borderRadius: 16, padding: "14px 16px", marginBottom: 18 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: MUTED, letterSpacing: 1, marginBottom: 10, textTransform: "uppercase" }}>Filtrar por estado</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            { id: "activos", label: "Activos", icon: "🟢", color: AMBER },
+            { id: "pendiente", label: "Pendientes", icon: ENCARGO_STATUS.pendiente.icon, color: ENCARGO_STATUS.pendiente.color },
+            { id: "confirmado", label: "Confirmados", icon: ENCARGO_STATUS.confirmado.icon, color: ENCARGO_STATUS.confirmado.color },
+            { id: "listo", label: "Listos", icon: ENCARGO_STATUS.listo.icon, color: ENCARGO_STATUS.listo.color },
+            { id: "entregado", label: "Entregados", icon: ENCARGO_STATUS.entregado.icon, color: ENCARGO_STATUS.entregado.color },
+            { id: "cancelado", label: "Cancelados", icon: ENCARGO_STATUS.cancelado.icon, color: ENCARGO_STATUS.cancelado.color },
+            { id: "all", label: "Todos", icon: "📋", color: GOLD },
+          ].map((f) => {
+            const active = statusFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                className="enc-filter-btn"
+                onClick={() => setStatusFilter(f.id)}
+                title={ENCARGO_FILTER_DESCRIPTIONS[f.id]}
+                style={{
+                  display: "flex", alignItems: "center", gap: 7, padding: "6px 14px 6px 6px", borderRadius: 24, cursor: "pointer",
+                  border: active ? `1px solid ${f.color}` : `1px solid ${LINE}`,
+                  background: active ? `linear-gradient(135deg, ${f.color}2E, ${f.color}14)` : "rgba(255,255,255,0.02)",
+                  boxShadow: active ? `0 4px 14px ${f.color}40` : "none",
+                }}
+              >
+                <span style={{ width: 22, height: 22, borderRadius: "50%", background: active ? f.color : "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{f.icon}</span>
+                <span style={{ fontSize: 12.5, fontWeight: 800, color: active ? CREAM : MUTED }}>{f.label}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 800, minWidth: 18, textAlign: "center", padding: "1px 6px", borderRadius: 10, background: active ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.05)", color: active ? CREAM : MUTED }}>{filterCounts[f.id]}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, color: MUTED, marginTop: 10, fontStyle: "italic" }}>ℹ️ {ENCARGO_FILTER_DESCRIPTIONS[statusFilter]}</div>
       </div>
 
       {filtered.length === 0 && <p style={{ color: MUTED, fontSize: 13 }}>No hay encargos en esta categoría.</p>}
