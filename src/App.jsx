@@ -5,7 +5,8 @@ import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Re
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
 const supabase = createClient(supabaseUrl, supabaseKey);
-const RECORD_ID = "main"; // ✅ Versión verificada y consolidada — sin errores de sintaxis
+const DEFAULT_BRANCH_ID = "main"; // ✅ Sucursal original (Masatepe) — no se toca para no perder los datos ya guardados
+const BRANCHES_REGISTRY_ID = "__branches__"; // fila especial en pos_state que guarda la lista de sucursales
 
 const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
 const SHIFT_START = "17:00";
@@ -146,6 +147,48 @@ function todayStr() {
 export default function App() {
   const [state, setState] = useState(initialState());
   const [loaded, setLoaded] = useState(false);
+  const [branchId, setBranchId] = useState(() => localStorage.getItem("sucursalId") || null);
+  const [branches, setBranches] = useState([]);
+  const [branchesLoaded, setBranchesLoaded] = useState(false);
+
+  // Registro de sucursales: vive en su propia fila de pos_state, separado del estado operativo
+  // de cada sucursal (mesas/caja/inventario/etc.), para poder listar todas sin mezclarlas.
+  useEffect(() => {
+    let alive = true;
+    async function loadBranches() {
+      const { data, error } = await supabase.from("pos_state").select("value").eq("id", BRANCHES_REGISTRY_ID).maybeSingle();
+      if (!alive) return;
+      if (!error && data) {
+        try {
+          setBranches(JSON.parse(data.value).branches || []);
+        } catch (e) {
+          setBranches([{ id: DEFAULT_BRANCH_ID, name: RESTAURANT_NAME }]);
+        }
+      } else {
+        const seed = [{ id: DEFAULT_BRANCH_ID, name: RESTAURANT_NAME }];
+        setBranches(seed);
+        await supabase.from("pos_state").insert({ id: BRANCHES_REGISTRY_ID, value: JSON.stringify({ branches: seed }) });
+      }
+      setBranchesLoaded(true);
+    }
+    loadBranches();
+    return () => { alive = false; };
+  }, []);
+
+  function pickBranch(id) {
+    localStorage.setItem("sucursalId", id);
+    initRef.current = false;
+    setBranchId(id);
+  }
+
+  async function createBranch(name) {
+    const id = "b" + Date.now();
+    const next = [...branches, { id, name }];
+    setBranches(next);
+    await supabase.from("pos_state").upsert({ id: BRANCHES_REGISTRY_ID, value: JSON.stringify({ branches: next }) });
+    await supabase.from("pos_state").insert({ id, value: JSON.stringify(initialState()) });
+    pickBranch(id);
+  }
   const [view, setView] = useState(() => {
     const p = new URLSearchParams(window.location.search).get("pantalla");
     return p === "cocina" || p === "menutv" ? p : "mesas";
@@ -155,7 +198,32 @@ export default function App() {
   const [showNewDelivery, setShowNewDelivery] = useState(false);
   const [menuManagerOpen, setMenuManagerOpen] = useState(false);
   const [tvManagerOpen, setTvManagerOpen] = useState(false);
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(null);
+  const ADMIN_VIEWS = ["caja", "reportes", "historial", "global"];
+  const adminLockTimerRef = useRef(null);
+  // Se re-bloquea solo al salir de Caja/Reportes/Historial, para que el mesero no se quede
+  // usando el acceso que abrió el cajero/dueño en el mismo dispositivo.
+  useEffect(() => {
+    if (!ADMIN_VIEWS.includes(view)) setAdminUnlocked(null);
+  }, [view]);
+  // Auto-bloqueo por inactividad (5 min) mientras está en una sección protegida.
+  useEffect(() => {
+    if (!adminUnlocked) return;
+    function resetTimer() {
+      clearTimeout(adminLockTimerRef.current);
+      adminLockTimerRef.current = setTimeout(() => setAdminUnlocked(null), 5 * 60 * 1000);
+    }
+    resetTimer();
+    window.addEventListener("mousedown", resetTimer);
+    window.addEventListener("keydown", resetTimer);
+    window.addEventListener("touchstart", resetTimer);
+    return () => {
+      clearTimeout(adminLockTimerRef.current);
+      window.removeEventListener("mousedown", resetTimer);
+      window.removeEventListener("keydown", resetTimer);
+      window.removeEventListener("touchstart", resetTimer);
+    };
+  }, [adminUnlocked]);
   const [receiptFor, setReceiptFor] = useState(null);
   const [connStatus, setConnStatus] = useState("Conectando…");
   const [connError, setConnError] = useState(null);
@@ -236,10 +304,11 @@ export default function App() {
   }
 
   const persist = useCallback(async (next) => {
+    if (!branchId) return;
     setState(next);
     skipNextPoll.current = true;
     const { error } = await supabase.from("pos_state").upsert({
-      id: RECORD_ID,
+      id: branchId,
       value: JSON.stringify(next),
       updated_at: new Date().toISOString(),
     });
@@ -251,12 +320,13 @@ export default function App() {
       setConnError(null);
       setLastSync(new Date());
     }
-  }, []);
+  }, [branchId]);
 
   useEffect(() => {
+    if (!branchId) return;
     let alive = true;
     async function load() {
-      const { data, error } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).maybeSingle();
+      const { data, error } = await supabase.from("pos_state").select("value").eq("id", branchId).maybeSingle();
       if (error) {
         setConnStatus("Error al cargar");
         setConnError(error.message || JSON.stringify(error));
@@ -276,7 +346,7 @@ export default function App() {
         skipNextPoll.current = false;
         return;
       }
-      const { data, error } = await supabase.from("pos_state").select("value").eq("id", RECORD_ID).maybeSingle();
+      const { data, error } = await supabase.from("pos_state").select("value").eq("id", branchId).maybeSingle();
       if (error) {
         setConnStatus("Error al sincronizar");
         setConnError(error.message || JSON.stringify(error));
@@ -291,15 +361,15 @@ export default function App() {
       alive = false;
       clearInterval(iv);
     };
-  }, []);
+  }, [branchId]);
 
   useEffect(() => {
-    if (loaded && !initRef.current) {
+    if (loaded && !initRef.current && branchId) {
       initRef.current = true;
       supabase
         .from("pos_state")
         .select("id")
-        .eq("id", RECORD_ID)
+        .eq("id", branchId)
         .maybeSingle()
         .then(({ data, error }) => {
           if (error) {
@@ -308,7 +378,7 @@ export default function App() {
             return;
           }
           if (!data) {
-            supabase.from("pos_state").insert({ id: RECORD_ID, value: JSON.stringify(state) }).then(({ error: insErr }) => {
+            supabase.from("pos_state").insert({ id: branchId, value: JSON.stringify(state) }).then(({ error: insErr }) => {
               if (insErr) {
                 setConnStatus("Error al crear registro inicial");
                 setConnError(insErr.message || JSON.stringify(insErr));
@@ -759,11 +829,20 @@ export default function App() {
     { id: "empleados", label: "Empleados", icon: UserCheck },
     { id: "inventario", label: "Inventario", icon: ClipboardList },
     { id: "reportes", label: "Reportes", icon: BarChart3 },
+    ...(branches.length > 1 ? [{ id: "global", label: "Global", icon: BarChart3 }] : []),
     { id: "historial", label: "Historial", icon: Archive },
     { id: "menutv", label: "Menú TV", icon: Tv },
   ];
 
   const kiosk = !!new URLSearchParams(window.location.search).get("pantalla");
+
+  if (!branchesLoaded) {
+    return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63" }}>Cargando…</div>;
+  }
+
+  if (!branchId) {
+    return <BranchPicker branches={branches} onPick={pickBranch} onCreate={createBranch} />;
+  }
 
   if (!loaded) {
     return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63" }}>Cargando…</div>;
@@ -870,9 +949,12 @@ export default function App() {
 
         {view === "caja" &&
           (adminUnlocked ? (
-            <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} onAddExpense={addExpense} onDeleteExpense={deleteExpense} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
+            <>
+              <LockNowButton onLock={() => setAdminUnlocked(null)} unlockedBy={adminUnlocked} />
+              <CajaView tables={tables} deliveries={deliveries} sales={sales} expenses={expenses} employees={employees} cashSessions={cashSessions} onOpenSession={openCashSession} onCloseSession={closeCashSession} onCharge={closeTicket} onAddExpense={addExpense} onDeleteExpense={deleteExpense} pin={pin} onChangePin={(p) => persist({ ...state, pin: p })} salesGoal={salesGoal} onSetGoal={setSalesGoal} />
+            </>
           ) : (
-            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} title="Caja protegida" subtitle="Ingresá el PIN para abrir la caja" />
+            <PinGate pin={pin} employees={employees} onUnlock={(name) => setAdminUnlocked(name)} title="Caja protegida" subtitle="Ingresá el PIN para abrir la caja" />
           ))}
 
         {view === "delivery" && (
@@ -918,16 +1000,32 @@ export default function App() {
 
         {view === "reportes" &&
           (adminUnlocked ? (
-            <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} onMarkFiadoPaid={markFiadoAsPaid} />
+            <>
+              <LockNowButton onLock={() => setAdminUnlocked(null)} unlockedBy={adminUnlocked} />
+              <ReportesView sales={sales} expenses={expenses} payments={payments} salesLog={salesLog} expensesLog={expensesLog} onAddExpense={addExpense} onDeleteSale={deleteSale} onDeleteExpense={deleteExpense} onClearDay={clearDay} onClearMonth={clearMonth} clockRecords={clockRecords} onMarkFiadoPaid={markFiadoAsPaid} />
+            </>
           ) : (
-            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} title="Reportes protegidos" subtitle="Ingresá el PIN para ver los reportes" />
+            <PinGate pin={pin} employees={employees} onUnlock={(name) => setAdminUnlocked(name)} title="Reportes protegidos" subtitle="Ingresá el PIN para ver los reportes" />
           ))}
 
         {view === "historial" &&
           (adminUnlocked ? (
-            <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />
+            <>
+              <LockNowButton onLock={() => setAdminUnlocked(null)} unlockedBy={adminUnlocked} />
+              <HistorialView salesLog={salesLog} expensesLog={expensesLog} payments={payments} onDeleteSale={deleteSalesLogEntry} onDeleteExpense={deleteExpensesLogEntry} />
+            </>
           ) : (
-            <PinGate pin={pin} onUnlock={() => setAdminUnlocked(true)} title="Historial protegido" subtitle="Ingresá el PIN para ver el historial" />
+            <PinGate pin={pin} employees={employees} onUnlock={(name) => setAdminUnlocked(name)} title="Historial protegido" subtitle="Ingresá el PIN para ver el historial" />
+          ))}
+
+        {view === "global" &&
+          (adminUnlocked ? (
+            <>
+              <LockNowButton onLock={() => setAdminUnlocked(null)} unlockedBy={adminUnlocked} />
+              <ReportesGlobalesView branches={branches} currentBranchId={branchId} />
+            </>
+          ) : (
+            <PinGate pin={pin} employees={employees} onUnlock={(name) => setAdminUnlocked(name)} title="Reportes globales" subtitle="Ingresá el PIN para ver todas las sucursales" />
           ))}
 
         {view === "menutv" && <MenuBoardView promotions={promotions} menuItems={menuItems} menuCats={menuCats} kiosk={kiosk} tvShowPromos={state.tvShowPromos} onManage={() => setTvManagerOpen(true)} />}
@@ -1018,14 +1116,228 @@ function statusStyle(kitchenStatus, hasItems) {
   return { grad: "linear-gradient(135deg, #26A65B, #158A4A)", text: "#fff", label: "Libre", icon: "🟢", glow: "rgba(38,166,91,0.4)" };
 }
 
-function PinGate({ pin, onUnlock, title, subtitle }) {
+function ReportesGlobalesView({ branches, currentBranchId }) {
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0, 10);
+  });
+  const [rows, setRows] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const GOLD = "#F2C879";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const CARD = "#1E1611";
+  const CARD2 = "#251C15";
+  const INK = "#15100B";
+  const LINE = "rgba(242,200,121,0.14)";
+
+  async function loadAll() {
+    setLoading(true);
+    const dayStart = new Date(selectedDate + "T00:00:00");
+    const dayEnd = new Date(selectedDate + "T23:59:59");
+    const results = await Promise.all(
+      branches.map(async (b) => {
+        const { data, error } = await supabase.from("pos_state").select("value").eq("id", b.id).maybeSingle();
+        if (error || !data) return { ...b, error: true };
+        let parsed;
+        try { parsed = JSON.parse(data.value); } catch (e) { return { ...b, error: true }; }
+        const sales = Array.isArray(parsed.salesLog) ? parsed.salesLog : (Array.isArray(parsed.sales) ? parsed.sales : []);
+        const expenses = Array.isArray(parsed.expensesLog) ? parsed.expensesLog : (Array.isArray(parsed.expenses) ? parsed.expenses : []);
+        const daySales = sales.filter((s) => new Date(s.time) >= dayStart && new Date(s.time) <= dayEnd);
+        const dayExpenses = expenses.filter((e) => new Date(e.time) >= dayStart && new Date(e.time) <= dayEnd);
+        const income = daySales.reduce((sum, s) => sum + s.total, 0);
+        const fiadoPending = daySales.filter((s) => s.method === "Fiado" && !s.fiadoPaid).reduce((sum, s) => sum + s.total, 0);
+        const expensesTotal = dayExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        return { ...b, income, expensesTotal, fiadoPending, salesCount: daySales.length, net: income - expensesTotal };
+      })
+    );
+    setRows(results);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadAll(); }, [selectedDate, branches]);
+
+  const totals = rows ? rows.reduce((acc, r) => ({
+    income: acc.income + (r.income || 0),
+    expensesTotal: acc.expensesTotal + (r.expensesTotal || 0),
+    fiadoPending: acc.fiadoPending + (r.fiadoPending || 0),
+    salesCount: acc.salesCount + (r.salesCount || 0),
+    net: acc.net + (r.net || 0),
+  }), { income: 0, expensesTotal: 0, fiadoPending: 0, salesCount: 0, net: 0 }) : null;
+
+  return (
+    <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');`}</style>
+
+      <div style={{
+        background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`, borderRadius: 22, padding: "24px 26px", marginBottom: 22,
+        border: `1px solid ${LINE}`, boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 2.5, color: AMBER, textTransform: "uppercase", marginBottom: 4 }}>Todas las sucursales</div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 25, margin: 0, color: CREAM }}>🌐 Reportes globales</h2>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 9, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.05)", color: CREAM, colorScheme: "dark" }} />
+            <button onClick={loadAll} style={{ padding: "9px 14px", borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.05)", color: CREAM, cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🔄 Actualizar</button>
+          </div>
+        </div>
+
+        {totals && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 20 }}>
+            <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #4ADE80" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>INGRESOS (TODAS)</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.income)}</div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${EMBER}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>GASTOS (TODAS)</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.expensesTotal)}</div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${GOLD}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>NETO DEL DÍA</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.net)}</div>
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #E8A33D" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>FIADO PENDIENTE</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.fiadoPending)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {loading && <p style={{ color: MUTED, fontSize: 13 }}>Consultando todas las sucursales…</p>}
+
+      {!loading && rows && (
+        <div style={{ display: "grid", gap: 12 }}>
+          {rows.map((r) => (
+            <div key={r.id} style={{
+              background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, border: r.id === currentBranchId ? `2px solid ${GOLD}` : `1px solid ${LINE}`,
+              borderRadius: 16, padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12,
+            }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 15, color: CREAM, fontFamily: "'Fraunces', serif", display: "flex", alignItems: "center", gap: 8 }}>
+                  📍 {r.name} {r.id === currentBranchId && <span style={{ fontSize: 10, background: "rgba(242,200,121,0.15)", color: GOLD, borderRadius: 8, padding: "2px 8px", fontWeight: 700 }}>este dispositivo</span>}
+                </div>
+                {r.error ? (
+                  <div style={{ fontSize: 12, color: "#F87171", marginTop: 4 }}>⚠️ No se pudo cargar esta sucursal.</div>
+                ) : (
+                  <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4 }}>{r.salesCount} ventas registradas ese día</div>
+                )}
+              </div>
+              {!r.error && (
+                <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
+                  <div><div style={{ fontSize: 9.5, color: MUTED, fontWeight: 700 }}>INGRESOS</div><div style={{ fontWeight: 800, color: "#4ADE80" }}>{money(r.income)}</div></div>
+                  <div><div style={{ fontSize: 9.5, color: MUTED, fontWeight: 700 }}>GASTOS</div><div style={{ fontWeight: 800, color: "#F87171" }}>{money(r.expensesTotal)}</div></div>
+                  <div><div style={{ fontSize: 9.5, color: MUTED, fontWeight: 700 }}>NETO</div><div style={{ fontWeight: 800, color: CREAM }}>{money(r.net)}</div></div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BranchPicker({ branches, onPick, onCreate }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const GOLD = "#F2C879";
+  const CREAM = "#F5ECD9";
+  const MUTED = "#A8977E";
+  const EMBER = "#C1272D";
+  const AMBER = "#E8A33D";
+  const INK = "#15100B";
+  const LINE = "rgba(242,200,121,0.14)";
+
+  return (
+    <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');`}</style>
+      <div style={{ maxWidth: 380, width: "100%" }}>
+        <div style={{ textAlign: "center", marginBottom: 26 }}>
+          <div style={{ fontSize: 40, marginBottom: 6 }}>🍔🍗</div>
+          <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, color: CREAM, margin: 0 }}>¿En qué sucursal estás?</h2>
+          <p style={{ fontSize: 12.5, color: MUTED, marginTop: 6 }}>Este dispositivo va a quedar asignado a esa sucursal.</p>
+        </div>
+
+        <div style={{ display: "grid", gap: 10, marginBottom: 18 }}>
+          {branches.map((b) => (
+            <button
+              key={b.id}
+              onClick={() => onPick(b.id)}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 14, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.03)", color: CREAM, cursor: "pointer", textAlign: "left" }}
+            >
+              <span style={{ width: 38, height: 38, borderRadius: "50%", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, color: "#fff", flexShrink: 0 }}>
+                {b.name.charAt(0).toUpperCase()}
+              </span>
+              <span style={{ fontWeight: 700, fontSize: 14.5 }}>{b.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {adding ? (
+          <div style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${LINE}`, borderRadius: 14, padding: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>Nombre de la nueva sucursal</div>
+            <input
+              value={name} onChange={(e) => setName(e.target.value)} autoFocus
+              placeholder='Ej: "El Sabor de lo Nuestro Granada"'
+              style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 10, border: `1px solid ${LINE}`, background: "rgba(255,255,255,0.04)", color: CREAM, fontSize: 13, marginBottom: 10 }}
+            />
+            <div style={{ fontSize: 10.5, color: MUTED, marginBottom: 12 }}>⚠️ Se crea con su propia caja, mesas e inventario vacíos — no comparte nada con las demás sucursales.</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => { setAdding(false); setName(""); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: `1px solid ${LINE}`, background: "transparent", color: MUTED, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
+              <button
+                disabled={!name.trim()}
+                onClick={() => onCreate(name.trim())}
+                style={{ flex: 1, padding: 10, borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: name.trim() ? 1 : 0.5 }}
+              >
+                Crear sucursal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setAdding(true)}
+            style={{ width: "100%", padding: 12, borderRadius: 14, border: `1px dashed ${LINE}`, background: "transparent", color: MUTED, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+          >
+            + Agregar nueva sucursal
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LockNowButton({ onLock, unlockedBy }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+      <div style={{ fontSize: 11.5, color: "#8a7a63", fontWeight: 700 }}>🔓 Sesión abierta: <span style={{ color: "#2E7D32" }}>{unlockedBy || "—"}</span></div>
+      <button
+        onClick={() => { if (window.confirm("¿Bloquear esta sección ahora? Vas a necesitar el PIN de nuevo para volver a entrar.")) onLock(); }}
+        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, color: "#8a7a63", background: "rgba(0,0,0,0.04)", border: "1px solid #E5D9C3", borderRadius: 20, padding: "6px 14px", cursor: "pointer" }}
+      >
+        <Lock size={12} /> Bloquear ahora
+      </button>
+    </div>
+  );
+}
+
+function PinGate({ pin, employees, onUnlock, title, subtitle }) {
   const [val, setVal] = useState("");
   const [err, setErr] = useState(false);
   const [shake, setShake] = useState(false);
 
   function tryUnlock(v) {
+    const matchedEmployee = (employees || []).find((emp) => emp.accessPin && emp.accessPin === v);
     if (v === pin) {
-      onUnlock();
+      onUnlock("Dueño/Administrador");
+    } else if (matchedEmployee) {
+      onUnlock(matchedEmployee.name);
     } else {
       setErr(true);
       setShake(true);
@@ -5779,6 +6091,7 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
   const [role, setRole] = useState(employee.role || ROLES[0]);
   const [phone, setPhone] = useState(employee.phone || "");
   const [wage, setWage] = useState(String(employee.dailyWage || ""));
+  const [accessPin, setAccessPin] = useState(employee.accessPin || "");
 
   return (
     <div style={{ background: "linear-gradient(160deg, #FFF8ED, #FFF3E0)", border: "2px solid #F2C879", borderRadius: 12, padding: 16, marginTop: 4 }}>
@@ -5815,6 +6128,16 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
         </div>
       </div>
 
+      <label style={lbl}>🔐 PIN personal para Caja/Reportes/Historial</label>
+      <input
+        type="password" inputMode="numeric" value={accessPin}
+        onChange={(e) => setAccessPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+        style={inp} placeholder="Dejar vacío = sin acceso a esas secciones"
+      />
+      <div style={{ fontSize: 10.5, color: "#8a7a63", marginTop: 2 }}>
+        Solo dale un PIN a las personas de confianza (dueño, cajero). Un mesero o cocinero sin PIN aquí no puede entrar a Caja, Reportes ni Historial desde ningún dispositivo.
+      </div>
+
       <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         <button
           onClick={onCancel}
@@ -5824,7 +6147,7 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
         </button>
         <button
           disabled={!name.trim()}
-          onClick={() => onSave({ name: name.trim(), role, phone, dailyWage: Number(wage) || 0 })}
+          onClick={() => onSave({ name: name.trim(), role, phone, dailyWage: Number(wage) || 0, accessPin: accessPin.trim() })}
           style={{ flex: 1, padding: 11, borderRadius: 8, border: "none", background: "#2E7D32", color: "#fff", cursor: "pointer", fontWeight: 800, opacity: name.trim() ? 1 : 0.5 }}
         >
           💾 Guardar cambios
