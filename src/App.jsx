@@ -848,11 +848,32 @@ export default function App() {
     return <div style={{ padding: 40, textAlign: "center", color: "#8a7a63" }}>Cargando…</div>;
   }
 
+  const SHELL_INK = "#15100B";
+  const SHELL_CARD = "#1E1611";
+  const SHELL_GOLD = "#F2C879";
+  const SHELL_EMBER = "#C1272D";
+  const SHELL_AMBER = "#E8A33D";
+  const SHELL_CREAM = "#F5ECD9";
+  const SHELL_MUTED = "#A8977E";
+  const SHELL_LINE = "rgba(242,200,121,0.14)";
+  const currentBranchName = (branches.find((b) => b.id === branchId) || {}).name || RESTAURANT_NAME;
+
   return (
     <div style={{
-      fontFamily: "Arial, sans-serif", background: "#FFF8ED", color: "#2B2118",
+      fontFamily: "'Plus Jakarta Sans', Arial, sans-serif",
+      background: view === "menutv" ? "#FFF8ED" : `linear-gradient(160deg, ${SHELL_INK} 0%, #1a130d 55%, ${SHELL_INK} 100%)`,
+      color: view === "menutv" ? "#2B2118" : SHELL_CREAM,
       ...(view === "menutv" ? { position: "fixed", inset: 0, overflow: "hidden", display: "flex", flexDirection: "column" } : { minHeight: "100vh" }),
     }}>
+      {view !== "menutv" && (
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+          .shell-nav-btn { transition: transform 0.12s ease, box-shadow 0.15s ease; white-space: nowrap; }
+          .shell-nav-btn:hover { transform: translateY(-1px); }
+          .shell-nav-scroll::-webkit-scrollbar { height: 5px; }
+          .shell-nav-scroll::-webkit-scrollbar-thumb { background: rgba(242,200,121,0.25); border-radius: 10px; }
+        `}</style>
+      )}
       {readyToast && (
         <div
           onClick={() => setReadyToast(null)}
@@ -878,7 +899,8 @@ export default function App() {
         style={{
           position: "fixed", bottom: 16, right: 16, zIndex: 100, width: 52, height: 52, borderRadius: "50%",
           border: "none", cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center",
-          background: audioReady ? "#2E7D32" : "#C1272D", color: "#fff", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          background: audioReady ? "linear-gradient(135deg, #2E7D32, #26A65B)" : `linear-gradient(135deg, ${SHELL_EMBER}, ${SHELL_AMBER})`, color: "#fff",
+          boxShadow: audioReady ? "0 4px 16px rgba(38,166,91,0.4)" : "0 4px 16px rgba(193,39,45,0.4)",
         }}
       >
         {audioReady ? "🔊" : "🔇"}
@@ -886,50 +908,70 @@ export default function App() {
       {!kiosk && view !== "menutv" && (
         <>
           <div style={{
-            background: connError ? "#C1272D" : "#2E7D32", color: "#fff", fontSize: 12, fontWeight: 700,
-            padding: "6px 14px", textAlign: "center", flexShrink: 0,
+            background: connError ? "rgba(193,39,45,0.15)" : "rgba(46,125,50,0.12)",
+            borderBottom: `1px solid ${connError ? "rgba(193,39,45,0.3)" : "rgba(46,125,50,0.2)"}`,
+            color: connError ? "#F87171" : "#6EE7A0", fontSize: 11, fontWeight: 700,
+            padding: "5px 14px", textAlign: "center", flexShrink: 0, letterSpacing: 0.3,
           }}>
             {connError ? `⚠️ ${connStatus}: ${connError}` : `✅ ${connStatus}${lastSync ? " · última sync " + lastSync.toLocaleTimeString("es-NI") : ""}`}
           </div>
-          <div style={{ background: "#2B2118", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, flexShrink: 0 }}>
-            <h1 style={{ color: "#FFF8ED", fontSize: 20, fontWeight: 800, margin: 0, letterSpacing: 0.5 }}>
-              🍔🍗 {RESTAURANT_NAME}
-            </h1>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{
+            background: `linear-gradient(160deg, ${SHELL_INK}, #221910)`, borderBottom: `1px solid ${SHELL_LINE}`,
+            padding: "16px 22px 12px", flexShrink: 0, position: "relative", overflow: "hidden",
+          }}>
+            <div style={{ position: "absolute", top: -50, right: -40, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.09), transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14, position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 26 }}>🍔🍗</span>
+                <div>
+                  <div style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 18, color: SHELL_CREAM, letterSpacing: 0.2, lineHeight: 1.1 }}>
+                    {RESTAURANT_NAME}
+                  </div>
+                  {branches.length > 1 && (
+                    <div style={{ fontSize: 10.5, color: SHELL_GOLD, fontWeight: 700, marginTop: 2 }}>📍 {currentBranchName}</div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => { playReadyBeep(); }}
+                title="Probar sonido"
+                className="shell-nav-btn"
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_LINE}`,
+                  cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(255,255,255,0.04)", color: audioReady ? "#6EE7A0" : SHELL_MUTED,
+                }}
+              >
+                {audioReady ? "🔊" : "🔇"} Probar sonido
+              </button>
+            </div>
+            <div className="shell-nav-scroll" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 4, position: "relative" }}>
               {nav.map((n) => {
                 const Icon = n.icon;
                 const active = view === n.id;
                 return (
                   <button
                     key={n.id}
+                    className="shell-nav-btn"
                     onClick={() => setView(n.id)}
                     style={{
-                      display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "none",
-                      cursor: "pointer", fontWeight: 700, fontSize: 13,
-                      background: active ? "#E8A33D" : "#3d2f22", color: active ? "#2B2118" : "#F2C879",
+                      display: "flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, cursor: "pointer",
+                      fontWeight: 700, fontSize: 12.5, flexShrink: 0,
+                      border: active ? `1px solid ${SHELL_GOLD}` : `1px solid ${SHELL_LINE}`,
+                      background: active ? `linear-gradient(135deg, ${SHELL_EMBER}, ${SHELL_AMBER})` : "rgba(255,255,255,0.03)",
+                      color: active ? "#fff" : SHELL_MUTED,
+                      boxShadow: active ? "0 6px 16px rgba(193,39,45,0.3)" : "none",
                     }}
                   >
-                    <Icon size={16} /> {n.label}
+                    <Icon size={15} /> {n.label}
                   </button>
                 );
               })}
-              <button
-                onClick={() => { playReadyBeep(); }}
-                title="Probar sonido"
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: "none",
-                  cursor: "pointer", fontWeight: 700, fontSize: 13,
-                  background: audioReady ? "#2E7D32" : "#8a7a63", color: "#fff",
-                }}
-              >
-                {audioReady ? "🔊" : "🔇"} Probar sonido
-              </button>
             </div>
           </div>
         </>
       )}
 
-      <div style={view === "menutv" ? { padding: 0, flex: 1, minHeight: 0, width: "100%", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto" }}>
+      <div style={view === "menutv" ? { padding: 0, flex: 1, minHeight: 0, width: "100%", boxSizing: "border-box", overflow: "hidden" } : { padding: 20, maxWidth: 1100, margin: "0 auto", color: "#2B2118" }}>
         {view === "mesas" && (
           <MesasView
             tables={tables}
@@ -1453,62 +1495,80 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
   const tableToRemove = tables.find((t) => t.id === confirmRemoveId);
   const fallbackSection = sections[0]?.name || "Salón Principal";
 
+  const MGOLD = "#F2C879";
+  const MCREAM = "#F5ECD9";
+  const MMUTED = "#A8977E";
+  const MEMBER = "#C1272D";
+  const MAMBER = "#E8A33D";
+  const MCARD = "#1E1611";
+  const MCARD2 = "#251C15";
+  const MINK = "#15100B";
+  const MLINE = "rgba(242,200,121,0.14)";
+
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <h2 style={{ fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: 0.2 }}>🍽️ Piso del restaurante</h2>
-          <div style={{ fontSize: 12, color: "#8a7a63", marginTop: 2 }}>{RESTAURANT_NAME}</div>
-        </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={() => setManageMode((m) => !m)}
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, cursor: "pointer",
-              fontWeight: 800, fontSize: 13, boxShadow: "0 3px 10px rgba(43,33,24,0.15)",
-              border: manageMode ? "1px solid #2B2118" : "1px solid #E5D9C3",
-              background: manageMode ? "#2B2118" : "#fff", color: manageMode ? "#F2C879" : "#2B2118",
-            }}
-          >
-            {manageMode ? "✓ Listo" : "🛠️ Editar mesas"}
-          </button>
-          <button
-            onClick={() => setSectionManagerOpen(true)}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "1px solid #E5D9C3", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "#fff", color: "#2B2118" }}
-          >
-            🗂️ Secciones
-          </button>
-          <button
-            onClick={onManageMenu}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 13, background: "linear-gradient(135deg, #2B2118, #3d2f22)", color: "#F2C879", boxShadow: "0 3px 10px rgba(43,33,24,0.25)" }}
-          >
-            🍔 Gestionar menú
-          </button>
-        </div>
-      </div>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
 
-      {manageMode && (
-        <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: "#6b5738" }}>
-          Modo edición activo: tocá la ❌ en una mesa libre para eliminarla, o el 🗂️ para moverla de sección. Las mesas ocupadas no se pueden eliminar ni mover.
+      <div style={{
+        background: `linear-gradient(160deg, ${MINK}, #211710 60%, ${MINK})`, borderRadius: 22, padding: "22px 24px", marginBottom: 22,
+        border: `1px solid ${MLINE}`, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(242,200,121,0.09), transparent 70%)" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10, position: "relative" }}>
+          <div>
+            <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 24, margin: 0, color: MCREAM }}>🍽️ Piso del restaurante</h2>
+            <div style={{ fontSize: 12, color: MMUTED, marginTop: 3 }}>{RESTAURANT_NAME}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              onClick={() => setManageMode((m) => !m)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, cursor: "pointer",
+                fontWeight: 700, fontSize: 12.5,
+                border: manageMode ? `1px solid ${MGOLD}` : `1px solid ${MLINE}`,
+                background: manageMode ? "rgba(242,200,121,0.14)" : "rgba(255,255,255,0.03)", color: manageMode ? MGOLD : MCREAM,
+              }}
+            >
+              {manageMode ? "✓ Listo" : "🛠️ Editar mesas"}
+            </button>
+            <button
+              onClick={() => setSectionManagerOpen(true)}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, border: `1px solid ${MLINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(255,255,255,0.03)", color: MCREAM }}
+            >
+              🗂️ Secciones
+            </button>
+            <button
+              onClick={onManageMenu}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12.5, background: `linear-gradient(135deg, ${MEMBER}, ${MAMBER})`, color: "#fff", boxShadow: "0 6px 16px rgba(193,39,45,0.3)" }}
+            >
+              🍔 Gestionar menú
+            </button>
+          </div>
         </div>
-      )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 26 }}>
-        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 12, padding: "14px 16px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", letterSpacing: 0.5, marginBottom: 4 }}>MESAS TOTALES</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: "#2B2118" }}>{tables.length}</div>
-        </div>
-        <div style={{ background: "linear-gradient(135deg, #FF5722, #D84315)", borderRadius: 12, padding: "14px 16px", color: "#fff" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>OCUPADAS</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{ocupadas}</div>
-        </div>
-        <div style={{ background: "linear-gradient(135deg, #26A65B, #158A4A)", borderRadius: 12, padding: "14px 16px", color: "#fff" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>LIBRES</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{libres}</div>
-        </div>
-        <div style={{ background: "linear-gradient(135deg, #2B2118, #3d2f22)", borderRadius: 12, padding: "14px 16px", color: "#F2C879" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, marginBottom: 4, opacity: 0.9 }}>EN MESA AHORA</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{money(floorTotal)}</div>
+        {manageMode && (
+          <div style={{ background: "rgba(242,200,121,0.08)", border: `1px solid ${MGOLD}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: MCREAM, position: "relative" }}>
+            Modo edición activo: tocá la ❌ en una mesa libre para eliminarla, o el 🗂️ para moverla de sección. Las mesas ocupadas no se pueden eliminar ni mover.
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, position: "relative" }}>
+          <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${MGOLD}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>MESAS TOTALES</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{tables.length}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #FF5722" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>OCUPADAS</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{ocupadas}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #4ADE80" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>LIBRES</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{libres}</div>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${MAMBER}` }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>EN MESA AHORA</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{money(floorTotal)}</div>
+          </div>
         </div>
       </div>
 
@@ -1519,19 +1579,19 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <span style={{ fontSize: 19 }}>{sec.icon}</span>
-                <span style={{ fontSize: 15, fontWeight: 800, color: "#2B2118", letterSpacing: 0.3 }}>{sec.name}</span>
-                <span style={{ fontSize: 11, color: "#a8977e", fontWeight: 700, background: "#F0E8D8", borderRadius: 12, padding: "2px 9px" }}>{secTables.length} mesa{secTables.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: MCREAM, letterSpacing: 0.3 }}>{sec.name}</span>
+                <span style={{ fontSize: 11, color: MMUTED, fontWeight: 700, background: "rgba(255,255,255,0.05)", border: `1px solid ${MLINE}`, borderRadius: 12, padding: "2px 9px" }}>{secTables.length} mesa{secTables.length !== 1 ? "s" : ""}</span>
               </div>
               <button
                 onClick={() => onAddTable(sec.name)}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12, background: "linear-gradient(135deg, #26A65B, #158A4A)", color: "#fff" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12, background: "linear-gradient(135deg, #2E7D32, #26A65B)", color: "#fff" }}
               >
                 ➕ Agregar mesa aquí
               </button>
             </div>
 
             {secTables.length === 0 ? (
-              <div style={{ border: "1px dashed #E5D9C3", borderRadius: 14, padding: 18, textAlign: "center", color: "#a8977e", fontSize: 12.5 }}>
+              <div style={{ border: `1px dashed ${MLINE}`, borderRadius: 14, padding: 18, textAlign: "center", color: MMUTED, fontSize: 12.5 }}>
                 Esta sección todavía no tiene mesas.
               </div>
             ) : (
@@ -2532,31 +2592,42 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(175px, 1fr))", gap: 12 }}>
               {listForCat.map((m) => {
                 const inCart = cartQtyFor(m.id);
+                const catIcon = cat === "Promociones" ? "🏷️" : (menuCats.find((mc) => mc.name === cat)?.icon || "🍽️");
                 return (
                   <button
                     key={m.id}
                     className="so-elite"
                     onClick={() => handleItemClick(m)}
                     style={{
-                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: "16px 16px", borderRadius: 14,
+                      display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0, padding: 0, borderRadius: 14,
                       border: `1px solid ${inCart > 0 ? "rgba(184,92,56,0.35)" : LINE}`, cursor: "pointer", fontSize: 14, textAlign: "left", position: "relative",
-                      background: cat === "Promociones" ? "linear-gradient(160deg, #FBEEE2, #F5DCC4)" : CARD,
+                      background: CARD, overflow: "hidden",
                       boxShadow: "0 2px 10px rgba(74,55,40,0.06)", transition: "border-color 0.15s ease, transform 0.12s ease",
                     }}
                   >
                     {inCart > 0 && (
                       <span style={{
-                        position: "absolute", top: 12, right: 12, color: "#fff", background: TERRACOTTA, borderRadius: "50%",
-                        width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10.5, fontWeight: 700,
+                        position: "absolute", top: 10, right: 10, color: "#fff", background: TERRACOTTA, borderRadius: "50%",
+                        width: 22, height: 22, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, zIndex: 2,
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
                       }}>
                         {inCart}
                       </span>
                     )}
-                    <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, color: ESPRESSO, fontSize: 15.5, lineHeight: 1.3, paddingRight: inCart > 0 ? 22 : 0 }}>{m.name}</span>
-                    <span style={{ width: 22, height: 1, background: GOLD, opacity: 0.6 }} />
-                    <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontWeight: 500, color: TERRACOTTA, fontSize: 15 }}>
-                      {money(m.price)}
-                    </span>
+                    <div style={{
+                      width: "100%", height: 92, flexShrink: 0,
+                      ...(m.photoUrl
+                        ? { backgroundImage: `url(${m.photoUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
+                        : { background: cat === "Promociones" ? "linear-gradient(160deg, #FBEEE2, #F5DCC4)" : `linear-gradient(160deg, ${CREAM_DEEP}, ${LINE})`, display: "flex", alignItems: "center", justifyContent: "center" }),
+                    }}>
+                      {!m.photoUrl && <span style={{ fontSize: 30, opacity: 0.45 }}>{catIcon}</span>}
+                    </div>
+                    <div style={{ padding: "10px 14px 13px", display: "flex", flexDirection: "column", gap: 6, width: "100%", boxSizing: "border-box" }}>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 500, color: ESPRESSO, fontSize: 14.5, lineHeight: 1.25 }}>{m.name}</span>
+                      <span style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontWeight: 500, color: TERRACOTTA, fontSize: 14.5 }}>
+                        {money(m.price)}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
