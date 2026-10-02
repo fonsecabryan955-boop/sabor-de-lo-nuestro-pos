@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Percent, Users, Archive, ClipboardList, CalendarClock } from "lucide-react";
+import { Plus, Minus, X, Send, CheckCircle2, Clock, ChefHat, UtensilsCrossed, Receipt, Bike, BarChart3, Lock, Printer, UserCheck, Wallet, Tag, Tv, Percent, Users, Archive, ClipboardList, CalendarClock, Search } from "lucide-react";
 
 const supabaseUrl = "https://tgzxcmorfgpblfsgwcgv.supabase.co";
 const supabaseKey = "sb_publishable_BDJcoHqoybh94C8tm0AoLg_rsQuZ51P";
@@ -618,6 +618,26 @@ export default function App() {
     if (kind === "table") withTables((ts) => ts.map((t) => (t.id === id ? stamp(t) : t)));
     else withDeliveries((ds) => ds.map((d) => (d.id === id ? stamp(d) : d)));
   }
+  // Marca un platillo individual del ticket como preparado (tipo KDS). No toca kitchenSentAt
+  // para que el cronómetro del ticket siga contando desde que se envió originalmente.
+  function toggleKitchenItemDone(kind, id, menuId) {
+    const toggleFn = (items) => items.map((it) => (it.menuId === menuId ? { ...it, kitchenDone: !it.kitchenDone } : it));
+    if (kind === "table") {
+      withTables((ts) => ts.map((t) => {
+        if (t.id !== id) return t;
+        const next = { ...t, items: toggleFn(t.items) };
+        if (t.kitchenStatus === "pendiente") next.kitchenStatus = "preparando";
+        return next;
+      }));
+    } else {
+      withDeliveries((ds) => ds.map((d) => {
+        if (d.id !== id) return d;
+        const next = { ...d, items: toggleFn(d.items) };
+        if (d.kitchenStatus === "pendiente") next.kitchenStatus = "preparando";
+        return next;
+      }));
+    }
+  }
   function closeTicket(kind, id, method, discount, tip, itemMenuIds, bank, fiadoPersonName) {
     const disc = discount && discount.value > 0 ? discount : null;
     const tipAmount = Number(tip) || 0;
@@ -987,7 +1007,7 @@ export default function App() {
           />
         )}
 
-        {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} kiosk={kiosk} />}
+        {view === "cocina" && <CocinaView tables={tables} deliveries={deliveries} onAdvance={advanceKitchen} onToggleItem={toggleKitchenItemDone} kiosk={kiosk} />}
 
         {view === "caja" &&
           (adminUnlocked ? (
@@ -2577,12 +2597,22 @@ function OrderModal({ title, items, kitchenStatus, promotions, menuItems, menuCa
 
           {/* Columna 2: productos */}
           <div style={{ flex: 1, padding: 20, overflow: "auto" }}>
-            <input
-              placeholder="Buscar producto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: "100%", padding: "11px 16px", borderRadius: 10, border: `1px solid ${LINE}`, fontSize: 13, boxSizing: "border-box", marginBottom: 16, background: CARD, fontFamily: "inherit", color: ESPRESSO }}
-            />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: MUTED, fontWeight: 600 }}>
+                <span>🏠</span>
+                <span style={{ opacity: 0.6 }}>/</span>
+                <span style={{ color: ESPRESSO, fontWeight: 700 }}>{cat}</span>
+              </div>
+              <div style={{ position: "relative", minWidth: 220, flex: "0 1 260px" }}>
+                <Search size={14} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: MUTED }} />
+                <input
+                  placeholder="Buscar producto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px 10px 34px", borderRadius: 24, border: `1px solid ${LINE}`, fontSize: 13, boxSizing: "border-box", background: CARD, fontFamily: "inherit", color: ESPRESSO }}
+                />
+              </div>
+            </div>
             {cat === "Promociones" && listForCat.length === 0 && !search && (
               <p style={{ fontSize: 13, color: MUTED }}>No hay promociones activas. Agrégalas en la pestaña "Promos".</p>
             )}
@@ -2719,30 +2749,27 @@ function ElapsedBadge({ sentAt }) {
   );
 }
 
-function CocinaView({ tables, deliveries, onAdvance }) {
+function CocinaView({ tables, deliveries, onAdvance, onToggleItem }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(iv);
   }, []);
 
-  const nuevos = [
-    ...tables.filter((t) => t.kitchenStatus === "pendiente").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "pendiente").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
-  ];
-  const preparando = [
-    ...tables.filter((t) => t.kitchenStatus === "preparando").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
-  ];
-  const listos = [
-    ...tables.filter((t) => t.kitchenStatus === "listo").map((t) => ({ kind: "table", id: t.id, label: `Mesa ${t.id}`, ...t })),
-    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, label: d.type === "pickup" ? "🥡 Para llevar" : "🛵 Delivery", ...d })),
-  ];
+  function ticketMeta(o) {
+    if (o.kind === "table") return { accent: "#FFB300", icon: "🍽️", label: `Mesa ${o.id}`, sub: null };
+    if (o.type === "pickup") return { accent: "#FF5252", icon: "🥡", label: "Para llevar", sub: o.customer };
+    return { accent: "#26A65B", icon: "🛵", label: "Delivery", sub: o.customer };
+  }
 
-  const columns = [
-    { key: "nuevos", title: "NUEVOS", emoji: "🆕", items: nuevos, accent: "#FF5252", action: "preparando", actionLabel: "Empezar a preparar" },
-    { key: "preparando", title: "PREPARANDO", emoji: "🔥", items: preparando, accent: "#FFB300", action: "listo", actionLabel: "Marcar listo" },
-    { key: "listos", title: "LISTOS", emoji: "✅", items: listos, accent: "#00E676", action: null, actionLabel: null },
+  const active = [
+    ...tables.filter((t) => t.kitchenStatus === "pendiente" || t.kitchenStatus === "preparando").map((t) => ({ kind: "table", id: t.id, ...t })),
+    ...deliveries.filter((d) => d.kitchenStatus === "pendiente" || d.kitchenStatus === "preparando").map((d) => ({ kind: "delivery", id: d.id, ...d })),
+  ].sort((a, b) => new Date(a.kitchenSentAt || 0) - new Date(b.kitchenSentAt || 0));
+
+  const listos = [
+    ...tables.filter((t) => t.kitchenStatus === "listo").map((t) => ({ kind: "table", id: t.id, ...t })),
+    ...deliveries.filter((d) => d.kitchenStatus === "listo").map((d) => ({ kind: "delivery", id: d.id, ...d })),
   ];
 
   return (
@@ -2752,6 +2779,9 @@ function CocinaView({ tables, deliveries, onAdvance }) {
         @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
         @keyframes cardIn { from { transform: scale(0.94) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes liveDot { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,230,118,0.5); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(0,230,118,0); } }
+        .kds-ticket-row::-webkit-scrollbar { height: 6px; }
+        .kds-ticket-row::-webkit-scrollbar-thumb { background: rgba(242,200,121,0.25); border-radius: 10px; }
+        .kds-item-row:active { transform: scale(0.98); }
       `}</style>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
@@ -2768,66 +2798,119 @@ function CocinaView({ tables, deliveries, onAdvance }) {
         </div>
       </div>
 
-      {nuevos.length === 0 && preparando.length === 0 && listos.length === 0 && (
+      {active.length === 0 && listos.length === 0 && (
         <div style={{ textAlign: "center", padding: "70px 20px", color: "#7a6c56" }}>
           <div style={{ fontSize: 48, marginBottom: 10 }}>🍽️</div>
           <p style={{ fontSize: 15 }}>Todo tranquilo — no hay pedidos en cocina.</p>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 18, alignItems: "start" }}>
-        {columns.map((col) => (
-          <div key={col.key} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 18, border: `1px solid ${col.accent}33`, overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: `2px solid ${col.accent}`, background: `${col.accent}14` }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: "'Anton', sans-serif", fontSize: 16, letterSpacing: 1.2, color: col.accent }}>
-                <span style={{ width: 26, height: 26, borderRadius: "50%", background: col.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>{col.emoji}</span>
-                {col.title}
-              </span>
-              <span style={{ background: col.accent, color: "#1a1410", borderRadius: 20, padding: "2px 13px", fontSize: 13, fontFamily: "'Anton', sans-serif" }}>{col.items.length}</span>
-            </div>
-            <div style={{ padding: 12, minHeight: 100, display: "flex", flexDirection: "column", gap: 12 }}>
-              {col.items.length === 0 && <div style={{ fontSize: 12, color: "#5a4c3a", textAlign: "center", padding: "20px 0", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>— vacío —</div>}
-              {col.items.map((o) => (
+      {active.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: "#F2C879" }}>🎫 TICKETS ACTIVOS</span>
+            <span style={{ background: "#F2C879", color: "#1a1410", borderRadius: 20, padding: "1px 10px", fontSize: 12, fontWeight: 800 }}>{active.length}</span>
+          </div>
+          <div className="kds-ticket-row" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 12, alignItems: "stretch" }}>
+            {active.map((o) => {
+              const meta = ticketMeta(o);
+              const doneCount = o.items.filter((it) => it.kitchenDone).length;
+              const allDone = o.items.length > 0 && doneCount === o.items.length;
+              return (
                 <div
                   key={o.kind + o.id}
                   style={{
-                    background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, padding: 16, color: "#F5ECD9",
-                    animation: "cardIn 0.3s ease", border: `1px solid ${col.accent}55`, borderLeft: `5px solid ${col.accent}`,
+                    minWidth: 260, maxWidth: 270, flexShrink: 0, display: "flex", flexDirection: "column",
+                    background: "linear-gradient(160deg, #262019, #1d1712)", borderRadius: 16, overflow: "hidden",
+                    animation: "cardIn 0.3s ease", border: `1px solid ${meta.accent}55`,
                     fontFamily: "'Plus Jakarta Sans', Arial, sans-serif", boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <strong style={{ fontFamily: "'Anton', sans-serif", fontSize: 19, letterSpacing: 0.3, fontWeight: 400 }}>{o.label}</strong>
-                    <ElapsedBadge sentAt={o.kitchenSentAt} />
+                  <div style={{ padding: "12px 14px", borderBottom: `2px solid ${meta.accent}`, background: `${meta.accent}1E` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontFamily: "'Anton', sans-serif", fontSize: 17, letterSpacing: 0.4, color: meta.accent }}>
+                        {meta.icon} {meta.label}
+                      </span>
+                      <ElapsedBadge sentAt={o.kitchenSentAt} />
+                    </div>
+                    {meta.sub && <div style={{ fontSize: 11.5, color: "#C9BBA3", marginTop: 2 }}>{meta.sub}</div>}
                   </div>
-                  <ul style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 14, lineHeight: 1.6, color: "#E4D8C0" }}>
+
+                  <div style={{ padding: "10px 10px", flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
                     {o.items.map((it) => (
-                      <li key={it.menuId}>
-                        <strong style={{ color: "#F2C879" }}>{it.qty}x</strong> {it.name}
-                        {it.notes && <div style={{ fontSize: 12, color: "#C1531F", fontStyle: "italic" }}>↳ {it.notes}</div>}
-                      </li>
+                      <div
+                        key={it.menuId}
+                        className="kds-item-row"
+                        onClick={() => onToggleItem(o.kind, o.id, it.menuId)}
+                        style={{
+                          display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", padding: "7px 8px", borderRadius: 10,
+                          background: it.kitchenDone ? "rgba(74,222,128,0.08)" : "transparent", transition: "background 0.15s ease, transform 0.1s ease",
+                        }}
+                      >
+                        <span style={{
+                          width: 21, height: 21, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+                          border: `2px solid ${it.kitchenDone ? "#4ADE80" : meta.accent}`, background: it.kitchenDone ? "#4ADE80" : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {it.kitchenDone && <span style={{ color: "#15100B", fontSize: 12, fontWeight: 900 }}>✓</span>}
+                        </span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13.5, lineHeight: 1.35, color: it.kitchenDone ? "#7a9282" : "#F5ECD9", textDecoration: it.kitchenDone ? "line-through" : "none" }}>
+                            <strong style={{ color: it.kitchenDone ? "#5f8a6c" : "#F2C879" }}>{it.qty}x</strong> {it.name}
+                          </div>
+                          {it.notes && <div style={{ fontSize: 11.5, color: "#E8A33D", fontStyle: "italic" }}>↳ {it.notes}</div>}
+                        </div>
+                      </div>
                     ))}
-                  </ul>
-                  {col.action && (
+                  </div>
+
+                  <div style={{ padding: "10px 14px 14px" }}>
+                    {o.items.length > 0 && (
+                      <div style={{ fontSize: 10.5, color: allDone ? "#4ADE80" : "#9a8a6f", textAlign: "center", marginBottom: 8, fontWeight: 700 }}>
+                        {doneCount}/{o.items.length} platillos listos
+                      </div>
+                    )}
                     <button
-                      onClick={() => onAdvance(o.kind, o.id, col.action)}
-                      style={{ width: "100%", padding: "12px 0", border: "none", borderRadius: 12, background: col.accent, color: "#1a1410", fontFamily: "'Anton', sans-serif", fontSize: 14, cursor: "pointer", letterSpacing: 0.3, boxShadow: `0 6px 14px ${col.accent}55` }}
+                      onClick={() => onAdvance(o.kind, o.id, "listo")}
+                      style={{
+                        width: "100%", padding: "11px 0", border: "none", borderRadius: 12, cursor: "pointer",
+                        background: meta.accent, color: "#1a1410", fontFamily: "'Anton', sans-serif", fontSize: 13.5, letterSpacing: 0.3,
+                        boxShadow: `0 6px 14px ${meta.accent}55`,
+                      }}
                     >
-                      {col.actionLabel} →
+                      ✅ Marcar completado
                     </button>
-                  )}
-                  {!col.action && (
-                    <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: col.accent, letterSpacing: 0.5 }}>🔔 AVISAR AL MESERO</div>
-                  )}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </>
+      )}
+
+      {listos.length > 0 && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "22px 0 12px", fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: "#4ADE80" }}>✅ LISTOS PARA ENTREGAR</span>
+            <span style={{ background: "#4ADE80", color: "#15100B", borderRadius: 20, padding: "1px 10px", fontSize: 12, fontWeight: 800 }}>{listos.length}</span>
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {listos.map((o) => {
+              const meta = ticketMeta(o);
+              return (
+                <div key={o.kind + o.id} style={{ background: "rgba(74,222,128,0.08)", border: "1px solid #4ADE80", borderRadius: 12, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
+                  <span style={{ fontWeight: 800, color: "#F5ECD9", fontSize: 13 }}>{meta.icon} {meta.label}{meta.sub ? ` — ${meta.sub}` : ""}</span>
+                  <span style={{ fontSize: 10.5, color: "#4ADE80", fontWeight: 700 }}>🔔 AVISAR AL MESERO</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
+
 
 function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, onCloseSession, onAddExpense, onDeleteExpense }) {
   const active = cashSessions.find((s) => !s.closedAt);
