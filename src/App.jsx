@@ -892,6 +892,16 @@ export default function App() {
           .shell-nav-btn:hover { transform: translateY(-1px); }
           .shell-nav-scroll::-webkit-scrollbar { height: 5px; }
           .shell-nav-scroll::-webkit-scrollbar-thumb { background: rgba(242,200,121,0.25); border-radius: 10px; }
+
+          /* Pulido global 2026 para TODOS los botones del sistema: rebote al presionar,
+             brillo al pasar el mouse, sin tocar el color/forma que ya tiene cada uno. */
+          button:not(:disabled) {
+            transition: transform 0.12s cubic-bezier(.34,1.56,.64,1), filter 0.15s ease, opacity 0.15s ease;
+            -webkit-tap-highlight-color: transparent;
+          }
+          button:not(:disabled):hover { filter: brightness(1.07); }
+          button:not(:disabled):active { transform: scale(0.95); filter: brightness(0.97); }
+          button:disabled { cursor: default; }
         `}</style>
       )}
       {readyToast && (
@@ -1319,7 +1329,12 @@ function BranchPicker({ branches, onPick, onCreate }) {
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');`}</style>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap');
+        button:not(:disabled) { transition: transform 0.12s cubic-bezier(.34,1.56,.64,1), filter 0.15s ease; -webkit-tap-highlight-color: transparent; }
+        button:not(:disabled):hover { filter: brightness(1.07); }
+        button:not(:disabled):active { transform: scale(0.95); filter: brightness(0.97); }
+      `}</style>
       <div style={{ maxWidth: 380, width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: 26 }}>
           <div style={{ fontSize: 40, marginBottom: 6 }}>🍔🍗</div>
