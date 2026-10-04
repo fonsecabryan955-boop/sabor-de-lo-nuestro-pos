@@ -111,6 +111,48 @@ function fiadoCollections(sales, start, end) {
   const byMethod = (m) => inRange.filter((s) => (s.fiadoPaidMethod || "Efectivo") === m).reduce((sum, s) => sum + s.total, 0);
   return { efectivo: byMethod("Efectivo"), tarjeta: byMethod("Tarjeta"), transferencia: byMethod("Transferencia"), count: inRange.length };
 }
+const WEEKDAY_NAMES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+// Clasifica día por día el periodo [start, end] para un empleado: trabajado / falta / descanso / pendiente (futuro).
+// restDay es 0-6 (domingo=0) o null si no tiene día de descanso fijo.
+function attendanceBetween(employeeName, start, end, clockRecords, restDay) {
+  const byDay = {};
+  clockRecords.filter((r) => r.employee === employeeName).forEach((r) => {
+    const key = new Date(r.time).toDateString();
+    // Si hay un registro de trabajo y uno de falta el mismo día, el de trabajo manda.
+    if (!byDay[key] || (byDay[key].absent && !r.absent)) byDay[key] = r;
+  });
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const cur = new Date(start); cur.setHours(0, 0, 0, 0);
+  const lastDay = new Date(end);
+  const days = [];
+  let worked = 0, absent = 0, rest = 0, pending = 0, late = 0;
+  while (cur <= lastDay) {
+    const key = cur.toDateString();
+    const rec = byDay[key];
+    let status;
+    if (cur > todayEnd) status = "pendiente";
+    else if (rec && !rec.absent) status = "trabajado";
+    else if (restDay !== null && restDay !== undefined && restDay !== "" && cur.getDay() === Number(restDay)) status = "descanso";
+    else status = "falta";
+    if (status === "trabajado") { worked++; if (rec.late) late++; }
+    else if (status === "falta") absent++;
+    else if (status === "descanso") rest++;
+    else pending++;
+    days.push({ date: new Date(cur), status, late: rec ? rec.late : false });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return { days, worked, absent, rest, pending, late, totalDays: days.length };
+}
+// Rango calendario de la quincena activa (día 1-15 o 16-fin de mes), maneja meses de 28/29/30/31 días.
+function quincenaRange(dateRef) {
+  const d = dateRef || new Date();
+  const year = d.getFullYear(), month = d.getMonth(), day = d.getDate();
+  if (day <= 15) {
+    return { start: new Date(year, month, 1, 0, 0, 0), end: new Date(year, month, 15, 23, 59, 59, 999), label: "Quincena 1 (día 1 al 15)" };
+  }
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return { start: new Date(year, month, 16, 0, 0, 0), end: new Date(year, month, lastDay, 23, 59, 59, 999), label: `Quincena 2 (día 16 al ${lastDay})` };
+}
 const DEFAULT_SECTIONS = [
   { name: "Salón Principal", icon: "🍽️" },
 ];
@@ -706,6 +748,10 @@ export default function App() {
   }
   function clockIn(employeeName) {
     const now = new Date();
+    const todayKey = now.toDateString();
+    // Evita marcar entrada dos veces el mismo día (y pagarle doble por accidente).
+    const already = clockRecords.find((r) => r.employee === employeeName && new Date(r.time).toDateString() === todayKey);
+    if (already) return;
     const [sh, sm] = SHIFT_START.split(":").map(Number);
     const shiftMinutes = sh * 60 + sm;
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -718,6 +764,24 @@ export default function App() {
         { id: Date.now(), employee: employeeName, time: now.toISOString(), late, minsLate },
       ],
     });
+  }
+  // Registra explícitamente que el empleado faltó un día (por defecto hoy). Esto es lo que
+  // le permite al sistema distinguir "faltó" de "nadie marcó nada todavía".
+  function markAbsence(employeeName, dateStr) {
+    const d = dateStr ? new Date(dateStr + "T12:00:00") : new Date();
+    const dayKey = d.toDateString();
+    const already = clockRecords.find((r) => r.employee === employeeName && new Date(r.time).toDateString() === dayKey);
+    if (already) return;
+    persist({
+      ...state,
+      clockRecords: [
+        ...clockRecords,
+        { id: Date.now(), employee: employeeName, time: d.toISOString(), absent: true },
+      ],
+    });
+  }
+  function deleteClockRecord(id) {
+    persist({ ...state, clockRecords: clockRecords.filter((r) => r.id !== id) });
   }
   function addMenuItem(item) {
     persist({ ...state, menuItems: [...menuItems, { id: `m${Date.now()}`, active: true, ...item }] });
@@ -1054,7 +1118,7 @@ export default function App() {
         {view === "clientes" && <ClientesView salesLog={salesLog} />}
 
         {view === "empleados" && (
-          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onAddPayment={addPayment} onDeletePayment={deletePayment} onToggleActive={toggleEmployeeActive} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />
+          <EmpleadosView employees={employees} clockRecords={clockRecords} payments={payments} onAdd={addEmployee} onClockIn={clockIn} onMarkAbsence={markAbsence} onDeleteClockRecord={deleteClockRecord} onAddPayment={addPayment} onDeletePayment={deletePayment} onToggleActive={toggleEmployeeActive} onDeleteEmployee={deleteEmployee} onUpdateEmployee={updateEmployee} />
         )}
 
         {view === "inventario" && (
@@ -5703,8 +5767,11 @@ function printPayStub(employee, payment) {
       ${employee.phone ? `<div class="row"><span>Teléfono</span><span>${employee.phone}</span></div>` : ""}
       <div class="row"><span>Fecha de pago</span><span>${payDate.toLocaleDateString("es-NI", { day: "numeric", month: "long", year: "numeric" })}</span></div>
 
+      ${payment.periodStart ? `<div class="row"><span>Período pagado</span><span>${new Date(payment.periodStart).toLocaleDateString("es-NI", { day: "numeric", month: "short" })} – ${new Date(payment.periodEnd || payment.time).toLocaleDateString("es-NI", { day: "numeric", month: "short" })}</span></div>` : ""}
+
       <div class="section-title">Detalle del pago</div>
       ${days ? `<div class="row"><span>Días trabajados</span><span>${days}</span></div>` : ""}
+      ${payment.absentDays != null && payment.absentDays > 0 ? `<div class="row"><span>Faltas en el período</span><span class="neg">${payment.absentDays}</span></div>` : ""}
       <div class="row"><span>Pago por día</span><span>${money(employee.dailyWage)}</span></div>
       ${days ? `<div class="row"><span>Subtotal (${days} × ${money(employee.dailyWage)})</span><span>${money(days * employee.dailyWage)}</span></div>` : ""}
       ${bono > 0 ? `<div class="row"><span>Bono / Comisión</span><span>+${money(bono)}</span></div>` : ""}
@@ -5744,8 +5811,13 @@ function PaydayBanner({ employees, payments, clockRecords }) {
     const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().sort((a, b) => new Date(a.time) - new Date(b.time));
     const last = empPayments[empPayments.length - 1];
     const cutoff = last ? new Date(last.time) : null;
-    const empClock = clockRecords.filter((r) => r.employee === emp.name);
-    const pendingDays = cutoff ? empClock.filter((r) => new Date(r.time) > cutoff).length : empClock.length;
+    const empClock = clockRecords.filter((r) => r.employee === emp.name && !r.absent);
+    const seenDays = new Set();
+    let pendingDays = 0;
+    empClock.filter((r) => !cutoff || new Date(r.time) > cutoff).forEach((r) => {
+      const key = new Date(r.time).toDateString();
+      if (!seenDays.has(key)) { seenDays.add(key); pendingDays++; }
+    });
     return pendingDays * (emp.dailyWage || 0);
   }
   const pending = activeEmployees.map((e) => ({ emp: e, owed: owedFor(e) })).filter((x) => x.owed > 0);
@@ -5775,7 +5847,7 @@ function PaydayBanner({ employees, payments, clockRecords }) {
   );
 }
 
-function PaymentForm({ employee, pendingDays, onPay }) {
+function PaymentForm({ employee, pendingDays, period, cutoff, onPay }) {
   const [days, setDays] = useState(pendingDays || 0);
   const [pago, setPago] = useState(String((pendingDays || 0) * (employee.dailyWage || 0) || employee.dailyWage || ""));
   const [bono, setBono] = useState("");
@@ -5787,6 +5859,22 @@ function PaymentForm({ employee, pendingDays, onPay }) {
   return (
     <div style={{ background: "#FFF3E0", border: "1px solid #F2C879", borderRadius: 12, padding: 14, marginTop: 12, marginBottom: 12 }}>
       <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 10 }}>💵 Registrar pago detallado</div>
+
+      {period && (
+        <div style={{ background: "#fff", border: "1px solid #E5D9C3", borderRadius: 10, padding: "10px 12px", marginBottom: 12 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 800, color: "#8a7a63", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+            📆 Período a pagar: {cutoff ? new Date(cutoff).toLocaleDateString("es-NI", { day: "numeric", month: "short" }) : "inicio"} → hoy
+          </div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12 }}>
+            <span>✅ <strong>{period.worked}</strong> trabajados</span>
+            <span style={{ color: period.absent > 0 ? "#C1272D" : "#8a7a63" }}>🚫 <strong>{period.absent}</strong> faltas</span>
+            {period.rest > 0 && <span>💤 <strong>{period.rest}</strong> descanso</span>}
+            {period.late > 0 && <span style={{ color: "#E8A33D" }}>⏰ <strong>{period.late}</strong> tarde</span>}
+            <span style={{ color: "#8a7a63" }}>📅 {period.totalDays} días en el período</span>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
           <label style={{ ...lbl, marginTop: 0 }}>Días trabajados</label>
@@ -5838,7 +5926,12 @@ function PaymentForm({ employee, pendingDays, onPay }) {
       <button
         disabled={neto <= 0}
         onClick={() => {
-          onPay({ amount: neto, note, days: Number(days) || 0, bruto, bono: Number(bono) || 0, deducciones: Number(deducciones) || 0 });
+          onPay({
+            amount: neto, note, days: Number(days) || 0, bruto, bono: Number(bono) || 0, deducciones: Number(deducciones) || 0,
+            absentDays: period ? period.absent : null,
+            periodStart: cutoff ? new Date(cutoff).toISOString() : null,
+            periodEnd: new Date().toISOString(),
+          });
           setBono(""); setDeducciones(""); setNote("");
         }}
         style={{ width: "100%", padding: 12, border: "none", borderRadius: 8, background: neto > 0 ? "#2E7D32" : "#C9D6E0", color: "#fff", fontWeight: 800, cursor: neto > 0 ? "pointer" : "not-allowed", fontSize: 14 }}
@@ -5867,14 +5960,18 @@ function printPayrollSummary(employees, payments, clockRecords) {
   const rows = employees.map((emp) => {
     const q1Paid = paidInRange(emp.name, 1, 15);
     const q2Paid = paidInRange(emp.name, 16, lastDay);
-    const empClock = clockRecords.filter((r) => r.employee === emp.name);
-    const lateCount = empClock.filter((r) => r.late).length;
-    const punctuality = empClock.length > 0 ? Math.round(((empClock.length - lateCount) / empClock.length) * 100) : 100;
+    const empClockWorked = clockRecords.filter((r) => r.employee === emp.name && !r.absent);
+    const lateCount = empClockWorked.filter((r) => r.late).length;
+    const punctuality = empClockWorked.length > 0 ? Math.round(((empClockWorked.length - lateCount) / empClockWorked.length) * 100) : 100;
+    const q1Attendance = attendanceBetween(emp.name, new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth(), 15, 23, 59, 59), clockRecords, emp.restDay);
+    const q2Attendance = attendanceBetween(emp.name, new Date(now.getFullYear(), now.getMonth(), 16), new Date(now.getFullYear(), now.getMonth(), lastDay, 23, 59, 59), clockRecords, emp.restDay);
     return `<tr>
       <td>${emp.name}</td>
       <td>${emp.role || "Personal"}</td>
       <td style="text-align:right">${money(emp.dailyWage)}</td>
       <td style="text-align:center">${punctuality}%</td>
+      <td style="text-align:center">${q1Attendance.worked}✓ / ${q1Attendance.absent}✗</td>
+      <td style="text-align:center">${q2Attendance.worked}✓ / ${q2Attendance.absent}✗</td>
       <td style="text-align:right">${money(q1Paid)}</td>
       <td style="text-align:right">${money(q2Paid)}</td>
       <td style="text-align:right"><strong>${money(q1Paid + q2Paid)}</strong></td>
@@ -5899,9 +5996,9 @@ function printPayrollSummary(employees, payments, clockRecords) {
       <div class="sub">REPORTE DE NÓMINA QUINCENAL · ${now.toLocaleDateString("es-NI", { month: "long", year: "numeric" }).toUpperCase()}</div>
       <hr/>
       <table>
-        <tr><th>Empleado</th><th>Puesto</th><th style="text-align:right">Pago/día</th><th style="text-align:center">Puntualidad</th><th style="text-align:right">Quincena 1 (1-15)</th><th style="text-align:right">Quincena 2 (16-${lastDay})</th><th style="text-align:right">Total mes</th></tr>
+        <tr><th>Empleado</th><th>Puesto</th><th style="text-align:right">Pago/día</th><th style="text-align:center">Puntualidad</th><th style="text-align:center">Q1 trabajó/faltó</th><th style="text-align:center">Q2 trabajó/faltó</th><th style="text-align:right">Quincena 1 (1-15)</th><th style="text-align:right">Quincena 2 (16-${lastDay})</th><th style="text-align:right">Total mes</th></tr>
         ${rows}
-        <tr class="total"><td colspan="4">TOTALES</td><td style="text-align:right">${money(totalQ1)}</td><td style="text-align:right">${money(totalQ2)}</td><td style="text-align:right">${money(totalQ1 + totalQ2)}</td></tr>
+        <tr class="total"><td colspan="6">TOTALES</td><td style="text-align:right">${money(totalQ1)}</td><td style="text-align:right">${money(totalQ2)}</td><td style="text-align:right">${money(totalQ1 + totalQ2)}</td></tr>
       </table>
       <hr/>
       <div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">Generado ${new Date().toLocaleString("es-NI")}</div>
@@ -5913,35 +6010,36 @@ function printPayrollSummary(employees, payments, clockRecords) {
   w.print();
 }
 
-function AttendanceMini({ employeeName, clockRecords }) {
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dayStr = d.toDateString();
-    const rec = clockRecords.find((r) => r.employee === employeeName && new Date(r.time).toDateString() === dayStr);
-    days.push({ date: d, status: rec ? (rec.late ? "late" : "ontime") : "none" });
-  }
+function AttendanceMini({ employeeName, clockRecords, restDay }) {
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 13);
+  const period = attendanceBetween(employeeName, start, end, clockRecords, restDay);
+  const COLORS = { trabajado: "#26A65B", falta: "#E53935", descanso: "#5B8DEF", pendiente: "#E5D9C3" };
+  const LABELS = { trabajado: "Trabajó", falta: "Faltó", descanso: "Descanso", pendiente: "Todavía no llega" };
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#8a7a63", marginBottom: 6 }}>📅 Asistencia (últimos 14 días)</div>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {days.map((d, i) => (
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
+        {period.days.map((d, i) => (
           <div
             key={i}
-            title={`${d.date.toLocaleDateString("es-NI")}: ${d.status === "ontime" ? "A tiempo" : d.status === "late" ? "Tarde" : "No marcó"}`}
+            title={`${d.date.toLocaleDateString("es-NI")}: ${d.status === "trabajado" ? (d.late ? "Trabajó (tarde)" : "Trabajó a tiempo") : LABELS[d.status]}`}
             style={{
               width: 18, height: 18, borderRadius: 4,
-              background: d.status === "ontime" ? "#26A65B" : d.status === "late" ? "#E53935" : "#E5D9C3",
+              background: COLORS[d.status],
+              border: d.status === "trabajado" && d.late ? "2px solid #E8A33D" : "none",
             }}
           />
         ))}
+      </div>
+      <div style={{ fontSize: 10.5, color: "#8a7a63" }}>
+        ✅ {period.worked} trabajados · 🚫 {period.absent} faltas{period.rest > 0 ? ` · 💤 ${period.rest} descanso` : ""}
       </div>
     </div>
   );
 }
 
-function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onAddPayment, onDeletePayment, onToggleActive, onDeleteEmployee, onUpdateEmployee }) {
+function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, onMarkAbsence, onDeleteClockRecord, onAddPayment, onDeletePayment, onToggleActive, onDeleteEmployee, onUpdateEmployee }) {
   const [name, setName] = useState("");
   const [wage, setWage] = useState("");
   const [role, setRole] = useState(ROLES[0]);
@@ -5951,12 +6049,18 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   const [sortBy, setSortBy] = useState("nombre");
   const [showInactive, setShowInactive] = useState(false);
   const [selected, setSelected] = useState("");
+  const [absentSelected, setAbsentSelected] = useState("");
+  const [absentDate, setAbsentDate] = useState(() => {
+    const d = new Date(); const tz = d.getTimezoneOffset() * 60000;
+    return new Date(d - tz).toISOString().slice(0, 10);
+  });
   const [expanded, setExpanded] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [payNote, setPayNote] = useState({});
   const today = todayStr();
   const monthKey = new Date().toISOString().slice(0, 7);
   const todayRecords = clockRecords.filter((r) => new Date(r.time).toDateString() === today).slice().reverse();
+  const alreadyMarkedToday = (empName) => todayRecords.some((r) => r.employee === empName);
 
   const INK = "#15100B";
   const CARD = "#1E1611";
@@ -5973,13 +6077,20 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   function employeeStats(emp) {
     const empPayments = payments.filter((p) => p.employeeName === emp.name).slice().sort((a, b) => new Date(a.time) - new Date(b.time));
     const lastPayment = empPayments[empPayments.length - 1];
-    const cutoff = lastPayment ? new Date(lastPayment.time) : null;
+    const cutoff = lastPayment ? new Date(lastPayment.time) : new Date(emp.hireDate || Date.now());
     const empClockAll = clockRecords.filter((r) => r.employee === emp.name);
-    const pendingDays = cutoff ? empClockAll.filter((r) => new Date(r.time) > cutoff).length : empClockAll.length;
+    const periodEnd = new Date();
+    const period = attendanceBetween(emp.name, cutoff, periodEnd, clockRecords, emp.restDay);
+    const pendingDays = period.worked;
     const owed = pendingDays * (emp.dailyWage || 0);
-    const lateCount = empClockAll.filter((r) => r.late).length;
-    const punctuality = empClockAll.length > 0 ? Math.round(((empClockAll.length - lateCount) / empClockAll.length) * 100) : 100;
-    return { empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed, totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount, totalDays: empClockAll.length, punctuality };
+    const workedAll = empClockAll.filter((r) => !r.absent);
+    const lateCount = workedAll.filter((r) => r.late).length;
+    const punctuality = workedAll.length > 0 ? Math.round(((workedAll.length - lateCount) / workedAll.length) * 100) : 100;
+    return {
+      empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed,
+      totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount, totalDays: workedAll.length, punctuality,
+      period, cutoff,
+    };
   }
 
   const activeEmployees = employees.filter((e) => e.active !== false);
@@ -6085,13 +6196,35 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
           {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
         </select>
         <button
-          disabled={!selected}
+          disabled={!selected || alreadyMarkedToday(selected)}
           onClick={() => onClockIn(selected)}
           className="emp-chip"
-          style={{ padding: "10px 18px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: selected ? 1 : 0.5 }}
+          style={{ padding: "10px 18px", border: "none", borderRadius: 10, background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: "#fff", fontWeight: 800, cursor: "pointer", opacity: selected && !alreadyMarkedToday(selected) ? 1 : 0.5 }}
         >
           Marcar entrada
         </button>
+        {selected && alreadyMarkedToday(selected) && (
+          <span style={{ fontSize: 11.5, color: "#4ADE80", fontWeight: 700 }}>✅ {selected} ya tiene un registro hoy</span>
+        )}
+      </div>
+
+      {/* Marcar falta */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24, alignItems: "center", background: "rgba(248,113,113,0.06)", border: "1px solid #F87171", borderRadius: 18, padding: 16 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#F87171", marginRight: 4 }}>🚫 Marcar falta:</span>
+        <select value={absentSelected} onChange={(e) => setAbsentSelected(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 220 }}>
+          <option value="">Selecciona un empleado</option>
+          {employees.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
+        </select>
+        <input type="date" value={absentDate} onChange={(e) => setAbsentDate(e.target.value)} style={{ ...empInp(LINE, CREAM), maxWidth: 150, colorScheme: "dark" }} />
+        <button
+          disabled={!absentSelected}
+          onClick={() => onMarkAbsence(absentSelected, absentDate)}
+          className="emp-chip"
+          style={{ padding: "10px 18px", border: "none", borderRadius: 10, background: "#F87171", color: "#fff", fontWeight: 800, cursor: "pointer", opacity: absentSelected ? 1 : 0.5 }}
+        >
+          Marcar falta
+        </button>
+        <span style={{ fontSize: 10.5, color: MUTED }}>Para días que ya pasaron y el empleado no vino — así el sistema no lo cuenta ni como trabajado ni como "sin marcar".</span>
       </div>
 
       {/* Filtros */}
@@ -6178,7 +6311,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                     />
                   ) : (
                     <>
-                      <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} />
+                      <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} restDay={emp.restDay} />
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                         <button onClick={() => setEditingEmployee(emp.id)} className="emp-chip" style={{ fontSize: 12, background: "rgba(62,127,217,0.10)", border: "1px solid #3E7FD955", color: "#7FA8E8", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
                           ✏️ Editar datos
@@ -6203,7 +6336,9 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                       <PaymentForm
                         employee={emp}
                         pendingDays={st.pendingDays}
-                        onPay={(data) => onAddPayment(emp.name, data.amount, data.note, { bruto: data.bruto, bono: data.bono, deducciones: data.deducciones, days: data.days })}
+                        period={st.period}
+                        cutoff={st.cutoff}
+                        onPay={(data) => onAddPayment(emp.name, data.amount, data.note, { bruto: data.bruto, bono: data.bono, deducciones: data.deducciones, days: data.days, absentDays: data.absentDays, periodStart: data.periodStart, periodEnd: data.periodEnd })}
                       />
                       <div style={{ fontSize: 12, fontWeight: 700, color: MUTED, marginBottom: 6 }}>Historial de pagos</div>
                       {st.empPayments.length === 0 && <p style={{ fontSize: 12, color: MUTED }}>Sin pagos registrados todavía.</p>}
@@ -6235,17 +6370,25 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
         })}
       </div>
 
-      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 24 }}>Entradas de hoy</h3>
-      {todayRecords.length === 0 && <p style={{ color: "#8a7a63" }}>Nadie ha marcado entrada todavía hoy.</p>}
+      <h3 style={{ fontSize: 13, textTransform: "uppercase", color: "#8a7a63", marginTop: 24 }}>Registros de hoy</h3>
+      {todayRecords.length === 0 && <p style={{ color: "#8a7a63" }}>Nadie ha marcado entrada ni falta todavía hoy.</p>}
       {todayRecords.map((r) => (
         <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #E5D9C3", fontSize: 14 }}>
           <span>{r.employee}</span>
-          <span>{new Date(r.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</span>
-          {r.late ? (
+          <span>{r.absent ? "—" : new Date(r.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })}</span>
+          {r.absent ? (
+            <span style={{ color: "#791F1F", background: "#FCEBEB", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>🚫 Falta</span>
+          ) : r.late ? (
             <span style={{ color: "#791F1F", background: "#FCEBEB", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>Tarde ({r.minsLate} min)</span>
           ) : (
             <span style={{ color: "#3B6D11", background: "#EAF3DE", padding: "2px 8px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>A tiempo</span>
           )}
+          <button
+            onClick={() => { if (window.confirm(`¿Borrar este registro de ${r.employee}?`)) onDeleteClockRecord(r.id); }}
+            style={{ background: "none", border: "none", color: "#C1272D", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
+          >
+            ✕
+          </button>
         </div>
       ))}
     </div>
@@ -6261,6 +6404,7 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
   const [phone, setPhone] = useState(employee.phone || "");
   const [wage, setWage] = useState(String(employee.dailyWage || ""));
   const [accessPin, setAccessPin] = useState(employee.accessPin || "");
+  const [restDay, setRestDay] = useState(employee.restDay === undefined || employee.restDay === null ? "" : String(employee.restDay));
 
   return (
     <div style={{ background: "linear-gradient(160deg, #FFF8ED, #FFF3E0)", border: "2px solid #F2C879", borderRadius: 12, padding: 16, marginTop: 4 }}>
@@ -6297,6 +6441,15 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
         </div>
       </div>
 
+      <label style={lbl}>😴 Día de descanso fijo</label>
+      <select value={restDay} onChange={(e) => setRestDay(e.target.value)} style={inp}>
+        <option value="">Ninguno (trabaja todos los días)</option>
+        {WEEKDAY_NAMES.map((w, i) => <option key={i} value={i}>{w}</option>)}
+      </select>
+      <div style={{ fontSize: 10.5, color: "#8a7a63", marginTop: 2, marginBottom: 6 }}>
+        Ese día no se le cuenta como falta si no marca entrada.
+      </div>
+
       <label style={lbl}>🔐 PIN personal para Caja/Reportes/Historial</label>
       <input
         type="password" inputMode="numeric" value={accessPin}
@@ -6316,7 +6469,7 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
         </button>
         <button
           disabled={!name.trim()}
-          onClick={() => onSave({ name: name.trim(), role, phone, dailyWage: Number(wage) || 0, accessPin: accessPin.trim() })}
+          onClick={() => onSave({ name: name.trim(), role, phone, dailyWage: Number(wage) || 0, accessPin: accessPin.trim(), restDay: restDay === "" ? null : Number(restDay) })}
           style={{ flex: 1, padding: 11, borderRadius: 8, border: "none", background: "#2E7D32", color: "#fff", cursor: "pointer", fontWeight: 800, opacity: name.trim() ? 1 : 0.5 }}
         >
           💾 Guardar cambios
