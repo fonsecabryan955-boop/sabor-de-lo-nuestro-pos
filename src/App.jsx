@@ -153,6 +153,18 @@ function quincenaRange(dateRef) {
   const lastDay = new Date(year, month + 1, 0).getDate();
   return { start: new Date(year, month, 16, 0, 0, 0), end: new Date(year, month, lastDay, 23, 59, 59, 999), label: `Quincena 2 (día 16 al ${lastDay})` };
 }
+// Rango del mes calendario actual (día 1 al día de hoy). Al cambiar de mes el rango cambia
+// solo — no hay que "reiniciar" nada a mano, el conteo arranca de cero automáticamente.
+function monthToDateRange(dateRef) {
+  const d = dateRef || new Date();
+  const year = d.getFullYear(), month = d.getMonth();
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return {
+    start: new Date(year, month, 1, 0, 0, 0),
+    end: new Date(year, month, lastDay, 23, 59, 59, 999),
+    label: d.toLocaleDateString("es-NI", { month: "long", year: "numeric" }),
+  };
+}
 const DEFAULT_SECTIONS = [
   { name: "Salón Principal", icon: "🍽️" },
 ];
@@ -6086,10 +6098,12 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
     const workedAll = empClockAll.filter((r) => !r.absent);
     const lateCount = workedAll.filter((r) => r.late).length;
     const punctuality = workedAll.length > 0 ? Math.round(((workedAll.length - lateCount) / workedAll.length) * 100) : 100;
+    const mtd = monthToDateRange();
+    const monthToDate = attendanceBetween(emp.name, mtd.start, new Date(), clockRecords, emp.restDay);
     return {
       empPayments: empPayments.slice().reverse(), lastPayment, pendingDays, owed,
       totalPaid: empPayments.reduce((s, p) => s + p.amount, 0), lateCount, totalDays: workedAll.length, punctuality,
-      period, cutoff,
+      period, cutoff, monthToDate, monthLabel: mtd.label,
     };
   }
 
@@ -6311,6 +6325,17 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                     />
                   ) : (
                     <>
+                      <div style={{ background: "rgba(242,200,121,0.07)", border: `1px solid ${GOLD}55`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 800, color: GOLD, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                          📅 Control mensual — {st.monthLabel}
+                        </div>
+                        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12.5, color: CREAM }}>
+                          <span>✅ <strong>{st.monthToDate.worked}</strong> trabajados</span>
+                          <span style={{ color: st.monthToDate.absent > 0 ? "#F87171" : MUTED }}>🚫 <strong>{st.monthToDate.absent}</strong> faltas</span>
+                          {st.monthToDate.rest > 0 && <span>💤 <strong>{st.monthToDate.rest}</strong> descanso</span>}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: MUTED, marginTop: 4 }}>Se reinicia solo el día 1 de cada mes.</div>
+                      </div>
                       <AttendanceMini employeeName={emp.name} clockRecords={clockRecords} restDay={emp.restDay} />
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                         <button onClick={() => setEditingEmployee(emp.id)} className="emp-chip" style={{ fontSize: 12, background: "rgba(62,127,217,0.10)", border: "1px solid #3E7FD955", color: "#7FA8E8", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
