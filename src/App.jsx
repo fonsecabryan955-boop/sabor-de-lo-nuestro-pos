@@ -284,6 +284,7 @@ export default function App() {
   const [lastSync, setLastSync] = useState(null);
   const [readyToast, setReadyToast] = useState(null);
   const [audioReady, setAudioReady] = useState(false);
+  const [notifPermission, setNotifPermission] = useState(() => (typeof Notification !== "undefined" ? Notification.permission : "unsupported"));
   const skipNextPoll = useRef(false);
   const initRef = useRef(false);
   const audioCtxRef = useRef(null);
@@ -355,6 +356,20 @@ export default function App() {
       osc.start(now + offset);
       osc.stop(now + offset + 0.15);
     });
+  }
+
+  // Notificación del navegador (banner del sistema) — funciona mientras la pestaña/app
+  // siga abierta, aunque el empleado esté viendo otra cosa. No requiere servidor.
+  function notifyBrowser(title, body) {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    try {
+      const n = new Notification(title, { body, icon: "🍔🍗", tag: "sabor-pedido", renotify: true });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch (e) {}
+  }
+  function requestNotifPermission() {
+    if (typeof Notification === "undefined") return;
+    Notification.requestPermission().then((perm) => setNotifPermission(perm));
   }
 
   const persist = useCallback(async (next) => {
@@ -486,11 +501,13 @@ export default function App() {
         setReadyToast(`🆕 Nuevo pedido: ${newOrderFound}`);
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
+        notifyBrowser("🆕 Nuevo pedido", newOrderFound);
       } else if (readyFound) {
         playReadyBeep();
         setReadyToast(`✅ ${readyFound} está listo`);
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         toastTimerRef.current = setTimeout(() => setReadyToast(null), 6000);
+        notifyBrowser("✅ Pedido listo", `${readyFound} está listo para entregar`);
       }
     }
     prevStatusRef.current = current;
@@ -1038,17 +1055,37 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => { playReadyBeep(); }}
-                title="Probar sonido"
-                className="shell-nav-btn"
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_LINE}`,
-                  cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(255,255,255,0.04)", color: audioReady ? "#6EE7A0" : SHELL_MUTED,
-                }}
-              >
-                {audioReady ? "🔊" : "🔇"} Probar sonido
-              </button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {notifPermission !== "unsupported" && notifPermission !== "granted" && (
+                  <button
+                    onClick={requestNotifPermission}
+                    title="Activar notificaciones del sistema para pedidos nuevos y listos"
+                    className="shell-nav-btn"
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_GOLD}`,
+                      cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(242,200,121,0.1)", color: SHELL_GOLD,
+                    }}
+                  >
+                    🔔 Activar notificaciones
+                  </button>
+                )}
+                {notifPermission === "granted" && (
+                  <span title="Las notificaciones del sistema están activas" style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_LINE}`, fontWeight: 700, fontSize: 12, color: "#6EE7A0" }}>
+                    🔔 Notificaciones activas
+                  </span>
+                )}
+                <button
+                  onClick={() => { playReadyBeep(); }}
+                  title="Probar sonido"
+                  className="shell-nav-btn"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_LINE}`,
+                    cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(255,255,255,0.04)", color: audioReady ? "#6EE7A0" : SHELL_MUTED,
+                  }}
+                >
+                  {audioReady ? "🔊" : "🔇"} Probar sonido
+                </button>
+              </div>
             </div>
             <div className="shell-nav-scroll" style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 4, position: "relative" }}>
               {nav.map((n) => {
