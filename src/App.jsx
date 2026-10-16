@@ -9,6 +9,16 @@ const DEFAULT_BRANCH_ID = "main"; // ✅ Sucursal original (Masatepe) — no se 
 const BRANCHES_REGISTRY_ID = "__branches__"; // fila especial en pos_state que guarda la lista de sucursales
 
 const RESTAURANT_NAME = "El Sabor de lo Nuestro Masatepe";
+// Logo de marca para el pie (parte de atrás) de los recibos/comprobantes impresos:
+// tenedor y cuchara juntos, "El Sabor de lo Nuestro" en naranja, "MASATEPE" debajo.
+function brandLogoFooterHtml() {
+  return `
+    <div style="text-align:center; margin-top:22px; padding-top:16px; border-top:2px dashed #ccc;">
+      <div style="font-size:26px; line-height:1;">🍴🥄</div>
+      <div style="font-weight:800; font-size:15px; color:#E8862E; letter-spacing:0.5px; margin-top:6px;">El Sabor de lo Nuestro</div>
+      <div style="font-size:10px; color:#8a7a63; letter-spacing:3px; margin-top:2px; font-weight:700;">MASATEPE</div>
+    </div>`;
+}
 const SHIFT_START = "17:00";
 const SHIFT_END = "21:00";
 const LATE_GRACE_MIN = 10;
@@ -3319,6 +3329,7 @@ function printSessionReport(session, sales, expenses) {
       ${sessionExpenses.length ? `<hr/><div style="font-weight:bold;margin-bottom:4px;">Gastos del turno</div><table>${expenseRows}</table>` : ""}
       <hr/>
       <div style="text-align:center;margin-top:10px;">${sessionSales.length} ventas registradas · Generado ${new Date().toLocaleString("es-NI")}</div>
+      ${brandLogoFooterHtml()}
     </body></html>`;
 
   const w = window.open("", "_blank", "width=380,height=650");
@@ -4073,6 +4084,7 @@ function printEncargoReceipt(e, total, balance) {
       </div>
 
       <div style="text-align:center;font-size:10px;color:#888;margin-top:26px;">Generado el ${new Date().toLocaleString("es-NI")}</div>
+      ${brandLogoFooterHtml()}
     </body></html>`;
   const w = window.open("", "_blank", "width=400,height=680");
   w.document.write(html);
@@ -4125,6 +4137,7 @@ function printEncargoCancelReceipt(e, total, paid, refunded) {
       </div>
 
       <div style="text-align:center;font-size:10px;color:#888;margin-top:26px;">Generado el ${new Date().toLocaleString("es-NI")}</div>
+      ${brandLogoFooterHtml()}
     </body></html>`;
   const w = window.open("", "_blank", "width=400,height=650");
   w.document.write(html);
@@ -5838,6 +5851,7 @@ function printPayStub(employee, payment) {
       </div>
 
       <div style="text-align:center;font-size:10px;color:#888;margin-top:26px;">Generado el ${new Date().toLocaleString("es-NI")}</div>
+      ${brandLogoFooterHtml()}
     </body></html>`;
   const w = window.open("", "_blank", "width=400,height=680");
   w.document.write(html);
@@ -6051,6 +6065,7 @@ function printPayrollSummary(employees, payments, clockRecords) {
       </table>
       <hr/>
       <div style="text-align:center;font-size:10px;color:#888;margin-top:10px;">Generado ${new Date().toLocaleString("es-NI")}</div>
+      ${brandLogoFooterHtml()}
     </body></html>`;
   const w = window.open("", "_blank", "width=420,height=650");
   w.document.write(html);
@@ -6593,6 +6608,7 @@ function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insum
       ${dayExpenses.length ? `<hr/><div style="font-weight:bold;">Gastos del día</div><table>${expRows}</table>` : ""}
       <hr/>
       <div style="text-align:center;font-size:10px;color:#888;">Generado ${new Date().toLocaleString("es-NI")}</div>
+      ${brandLogoFooterHtml()}
     </body></html>`;
   const w = window.open("", "_blank", "width=400,height=650");
   w.document.write(html);
@@ -7381,6 +7397,11 @@ function ReceiptModal({ sale, onClose }) {
             <div style={{ fontSize: 13, fontWeight: 800, color: "#D1453A" }}>¡Gracias por su compra! 🙏</div>
             <div style={{ fontSize: 10, color: "#8a7a63", marginTop: 3 }}>Vuelva pronto — le esperamos con gusto</div>
             <div style={{ fontSize: 16, marginTop: 8, letterSpacing: 3 }}>🌿 🍔 🌿</div>
+            <div style={{ textAlign: "center", marginTop: 16, paddingTop: 14, borderTop: "2px dashed #ccc" }}>
+              <div style={{ fontSize: 26, lineHeight: 1 }}>🍴🥄</div>
+              <div style={{ fontWeight: 800, fontSize: 15, color: "#E8862E", letterSpacing: 0.5, marginTop: 6 }}>El Sabor de lo Nuestro</div>
+              <div style={{ fontSize: 10, color: "#8a7a63", letterSpacing: 3, marginTop: 2, fontWeight: 700 }}>MASATEPE</div>
+            </div>
           </div>
         </div>
         <div style={{ padding: "0 12px 12px" }}>
