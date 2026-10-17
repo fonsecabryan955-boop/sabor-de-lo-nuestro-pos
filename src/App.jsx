@@ -973,12 +973,12 @@ export default function App() {
 
   const SHELL_INK = "#F2ECD8";
   const SHELL_CARD = "#FBF7EA";
-  const SHELL_GOLD = "#4A7C23";
+  const SHELL_GOLD = "#12A100";
   const SHELL_EMBER = "#D1453A";
   const SHELL_AMBER = "#E8862E";
   const SHELL_CREAM = "#000000";
   const SHELL_MUTED = "#5C7A3D";
-  const SHELL_LINE = "rgba(74,124,35,0.14)";
+  const SHELL_LINE = "rgba(18,161,0,0.14)";
   const currentBranchName = (branches.find((b) => b.id === branchId) || {}).name || RESTAURANT_NAME;
 
   return (
@@ -994,7 +994,7 @@ export default function App() {
           .shell-nav-btn { transition: transform 0.12s ease, box-shadow 0.15s ease; white-space: nowrap; }
           .shell-nav-btn:hover { transform: translateY(-1px); }
           .shell-nav-scroll::-webkit-scrollbar { height: 5px; }
-          .shell-nav-scroll::-webkit-scrollbar-thumb { background: rgba(74,124,35,0.25); border-radius: 10px; }
+          .shell-nav-scroll::-webkit-scrollbar-thumb { background: rgba(18,161,0,0.25); border-radius: 10px; }
 
           /* Pulido global 2026 para TODOS los botones del sistema: rebote al presionar,
              brillo al pasar el mouse, sin tocar el color/forma que ya tiene cada uno. */
@@ -1052,7 +1052,7 @@ export default function App() {
             background: `linear-gradient(160deg, ${SHELL_INK}, ${SHELL_CARD})`, borderBottom: `1px solid ${SHELL_LINE}`,
             padding: "16px 22px 12px", flexShrink: 0, position: "relative", overflow: "hidden",
           }}>
-            <div style={{ position: "absolute", top: -50, right: -40, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.09), transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", top: -50, right: -40, width: 160, height: 160, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.09), transparent 70%)", pointerEvents: "none" }} />
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14, position: "relative" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 26 }}>🍔🍗</span>
@@ -1073,7 +1073,7 @@ export default function App() {
                     className="shell-nav-btn"
                     style={{
                       display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_GOLD}`,
-                      cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(74,124,35,0.1)", color: SHELL_GOLD,
+                      cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(18,161,0,0.1)", color: SHELL_GOLD,
                     }}
                   >
                     🔔 Activar notificaciones
@@ -1090,7 +1090,7 @@ export default function App() {
                   className="shell-nav-btn"
                   style={{
                     display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 20, border: `1px solid ${SHELL_LINE}`,
-                    cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(74,124,35,0.04)", color: audioReady ? "#2E7D32" : SHELL_MUTED,
+                    cursor: "pointer", fontWeight: 700, fontSize: 12, background: "rgba(18,161,0,0.04)", color: audioReady ? "#2E7D32" : SHELL_MUTED,
                   }}
                 >
                   {audioReady ? "🔊" : "🔇"} Probar sonido
@@ -1110,7 +1110,7 @@ export default function App() {
                       display: "flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, cursor: "pointer",
                       fontWeight: 700, fontSize: 12.5, flexShrink: 0,
                       border: active ? `1px solid ${SHELL_GOLD}` : `1px solid ${SHELL_LINE}`,
-                      background: active ? `linear-gradient(135deg, ${SHELL_EMBER}, ${SHELL_AMBER})` : "rgba(74,124,35,0.03)",
+                      background: active ? `linear-gradient(135deg, ${SHELL_EMBER}, ${SHELL_AMBER})` : "rgba(18,161,0,0.03)",
                       color: active ? "#fff" : SHELL_MUTED,
                       boxShadow: active ? "0 6px 16px rgba(193,39,45,0.3)" : "none",
                     }}
@@ -1320,7 +1320,7 @@ function ReportesGlobalesView({ branches, currentBranchId }) {
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
   const EMBER = "#D1453A";
@@ -1328,7 +1328,7 @@ function ReportesGlobalesView({ branches, currentBranchId }) {
   const CARD = "#FBF7EA";
   const CARD2 = "#F5EEDC";
   const INK = "#F2ECD8";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
 
   async function loadAll() {
     setLoading(true);
@@ -1378,26 +1378,26 @@ function ReportesGlobalesView({ branches, currentBranchId }) {
             <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 25, margin: 0, color: CREAM }}>🌐 Reportes globales</h2>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 9, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.05)", color: CREAM, colorScheme: "dark" }} />
-            <button onClick={loadAll} style={{ padding: "9px 14px", borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.05)", color: CREAM, cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🔄 Actualizar</button>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 9, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.05)", color: CREAM, colorScheme: "dark" }} />
+            <button onClick={loadAll} style={{ padding: "9px 14px", borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.05)", color: CREAM, cursor: "pointer", fontWeight: 700, fontSize: 12.5 }}>🔄 Actualizar</button>
           </div>
         </div>
 
         {totals && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 20 }}>
-            <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #27AE60" }}>
+            <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #27AE60" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>INGRESOS (TODAS)</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.income)}</div>
             </div>
-            <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${EMBER}` }}>
+            <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${EMBER}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>GASTOS (TODAS)</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.expensesTotal)}</div>
             </div>
-            <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${GOLD}` }}>
+            <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${GOLD}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>NETO DEL DÍA</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.net)}</div>
             </div>
-            <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #E8862E" }}>
+            <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #E8862E" }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>FIADO PENDIENTE</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: CREAM }}>{money(totals.fiadoPending)}</div>
             </div>
@@ -1416,7 +1416,7 @@ function ReportesGlobalesView({ branches, currentBranchId }) {
             }}>
               <div>
                 <div style={{ fontWeight: 800, fontSize: 15, color: CREAM, fontFamily: "'Fraunces', serif", display: "flex", alignItems: "center", gap: 8 }}>
-                  📍 {r.name} {r.id === currentBranchId && <span style={{ fontSize: 10, background: "rgba(74,124,35,0.15)", color: GOLD, borderRadius: 8, padding: "2px 8px", fontWeight: 700 }}>este dispositivo</span>}
+                  📍 {r.name} {r.id === currentBranchId && <span style={{ fontSize: 10, background: "rgba(18,161,0,0.15)", color: GOLD, borderRadius: 8, padding: "2px 8px", fontWeight: 700 }}>este dispositivo</span>}
                 </div>
                 {r.error ? (
                   <div style={{ fontSize: 12, color: "#C0392B", marginTop: 4 }}>⚠️ No se pudo cargar esta sucursal.</div>
@@ -1442,13 +1442,13 @@ function ReportesGlobalesView({ branches, currentBranchId }) {
 function BranchPicker({ branches, onPick, onCreate }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const INK = "#F2ECD8";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
 
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(160deg, ${INK}, #211710 60%, ${INK})`, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
@@ -1470,7 +1470,7 @@ function BranchPicker({ branches, onPick, onCreate }) {
             <button
               key={b.id}
               onClick={() => onPick(b.id)}
-              style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 14, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.03)", color: CREAM, cursor: "pointer", textAlign: "left" }}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 14, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.03)", color: CREAM, cursor: "pointer", textAlign: "left" }}
             >
               <span style={{ width: 38, height: 38, borderRadius: "50%", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 15, color: "#fff", flexShrink: 0 }}>
                 {b.name.charAt(0).toUpperCase()}
@@ -1481,12 +1481,12 @@ function BranchPicker({ branches, onPick, onCreate }) {
         </div>
 
         {adding ? (
-          <div style={{ background: "rgba(74,124,35,0.03)", border: `1px solid ${LINE}`, borderRadius: 14, padding: 16 }}>
+          <div style={{ background: "rgba(18,161,0,0.03)", border: `1px solid ${LINE}`, borderRadius: 14, padding: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: GOLD, marginBottom: 8 }}>Nombre de la nueva sucursal</div>
             <input
               value={name} onChange={(e) => setName(e.target.value)} autoFocus
               placeholder='Ej: "El Sabor de lo Nuestro Granada"'
-              style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 10, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, fontSize: 13, marginBottom: 10 }}
+              style={{ width: "100%", boxSizing: "border-box", padding: 10, borderRadius: 10, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, fontSize: 13, marginBottom: 10 }}
             />
             <div style={{ fontSize: 10.5, color: MUTED, marginBottom: 12 }}>⚠️ Se crea con su propia caja, mesas e inventario vacíos — no comparte nada con las demás sucursales.</div>
             <div style={{ display: "flex", gap: 8 }}>
@@ -1553,13 +1553,13 @@ function PinGate({ pin, employees, onUnlock, title, subtitle }) {
     setVal((v) => v.slice(0, -1));
   }
 
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const INK = "#F2ECD8";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
 
   return (
     <div style={{
@@ -1573,9 +1573,9 @@ function PinGate({ pin, employees, onUnlock, title, subtitle }) {
         @keyframes pgPop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .pg-dot { transition: all 0.15s ease; }
         .pg-key { transition: transform 0.1s ease, background 0.15s ease; }
-        .pg-key:active { transform: scale(0.92); background: rgba(74,124,35,0.18) !important; }
+        .pg-key:active { transform: scale(0.92); background: rgba(18,161,0,0.18) !important; }
       `}</style>
-      <div style={{ position: "absolute", top: -70, right: -70, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.10), transparent 70%)" }} />
+      <div style={{ position: "absolute", top: -70, right: -70, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.10), transparent 70%)" }} />
 
       <div style={{ position: "relative" }}>
         <div style={{ width: 56, height: 56, borderRadius: "50%", background: `linear-gradient(135deg, ${EMBER}, ${AMBER})`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", boxShadow: "0 8px 20px rgba(193,39,45,0.35)" }}>
@@ -1588,7 +1588,7 @@ function PinGate({ pin, employees, onUnlock, title, subtitle }) {
           {Array.from({ length: Math.max(pin ? pin.length : 4, 4) }).map((_, i) => (
             <div key={i} className="pg-dot" style={{
               width: 14, height: 14, borderRadius: "50%",
-              background: val.length > i ? (err ? EMBER : GOLD) : "rgba(74,124,35,0.08)",
+              background: val.length > i ? (err ? EMBER : GOLD) : "rgba(18,161,0,0.08)",
               border: `1px solid ${val.length > i ? (err ? EMBER : GOLD) : LINE}`,
               animation: val.length === i + 1 && !shake ? "pgPop 0.15s ease" : "none",
             }} />
@@ -1599,17 +1599,17 @@ function PinGate({ pin, employees, onUnlock, title, subtitle }) {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 8 }}>
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => (
-            <button key={d} className="pg-key" onClick={() => press(d)} style={{ padding: "14px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.03)", color: CREAM, cursor: "pointer" }}>
+            <button key={d} className="pg-key" onClick={() => press(d)} style={{ padding: "14px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.03)", color: CREAM, cursor: "pointer" }}>
               {d}
             </button>
           ))}
-          <button className="pg-key" onClick={() => setVal("")} style={{ padding: "14px 0", fontSize: 12, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.03)", color: MUTED, cursor: "pointer" }}>
+          <button className="pg-key" onClick={() => setVal("")} style={{ padding: "14px 0", fontSize: 12, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.03)", color: MUTED, cursor: "pointer" }}>
             Borrar
           </button>
-          <button className="pg-key" onClick={() => press("0")} style={{ padding: "14px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.03)", color: CREAM, cursor: "pointer" }}>
+          <button className="pg-key" onClick={() => press("0")} style={{ padding: "14px 0", fontSize: 18, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.03)", color: CREAM, cursor: "pointer" }}>
             0
           </button>
-          <button className="pg-key" onClick={backspace} style={{ padding: "14px 0", fontSize: 16, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.03)", color: MUTED, cursor: "pointer" }}>
+          <button className="pg-key" onClick={backspace} style={{ padding: "14px 0", fontSize: 16, fontWeight: 700, borderRadius: 12, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.03)", color: MUTED, cursor: "pointer" }}>
             ⌫
           </button>
         </div>
@@ -1619,7 +1619,7 @@ function PinGate({ pin, employees, onUnlock, title, subtitle }) {
           disabled={val.length < (pin ? pin.length : 4)}
           style={{
             marginTop: 8, width: "100%", padding: 13, border: "none", borderRadius: 12, fontSize: 14,
-            background: val.length >= (pin ? pin.length : 4) ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(74,124,35,0.06)",
+            background: val.length >= (pin ? pin.length : 4) ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(18,161,0,0.06)",
             color: val.length >= (pin ? pin.length : 4) ? "#fff" : MUTED, fontWeight: 800, cursor: val.length >= (pin ? pin.length : 4) ? "pointer" : "default",
             boxShadow: val.length >= (pin ? pin.length : 4) ? "0 8px 20px rgba(193,39,45,0.3)" : "none",
           }}
@@ -1653,7 +1653,7 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
   const tableToRemove = tables.find((t) => t.id === confirmRemoveId);
   const fallbackSection = sections[0]?.name || "Salón Principal";
 
-  const MGOLD = "#4A7C23";
+  const MGOLD = "#12A100";
   const MCREAM = "#000000";
   const MMUTED = "#5C7A3D";
   const MEMBER = "#D1453A";
@@ -1661,7 +1661,7 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
   const MCARD = "#FBF7EA";
   const MCARD2 = "#F5EEDC";
   const MINK = "#F2ECD8";
-  const MLINE = "rgba(74,124,35,0.14)";
+  const MLINE = "rgba(18,161,0,0.14)";
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
@@ -1671,7 +1671,7 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
         background: `linear-gradient(160deg, ${MINK}, #211710 60%, ${MINK})`, borderRadius: 22, padding: "22px 24px", marginBottom: 22,
         border: `1px solid ${MLINE}`, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", position: "relative", overflow: "hidden",
       }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.09), transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.09), transparent 70%)" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10, position: "relative" }}>
           <div>
             <h2 style={{ fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 24, margin: 0, color: MCREAM }}>🍽️ Piso del restaurante</h2>
@@ -1684,14 +1684,14 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
                 display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, cursor: "pointer",
                 fontWeight: 700, fontSize: 12.5,
                 border: manageMode ? `1px solid ${MGOLD}` : `1px solid ${MLINE}`,
-                background: manageMode ? "rgba(74,124,35,0.14)" : "rgba(74,124,35,0.03)", color: manageMode ? MGOLD : MCREAM,
+                background: manageMode ? "rgba(18,161,0,0.14)" : "rgba(18,161,0,0.03)", color: manageMode ? MGOLD : MCREAM,
               }}
             >
               {manageMode ? "✓ Listo" : "🛠️ Editar mesas"}
             </button>
             <button
               onClick={() => setSectionManagerOpen(true)}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, border: `1px solid ${MLINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(74,124,35,0.03)", color: MCREAM }}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, border: `1px solid ${MLINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(18,161,0,0.03)", color: MCREAM }}
             >
               🗂️ Secciones
             </button>
@@ -1705,25 +1705,25 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
         </div>
 
         {manageMode && (
-          <div style={{ background: "rgba(74,124,35,0.08)", border: `1px solid ${MGOLD}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: MCREAM, position: "relative" }}>
+          <div style={{ background: "rgba(18,161,0,0.08)", border: `1px solid ${MGOLD}`, borderRadius: 12, padding: "10px 14px", marginBottom: 16, fontSize: 12.5, color: MCREAM, position: "relative" }}>
             Modo edición activo: tocá la ❌ en una mesa libre para eliminarla, o el 🗂️ para moverla de sección. Las mesas ocupadas no se pueden eliminar ni mover.
           </div>
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, position: "relative" }}>
-          <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${MGOLD}` }}>
+          <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${MGOLD}` }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>MESAS TOTALES</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{tables.length}</div>
           </div>
-          <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #FF5722" }}>
+          <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #FF5722" }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>OCUPADAS</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{ocupadas}</div>
           </div>
-          <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #27AE60" }}>
+          <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: "3px solid #27AE60" }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>LIBRES</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{libres}</div>
           </div>
-          <div style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${MAMBER}` }}>
+          <div style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${MLINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${MAMBER}` }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: MMUTED, letterSpacing: 1, marginBottom: 5 }}>EN MESA AHORA</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: MCREAM }}>{money(floorTotal)}</div>
           </div>
@@ -1738,7 +1738,7 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <span style={{ fontSize: 19 }}>{sec.icon}</span>
                 <span style={{ fontSize: 15, fontWeight: 800, color: MCREAM, letterSpacing: 0.3 }}>{sec.name}</span>
-                <span style={{ fontSize: 11, color: MMUTED, fontWeight: 700, background: "rgba(74,124,35,0.05)", border: `1px solid ${MLINE}`, borderRadius: 12, padding: "2px 9px" }}>{secTables.length} mesa{secTables.length !== 1 ? "s" : ""}</span>
+                <span style={{ fontSize: 11, color: MMUTED, fontWeight: 700, background: "rgba(18,161,0,0.05)", border: `1px solid ${MLINE}`, borderRadius: 12, padding: "2px 9px" }}>{secTables.length} mesa{secTables.length !== 1 ? "s" : ""}</span>
               </div>
               <button
                 onClick={() => onAddTable(sec.name)}
@@ -1770,7 +1770,7 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
                         transition: "transform 0.15s ease",
                       }}
                     >
-                      <div style={{ position: "absolute", top: -18, right: -18, width: 90, height: 90, borderRadius: "50%", background: "rgba(74,124,35,0.08)" }} />
+                      <div style={{ position: "absolute", top: -18, right: -18, width: 90, height: 90, borderRadius: "50%", background: "rgba(18,161,0,0.08)" }} />
                       {canRemove ? (
                         <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6, zIndex: 2 }}>
                           {canMove && (
@@ -1806,12 +1806,12 @@ function MesasView({ tables, sections, onOpen, onManageMenu, onAddTable, onRemov
                           onClick={(e) => e.stopPropagation()}
                           style={{ position: "absolute", inset: 0, background: "rgba(20,15,10,0.92)", display: "flex", flexDirection: "column", padding: 12, gap: 6, zIndex: 3, overflowY: "auto" }}
                         >
-                          <div style={{ fontSize: 10.5, fontWeight: 800, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 2 }}>MOVER A:</div>
+                          <div style={{ fontSize: 10.5, fontWeight: 800, color: "#12A100", letterSpacing: 0.5, marginBottom: 2 }}>MOVER A:</div>
                           {sections.filter((s) => s.name !== (t.section || fallbackSection)).map((s) => (
                             <div
                               key={s.name}
                               onClick={() => { onSetTableSection(t.id, s.name); setMovingTableId(null); }}
-                              style={{ background: "rgba(74,124,35,0.1)", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer" }}
+                              style={{ background: "rgba(18,161,0,0.1)", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer" }}
                             >
                               {s.icon} {s.name}
                             </div>
@@ -1875,7 +1875,7 @@ function SectionManagerModal({ sections, tables, onAdd, onRename, onDelete, onCl
       <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 480, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
         <div style={{ background: "linear-gradient(135deg, #000000, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>🗂️ Secciones del restaurante</h3>
-          <button onClick={onClose} style={{ background: "rgba(74,124,35,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: "rgba(18,161,0,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
         </div>
 
         <div style={{ padding: 18, overflow: "auto" }}>
@@ -1895,7 +1895,7 @@ function SectionManagerModal({ sections, tables, onAdd, onRename, onDelete, onCl
               <button
                 disabled={!newName.trim()}
                 onClick={() => { onAdd(newName, newIcon); setNewName(""); setNewIcon("🍽️"); }}
-                style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#000000", color: "#4A7C23", fontWeight: 800, cursor: "pointer", opacity: newName.trim() ? 1 : 0.5 }}
+                style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#000000", color: "#12A100", fontWeight: 800, cursor: "pointer", opacity: newName.trim() ? 1 : 0.5 }}
               >
                 Crear
               </button>
@@ -2007,7 +2007,7 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
       <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
         <div style={{ background: "linear-gradient(135deg, #000000, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>🍔 Gestionar menú</h3>
-          <button onClick={onClose} style={{ background: "rgba(74,124,35,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: "rgba(18,161,0,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
         </div>
 
         <div style={{ padding: 18, overflow: "auto" }}>
@@ -2043,7 +2043,7 @@ function MenuManagerModal({ menuItems, menuCats, onAddItem, onUpdateItem, onDele
                 <>
                   <input placeholder="Emoji" value={newCatIcon} onChange={(e) => setNewCatIcon(e.target.value)} style={{ ...inp, maxWidth: 60, textAlign: "center" }} />
                   <input placeholder="Nombre de la categoría (ej: Postres)" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} style={{ ...inp, maxWidth: 220 }} />
-                  <button onClick={handleAddCat} disabled={!newCatName.trim()} style={{ padding: "0 16px", height: 38, border: "none", borderRadius: 8, background: "#000000", color: "#4A7C23", fontWeight: 800, cursor: "pointer", opacity: newCatName.trim() ? 1 : 0.5 }}>
+                  <button onClick={handleAddCat} disabled={!newCatName.trim()} style={{ padding: "0 16px", height: 38, border: "none", borderRadius: 8, background: "#000000", color: "#12A100", fontWeight: 800, cursor: "pointer", opacity: newCatName.trim() ? 1 : 0.5 }}>
                     Crear categoría
                   </button>
                   <button onClick={() => setNewCatMode(false)} style={{ padding: "0 12px", height: 38, border: "1px solid #E5D9C3", borderRadius: 8, background: "#fff", cursor: "pointer" }}>
@@ -2112,7 +2112,7 @@ function TvMenuManagerModal({ menuItems, menuCats, tvShowPromos, onUpdateCategor
       <div style={{ background: "#FFF8ED", borderRadius: 18, width: "100%", maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.4)" }}>
         <div style={{ background: "linear-gradient(135deg, #000000, #3d2f22)", color: "#FFF8ED", padding: "18px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>📺 Editar Menú TV</h3>
-          <button onClick={onClose} style={{ background: "rgba(74,124,35,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: "rgba(18,161,0,0.15)", border: "none", borderRadius: 8, color: "#FFF8ED", cursor: "pointer", padding: 6 }}><X size={20} /></button>
         </div>
 
         <div style={{ padding: 18, overflow: "auto" }}>
@@ -2350,7 +2350,7 @@ function InventoryView({ inventory, inventoryLog, menuItems, onAdd, onUpdate, on
           <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>⚠️ Stock bajo — hay que comprar pronto</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {lowStock.map((i) => (
-              <span key={i.id} style={{ background: "rgba(74,124,35,0.22)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 700 }}>
+              <span key={i.id} style={{ background: "rgba(18,161,0,0.22)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 700 }}>
                 {i.name}: {i.stock} {i.unit} (mín. {i.minStock})
               </span>
             ))}
@@ -2537,7 +2537,7 @@ function MenuRecipeLine({ menuItem, inventoryItem, qty, onSetRecipe }) {
             : recipe.filter((r) => r.invId !== inventoryItem.id);
           onSetRecipe(menuItem.id, next);
         }}
-        style={{ fontSize: 11, background: "#000000", color: "#4A7C23", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
+        style={{ fontSize: 11, background: "#000000", color: "#12A100", border: "none", borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontWeight: 700 }}
       >
         Guardar
       </button>
@@ -2879,7 +2879,7 @@ function ElapsedBadge({ sentAt }) {
   return (
     <span style={{
       fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-      background: urgent ? "#D1453A" : "rgba(74,124,35,0.25)", color: "#fff",
+      background: urgent ? "#D1453A" : "rgba(18,161,0,0.25)", color: "#fff",
       animation: urgent ? "pulseBadge 1.2s infinite" : "none",
     }}>
       ⏱ {mins} min
@@ -2911,14 +2911,14 @@ function CocinaView({ tables, deliveries, onAdvance, onToggleItem }) {
   ];
 
   return (
-    <div style={{ background: "radial-gradient(circle at top, #F2ECD8, #FBF7EA)", borderRadius: 20, padding: "22px 20px", margin: "-4px", boxShadow: "0 10px 30px rgba(74,124,35,0.15)" }}>
+    <div style={{ background: "radial-gradient(circle at top, #F2ECD8, #FBF7EA)", borderRadius: 20, padding: "22px 20px", margin: "-4px", boxShadow: "0 10px 30px rgba(18,161,0,0.15)" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Anton&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes pulseBadge { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
         @keyframes cardIn { from { transform: scale(0.94) translateY(6px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes liveDot { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0,230,118,0.5); } 50% { opacity: 0.6; box-shadow: 0 0 0 6px rgba(0,230,118,0); } }
         .kds-ticket-row::-webkit-scrollbar { height: 6px; }
-        .kds-ticket-row::-webkit-scrollbar-thumb { background: rgba(74,124,35,0.25); border-radius: 10px; }
+        .kds-ticket-row::-webkit-scrollbar-thumb { background: rgba(18,161,0,0.25); border-radius: 10px; }
         .kds-item-row:active { transform: scale(0.98); }
       `}</style>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 8 }}>
@@ -2927,7 +2927,7 @@ function CocinaView({ tables, deliveries, onAdvance, onToggleItem }) {
             <span style={{ width: 9, height: 9, borderRadius: "50%", background: "#00E676", animation: "liveDot 1.6s infinite" }} />
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 2, color: "#00E676" }}>EN VIVO</span>
           </div>
-          <h2 style={{ fontFamily: "'Anton', sans-serif", fontSize: 28, margin: 0, color: "#4A7C23", letterSpacing: 0.5, textTransform: "uppercase" }}>Pantalla de Cocina</h2>
+          <h2 style={{ fontFamily: "'Anton', sans-serif", fontSize: 28, margin: 0, color: "#12A100", letterSpacing: 0.5, textTransform: "uppercase" }}>Pantalla de Cocina</h2>
           <div style={{ fontSize: 11, color: "#9a8a6f", letterSpacing: 1 }}>{RESTAURANT_NAME.toUpperCase()}</div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -2946,8 +2946,8 @@ function CocinaView({ tables, deliveries, onAdvance, onToggleItem }) {
       {active.length > 0 && (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontFamily: "'Plus Jakarta Sans', Arial, sans-serif" }}>
-            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: "#4A7C23" }}>🎫 TICKETS ACTIVOS</span>
-            <span style={{ background: "#4A7C23", color: "#FFFFFF", borderRadius: 20, padding: "1px 10px", fontSize: 12, fontWeight: 800 }}>{active.length}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, color: "#12A100" }}>🎫 TICKETS ACTIVOS</span>
+            <span style={{ background: "#12A100", color: "#FFFFFF", borderRadius: 20, padding: "1px 10px", fontSize: 12, fontWeight: 800 }}>{active.length}</span>
           </div>
           <div className="kds-ticket-row" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 12, alignItems: "stretch" }}>
             {active.map((o) => {
@@ -2994,7 +2994,7 @@ function CocinaView({ tables, deliveries, onAdvance, onToggleItem }) {
                         </span>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13.5, lineHeight: 1.35, color: it.kitchenDone ? "#7a9282" : "#000000", textDecoration: it.kitchenDone ? "line-through" : "none" }}>
-                            <strong style={{ color: it.kitchenDone ? "#5f8a6c" : "#4A7C23" }}>{it.qty}x</strong> {it.name}
+                            <strong style={{ color: it.kitchenDone ? "#5f8a6c" : "#12A100" }}>{it.qty}x</strong> {it.name}
                           </div>
                           {it.notes && <div style={{ fontSize: 11.5, color: "#E8862E", fontStyle: "italic" }}>↳ {it.notes}</div>}
                         </div>
@@ -3119,64 +3119,64 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
   const diff = counted !== "" ? Number(counted) - expectedCash : null;
 
   return (
-    <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 18, padding: 22, marginBottom: 22, color: "#000000", boxShadow: "0 10px 24px rgba(0,0,0,0.25)", border: "1px solid rgba(74,124,35,0.2)" }}>
+    <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 18, padding: 22, marginBottom: 22, color: "#000000", boxShadow: "0 10px 24px rgba(0,0,0,0.25)", border: "1px solid rgba(18,161,0,0.2)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(74,124,35,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔐</div>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(18,161,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🔐</div>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: "#4A7C23" }}>Caja abierta — {active.openedBy}</div>
+            <div style={{ fontWeight: 800, fontSize: 16, color: "#12A100" }}>Caja abierta — {active.openedBy}</div>
             <div style={{ fontSize: 11, color: "#5C7A3D" }}>Desde: {new Date(active.openedAt).toLocaleString("es-NI")}</div>
           </div>
         </div>
-        <div style={{ textAlign: "right", background: "rgba(74,124,35,0.06)", borderRadius: 10, padding: "8px 14px" }}>
+        <div style={{ textAlign: "right", background: "rgba(18,161,0,0.06)", borderRadius: 10, padding: "8px 14px" }}>
           <div style={{ fontSize: 10, color: "#5C7A3D", letterSpacing: 0.5 }}>FONDO INICIAL</div>
           <div style={{ fontWeight: 800, fontSize: 16 }}>{money(active.openingAmount)}</div>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, margin: "12px 0" }}>
-        <div style={{ background: "rgba(74,124,35,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #26A65B" }}>
+        <div style={{ background: "rgba(18,161,0,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #26A65B" }}>
           <div style={{ fontSize: 10, color: "#5C7A3D" }}>💵 Ventas efectivo{fiadoCollected.efectivo > 0 ? " + cobros fiado" : ""}</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cashSales)}</div>
           {fiadoCollected.efectivo > 0 && <div style={{ fontSize: 9.5, color: "#8a5a00" }}>incluye {money(fiadoCollected.efectivo)} de fiados cobrados</div>}
         </div>
-        <div style={{ background: "rgba(74,124,35,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #1565C0" }}>
+        <div style={{ background: "rgba(18,161,0,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #1565C0" }}>
           <div style={{ fontSize: 10, color: "#5C7A3D" }}>💳 Ventas tarjeta{fiadoCollected.tarjeta > 0 ? " + cobros fiado" : ""}</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(cardSales)}</div>
         </div>
-        <div style={{ background: "rgba(74,124,35,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #6A4FB6" }}>
+        <div style={{ background: "rgba(18,161,0,0.06)", borderRadius: 10, padding: 12, borderLeft: "3px solid #6A4FB6" }}>
           <div style={{ fontSize: 10, color: "#5C7A3D" }}>🏦 Ventas transferencia{fiadoCollected.transferencia > 0 ? " + cobros fiado" : ""}</div>
           <div style={{ fontWeight: 800, fontSize: 15 }}>{money(transferSales)}</div>
         </div>
         {sessionByCat.map((c) => (
-          <div key={c.id} style={{ background: "rgba(74,124,35,0.06)", borderRadius: 10, padding: 12, borderLeft: `3px solid ${c.color}` }}>
+          <div key={c.id} style={{ background: "rgba(18,161,0,0.06)", borderRadius: 10, padding: 12, borderLeft: `3px solid ${c.color}` }}>
             <div style={{ fontSize: 10, color: "#5C7A3D" }}>{c.icon} {c.label}</div>
             <div style={{ fontWeight: 800, fontSize: 15, color: "#D1453A" }}>-{money(c.amount)}</div>
           </div>
         ))}
-        <div style={{ background: "#4A7C23", borderRadius: 10, padding: 12 }}>
+        <div style={{ background: "#12A100", borderRadius: 10, padding: 12 }}>
           <div style={{ fontSize: 10, color: "#FFFFFF", fontWeight: 700 }}>💰 EFECTIVO ESPERADO</div>
           <div style={{ fontWeight: 800, fontSize: 17, color: "#FFFFFF" }}>{money(expectedCash)}</div>
         </div>
       </div>
 
-      <div style={{ background: "rgba(74,124,35,0.04)", border: "1px solid rgba(74,124,35,0.15)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 11.5 }}>
-        <div style={{ fontWeight: 800, color: "#4A7C23", marginBottom: 6, letterSpacing: 0.5 }}>📋 DESGLOSE DEL EFECTIVO ESPERADO</div>
+      <div style={{ background: "rgba(18,161,0,0.04)", border: "1px solid rgba(18,161,0,0.15)", borderRadius: 10, padding: "10px 14px", marginBottom: 4, fontSize: 11.5 }}>
+        <div style={{ fontWeight: 800, color: "#12A100", marginBottom: 6, letterSpacing: 0.5 }}>📋 DESGLOSE DEL EFECTIVO ESPERADO</div>
         <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#5C7A3D" }}><span>Fondo inicial</span><span style={{ color: "#fff" }}>{money(active.openingAmount)}</span></div>
         <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#5C7A3D" }}><span>+ Ventas en efectivo</span><span style={{ color: "#26A65B" }}>{money(cashSalesDirect)}</span></div>
         {fiadoCollected.efectivo > 0 && (
           <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#5C7A3D" }}><span>+ Cobros de fiados (efectivo)</span><span style={{ color: "#26A65B" }}>{money(fiadoCollected.efectivo)}</span></div>
         )}
         <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", color: "#5C7A3D" }}><span>− Gastos del turno</span><span style={{ color: "#D1453A" }}>{money(sessionExpenses)}</span></div>
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0 0", marginTop: 4, borderTop: "1px dashed rgba(74,124,35,0.15)", fontWeight: 800, color: "#4A7C23" }}><span>= Efectivo esperado en caja</span><span>{money(expectedCash)}</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0 0", marginTop: 4, borderTop: "1px dashed rgba(18,161,0,0.15)", fontWeight: 800, color: "#12A100" }}><span>= Efectivo esperado en caja</span><span>{money(expectedCash)}</span></div>
       </div>
-      <div style={{ fontSize: 11, color: "#5C7A3D", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#4A7C23" }}>{money(cashSales + cardSales + transferSales)}</strong> · Gastado en total: <strong style={{ color: "#D1453A" }}>-{money(sessionExpenses)}</strong></div>
+      <div style={{ fontSize: 11, color: "#5C7A3D", marginBottom: 16 }}>📋 {sessionSalesCount} venta{sessionSalesCount !== 1 ? "s" : ""} en este turno · Total general: <strong style={{ color: "#12A100" }}>{money(cashSales + cardSales + transferSales)}</strong> · Gastado en total: <strong style={{ color: "#D1453A" }}>-{money(sessionExpenses)}</strong></div>
 
-      <div style={{ background: "rgba(74,124,35,0.05)", borderRadius: 14, padding: 18, border: "1px solid rgba(74,124,35,0.08)", marginBottom: 16 }}>
+      <div style={{ background: "rgba(18,161,0,0.05)", borderRadius: 14, padding: 18, border: "1px solid rgba(18,161,0,0.08)", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(74,124,35,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📤</div>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(18,161,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>📤</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#4A7C23" }}>Registrar gasto del turno</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#12A100" }}>Registrar gasto del turno</div>
             <div style={{ fontSize: 10.5, color: "#8A7A62" }}>Elegí la categoría correcta para tener reportes de gastos más claros</div>
           </div>
         </div>
@@ -3189,7 +3189,7 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
               className="caja-chip"
               style={{
                 display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
-                background: expCategory === c.id ? c.color : "rgba(74,124,35,0.06)",
+                background: expCategory === c.id ? c.color : "rgba(18,161,0,0.06)",
                 color: expCategory === c.id ? (c.id === "Otro" ? "#000000" : "#fff") : "#5C7A3D",
                 boxShadow: expCategory === c.id ? `0 4px 12px ${c.color}44` : "none",
               }}
@@ -3214,11 +3214,11 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
           </button>
         </div>
         {sessionExpensesList.length > 0 && (
-          <div style={{ borderTop: "1px solid rgba(74,124,35,0.08)", paddingTop: 4 }}>
+          <div style={{ borderTop: "1px solid rgba(18,161,0,0.08)", paddingTop: 4 }}>
             {sessionExpensesList.map((e) => {
               const meta = catMeta(e.category);
               return (
-                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid rgba(74,124,35,0.06)", fontSize: 12.5 }}>
+                <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid rgba(18,161,0,0.06)", fontSize: 12.5 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <span style={{ width: 26, height: 26, borderRadius: 8, background: `${meta.color}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{meta.icon}</span>
                     <div style={{ minWidth: 0 }}>
@@ -3239,8 +3239,8 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
         )}
       </div>
 
-      <div style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(74,124,35,0.08)" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", marginBottom: 10, letterSpacing: 0.5 }}>🧮 CONTEO FÍSICO PARA CERRAR</div>
+      <div style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(18,161,0,0.08)" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", marginBottom: 10, letterSpacing: 0.5 }}>🧮 CONTEO FÍSICO PARA CERRAR</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <input placeholder="Efectivo contado" type="number" value={counted} onChange={(e) => setCounted(e.target.value)} style={{ ...inp, maxWidth: 190, color: "#000000", fontWeight: 700 }} />
           <input placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} style={{ ...inp, maxWidth: 180, color: "#000000" }} />
@@ -3249,9 +3249,9 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
         {counted !== "" && (
           <div style={{
             marginTop: 12, padding: "10px 14px", borderRadius: 10, fontWeight: 800, fontSize: 14, textAlign: "center",
-            background: diff === 0 ? "rgba(0,230,118,0.15)" : diff > 0 ? "rgba(74,124,35,0.15)" : "rgba(255,82,82,0.15)",
-            color: diff === 0 ? "#00E676" : diff > 0 ? "#4A7C23" : "#FF5252",
-            border: `1px solid ${diff === 0 ? "#00E676" : diff > 0 ? "#4A7C23" : "#FF5252"}44`,
+            background: diff === 0 ? "rgba(0,230,118,0.15)" : diff > 0 ? "rgba(18,161,0,0.15)" : "rgba(255,82,82,0.15)",
+            color: diff === 0 ? "#00E676" : diff > 0 ? "#12A100" : "#FF5252",
+            border: `1px solid ${diff === 0 ? "#00E676" : diff > 0 ? "#12A100" : "#FF5252"}44`,
           }}>
             {diff === 0 ? "✅ Cuadra exacto" : diff > 0 ? `📈 Sobran ${money(diff)}` : `📉 Faltan ${money(Math.abs(diff))}`}
           </div>
@@ -3260,7 +3260,7 @@ function CorteCaja({ sales, expenses, employees, cashSessions, onOpenSession, on
         <button
           disabled={counted === ""}
           onClick={() => { if (window.confirm("¿Cerrar la caja con estos datos?")) onCloseSession(active.id, counted, expectedCash, notes); }}
-          style={{ marginTop: 14, width: "100%", padding: 13, border: "none", borderRadius: 10, background: counted !== "" ? "linear-gradient(135deg, #D1453A, #E8862E)" : "rgba(74,124,35,0.1)", color: "#fff", fontWeight: 800, cursor: counted !== "" ? "pointer" : "not-allowed", fontSize: 14, letterSpacing: 0.3 }}
+          style={{ marginTop: 14, width: "100%", padding: 13, border: "none", borderRadius: 10, background: counted !== "" ? "linear-gradient(135deg, #D1453A, #E8862E)" : "rgba(18,161,0,0.1)", color: "#fff", fontWeight: 800, cursor: counted !== "" ? "pointer" : "not-allowed", fontSize: 14, letterSpacing: 0.3 }}
         >
           🔒 Cerrar caja
         </button>
@@ -3395,14 +3395,14 @@ function GoalBar({ sales, salesGoal, onSetGoal }) {
     <div style={{ background: reached ? "linear-gradient(135deg, #00C853, #009624)" : "linear-gradient(135deg, #000000, #3d2f22)", borderRadius: 14, padding: 16, marginBottom: 18, color: "#fff" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
         <span style={{ fontWeight: 800, fontSize: 13, letterSpacing: 0.5 }}>{reached ? "🎉 ¡META ALCANZADA!" : "🎯 META DE VENTAS DE HOY"}</span>
-        <button onClick={() => { setVal(salesGoal); setEditing(true); }} style={{ fontSize: 11, background: "rgba(74,124,35,0.15)", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", color: "#fff" }}>✏️ Cambiar</button>
+        <button onClick={() => { setVal(salesGoal); setEditing(true); }} style={{ fontSize: 11, background: "rgba(18,161,0,0.15)", border: "none", borderRadius: 6, padding: "3px 10px", cursor: "pointer", color: "#fff" }}>✏️ Cambiar</button>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
         <span style={{ fontWeight: 800, fontSize: 22 }}>{money(todayTotal)}</span>
         <span style={{ fontSize: 13, opacity: 0.85 }}>de {money(salesGoal)} ({pct}%)</span>
       </div>
-      <div style={{ background: "rgba(74,124,35,0.2)", borderRadius: 20, height: 14, overflow: "hidden" }}>
-        <div style={{ background: reached ? "#fff" : "linear-gradient(90deg, #E8862E, #4A7C23)", height: "100%", width: `${pct}%`, borderRadius: 20, transition: "width 0.5s ease" }} />
+      <div style={{ background: "rgba(18,161,0,0.2)", borderRadius: 20, height: 14, overflow: "hidden" }}>
+        <div style={{ background: reached ? "#fff" : "linear-gradient(90deg, #E8862E, #12A100)", height: "100%", width: `${pct}%`, borderRadius: 20, transition: "width 0.5s ease" }} />
       </div>
       {!reached && salesGoal > todayTotal && (
         <div style={{ fontSize: 11, marginTop: 6, opacity: 0.85 }}>Faltan {money(salesGoal - todayTotal)} para la meta</div>
@@ -3495,12 +3495,12 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
   const INK = "#F2ECD8";
   const CARD = "#FBF7EA";
   const CARD2 = "#F5EEDC";
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
   const BLUE = "#3E7FD9";
 
   function getDiscount(key) {
@@ -3527,7 +3527,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         @keyframes cajaShine { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
         @keyframes cajaPulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes cajaSweep { 0% { left: -30%; } 100% { left: 130%; } }
-        @keyframes cajaNumGlow { 0%,100% { text-shadow: 0 0 12px rgba(74,124,35,0.25); } 50% { text-shadow: 0 0 20px rgba(74,124,35,0.55); } }
+        @keyframes cajaNumGlow { 0%,100% { text-shadow: 0 0 12px rgba(18,161,0,0.25); } 50% { text-shadow: 0 0 20px rgba(18,161,0,0.55); } }
         @keyframes cajaCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
         .caja-card { animation: cajaFadeUp 0.35s ease; transition: transform 0.15s ease, box-shadow 0.15s ease; }
         .caja-card:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(0,0,0,0.4); }
@@ -3539,7 +3539,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
         .caja-charge-btn:hover { transform: translateY(-2px); }
         .caja-charge-btn::after {
           content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-          background: linear-gradient(120deg, transparent 30%, rgba(74,124,35,0.15) 50%, transparent 70%);
+          background: linear-gradient(120deg, transparent 30%, rgba(18,161,0,0.15) 50%, transparent 70%);
           background-size: 200% 100%; animation: cajaShine 3.5s linear infinite;
         }
         .caja-chip { transition: all 0.15s ease; }
@@ -3573,7 +3573,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
             opacity: 0.4, animation: "cajaCornerGlow 3s ease-in-out infinite", pointerEvents: "none", zIndex: 1,
           }} />
         ))}
-        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.10), transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.10), transparent 70%)" }} />
         <div style={{ position: "absolute", bottom: -80, left: -40, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(193,39,45,0.10), transparent 70%)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative", zIndex: 2 }}>
           <div>
@@ -3587,7 +3587,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
           <button
             onClick={() => setShowPinSettings((s) => !s)}
             className="caja-chip"
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: `1px solid ${LINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(74,124,35,0.04)", color: GOLD }}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: `1px solid ${LINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(18,161,0,0.04)", color: GOLD }}
           >
             <Lock size={14} /> Cambiar PIN
           </button>
@@ -3601,7 +3601,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
               { label: "DELIVERY", value: deliveryAbiertos, accent: BLUE },
               { label: "TOTAL A COBRAR", value: money(grandTotal), accent: "#27AE60", big: true },
             ].map((s, i) => (
-              <div key={i} style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}`, backdropFilter: "blur(2px)" }}>
+              <div key={i} style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}`, backdropFilter: "blur(2px)" }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
                 <div className={s.big ? "caja-stat-num" : ""} style={{ fontSize: s.big ? 22 : 24, fontWeight: 800, color: s.big ? "#27AE60" : CREAM, fontFamily: s.big ? "'Anton', sans-serif" : "inherit" }}>{s.value}</div>
               </div>
@@ -3658,7 +3658,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                 >
                   {t.icon} {t.label}
                   <span style={{
-                    background: accountTab === t.id ? "rgba(74,124,35,0.25)" : "rgba(74,124,35,0.12)",
+                    background: accountTab === t.id ? "rgba(18,161,0,0.25)" : "rgba(18,161,0,0.12)",
                     color: accountTab === t.id ? "#fff" : GOLD,
                     borderRadius: 20, padding: "1px 9px", fontSize: 11, fontWeight: 800,
                   }}>{t.list.length}</span>
@@ -3689,12 +3689,12 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
 
           return (
             <div key={key} className="caja-card" style={{ background: `linear-gradient(175deg, ${CARD}, ${CARD2})`, borderRadius: 20, overflow: "hidden", border: `1px solid ${LINE}`, gridColumn: o.items.length > 6 ? "span 2" : "span 1" }}>
-              <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${LINE}`, background: "rgba(74,124,35,0.02)" }}>
+              <div style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${LINE}`, background: "rgba(18,161,0,0.02)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ width: 34, height: 34, borderRadius: 10, background: `${typeAccent}22`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{typeIcon}</span>
                   <span style={{ color: CREAM, fontWeight: 700, fontSize: 15.5, fontFamily: "'Fraunces', serif" }}>{o.label}</span>
                 </div>
-                <span style={{ color: GOLD, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, background: "rgba(74,124,35,0.10)", padding: "4px 11px", borderRadius: 20 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
+                <span style={{ color: GOLD, fontSize: 11, fontWeight: 700, letterSpacing: 0.5, background: "rgba(18,161,0,0.10)", padding: "4px 11px", borderRadius: 20 }}>{o.items.reduce((s, it) => s + it.qty, 0)} ítems</span>
               </div>
 
               <div style={{ padding: 20 }}>
@@ -3728,7 +3728,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                           className="caja-chip"
                           style={{
                             width: 40, height: 40, borderRadius: "50%", border: "none", cursor: "pointer", fontWeight: 800, fontSize: 15,
-                            background: evenSplitN[key] === n ? "linear-gradient(135deg, #9C63D8, #7A3FC0)" : "rgba(74,124,35,0.06)",
+                            background: evenSplitN[key] === n ? "linear-gradient(135deg, #9C63D8, #7A3FC0)" : "rgba(18,161,0,0.06)",
                             color: evenSplitN[key] === n ? "#fff" : "#C9A8ED",
                           }}
                         >
@@ -3739,7 +3739,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     {evenSplitN[key] > 0 && (
                       <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(3, evenSplitN[key])}, 1fr)`, gap: 10 }}>
                         {Array.from({ length: evenSplitN[key] }, (_, i) => (
-                          <div key={i} style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: "10px 8px", textAlign: "center", border: "1px solid rgba(74,124,35,0.08)" }}>
+                          <div key={i} style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: "10px 8px", textAlign: "center", border: "1px solid rgba(18,161,0,0.08)" }}>
                             <div style={{ width: 28, height: 28, borderRadius: "50%", background: AVATAR_COLORS[i % AVATAR_COLORS.length], color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, margin: "0 auto 6px" }}>{i + 1}</div>
                             <div style={{ fontWeight: 800, fontSize: 14, color: "#C9A8ED" }}>{money(total / evenSplitN[key])}</div>
                           </div>
@@ -3769,8 +3769,8 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                 {isSplitting ? (
                   <div style={{ background: "rgba(62,127,217,0.08)", border: `1px solid ${BLUE}55`, borderRadius: 14, padding: 16, marginBottom: 16 }}>
                     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-                      <button onClick={() => setSplitSelected((s) => ({ ...s, [key]: o.items.map((it) => it.menuId) }))} className="caja-chip" style={{ fontSize: 11, background: "rgba(74,124,35,0.05)", border: `1px solid ${BLUE}`, color: BLUE, borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontWeight: 700 }}>Seleccionar todo</button>
-                      <button onClick={() => setSplitSelected((s) => ({ ...s, [key]: [] }))} className="caja-chip" style={{ fontSize: 11, background: "rgba(74,124,35,0.05)", border: `1px solid ${MUTED}`, color: MUTED, borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontWeight: 700 }}>Limpiar</button>
+                      <button onClick={() => setSplitSelected((s) => ({ ...s, [key]: o.items.map((it) => it.menuId) }))} className="caja-chip" style={{ fontSize: 11, background: "rgba(18,161,0,0.05)", border: `1px solid ${BLUE}`, color: BLUE, borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontWeight: 700 }}>Seleccionar todo</button>
+                      <button onClick={() => setSplitSelected((s) => ({ ...s, [key]: [] }))} className="caja-chip" style={{ fontSize: 11, background: "rgba(18,161,0,0.05)", border: `1px solid ${MUTED}`, color: MUTED, borderRadius: 8, padding: "5px 10px", cursor: "pointer", fontWeight: 700 }}>Limpiar</button>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: BLUE }}>SELECCIONADO ({selectedIds.length}/{o.items.length})</span>
@@ -3830,8 +3830,8 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                         style={{
                           flex: "1 1 21%", minWidth: 78, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, padding: "13px 10px", borderRadius: 14, cursor: "pointer",
                           border: m === opt.id ? `2px solid ${opt.id === "Fiado" ? "#E8862E" : GOLD}` : `1px solid ${LINE}`,
-                          background: m === opt.id ? (opt.id === "Fiado" ? "rgba(232,163,61,0.12)" : "rgba(74,124,35,0.10)") : "rgba(74,124,35,0.02)",
-                          boxShadow: m === opt.id ? `0 6px 16px ${opt.id === "Fiado" ? "rgba(232,163,61,0.2)" : "rgba(74,124,35,0.15)"}` : "none",
+                          background: m === opt.id ? (opt.id === "Fiado" ? "rgba(232,163,61,0.12)" : "rgba(18,161,0,0.10)") : "rgba(18,161,0,0.02)",
+                          boxShadow: m === opt.id ? `0 6px 16px ${opt.id === "Fiado" ? "rgba(232,163,61,0.2)" : "rgba(18,161,0,0.15)"}` : "none",
                         }}
                       >
                         <span style={{ fontSize: 21 }}>{opt.icon}</span>
@@ -3853,7 +3853,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                           style={{
                             flex: "1 1 auto", padding: "10px 12px", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 12.5,
                             border: (bank[key] || "") === bk ? `2px solid ${GOLD}` : `1px solid ${LINE}`,
-                            background: (bank[key] || "") === bk ? "rgba(74,124,35,0.10)" : "rgba(74,124,35,0.02)",
+                            background: (bank[key] || "") === bk ? "rgba(18,161,0,0.10)" : "rgba(18,161,0,0.02)",
                             color: (bank[key] || "") === bk ? GOLD : CREAM,
                           }}
                         >
@@ -3886,7 +3886,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                 {m === "Efectivo" && (() => {
                   const dueTotal = finalTotal + (isSplitting ? 0 : (Number(tipValue[key]) || 0));
                   return (
-                    <div style={{ background: "rgba(74,124,35,0.06)", border: `1.5px solid ${GOLD}55`, borderRadius: 14, padding: 16, marginBottom: 12 }}>
+                    <div style={{ background: "rgba(18,161,0,0.06)", border: `1.5px solid ${GOLD}55`, borderRadius: 14, padding: 16, marginBottom: 12 }}>
                       <div style={{ fontSize: 11.5, fontWeight: 800, color: GOLD, marginBottom: 10 }}>¿CON CUÁNTO PAGA EL CLIENTE?</div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
                         {[dueTotal, 100, 200, 500, 1000].filter((v, i, arr) => arr.indexOf(v) === i && v > 0).map((v) => (
@@ -3896,7 +3896,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                             className="caja-chip"
                             style={{
                               padding: "8px 13px", borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 800, fontSize: 12,
-                              background: v === dueTotal ? "linear-gradient(135deg, #34D399, #059669)" : "rgba(74,124,35,0.06)",
+                              background: v === dueTotal ? "linear-gradient(135deg, #34D399, #059669)" : "rgba(18,161,0,0.06)",
                               color: v === dueTotal ? "#fff" : CREAM,
                             }}
                           >
@@ -3920,11 +3920,11 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                               <div style={{ fontSize: 26 }}>{money(Math.abs(change))}</div>
                             </div>
                             {breakdown.length > 0 && (
-                              <div style={{ marginTop: 10, background: "rgba(74,124,35,0.04)", borderRadius: 10, padding: 12, border: `1px solid ${LINE}` }}>
+                              <div style={{ marginTop: 10, background: "rgba(18,161,0,0.04)", borderRadius: 10, padding: 12, border: `1px solid ${LINE}` }}>
                                 <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, marginBottom: 8, letterSpacing: 0.5 }}>ENTREGAR:</div>
                                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                                   {breakdown.map((b) => (
-                                    <span key={b.denom} style={{ fontSize: 12, background: "rgba(74,124,35,0.10)", borderRadius: 8, padding: "5px 11px", fontWeight: 700, color: GOLD }}>{b.count}× {money(b.denom)}</span>
+                                    <span key={b.denom} style={{ fontSize: 12, background: "rgba(18,161,0,0.10)", borderRadius: 8, padding: "5px 11px", fontWeight: 700, color: GOLD }}>{b.count}× {money(b.denom)}</span>
                                   ))}
                                 </div>
                               </div>
@@ -3941,7 +3941,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     disabled={selectedIds.length === 0 || ((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())}
                     onClick={() => { playChaChing(); onCharge(o.kind, o.id, m, null, null, selectedIds, bank[key], fiadoPerson[key]); setSplitSelected((s) => ({ ...s, [key]: [] })); setSplitMode((s) => ({ ...s, [key]: false })); }}
                     className="caja-charge-btn"
-                    style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: selectedIds.length ? `linear-gradient(135deg, ${BLUE}, #2A5FB0)` : "rgba(74,124,35,0.08)", color: "#fff", fontWeight: 800, cursor: selectedIds.length ? "pointer" : "not-allowed", fontSize: 14.5, letterSpacing: 0.3 }}
+                    style={{ width: "100%", padding: 15, border: "none", borderRadius: 14, background: selectedIds.length ? `linear-gradient(135deg, ${BLUE}, #2A5FB0)` : "rgba(18,161,0,0.08)", color: "#fff", fontWeight: 800, cursor: selectedIds.length ? "pointer" : "not-allowed", fontSize: 14.5, letterSpacing: 0.3 }}
                   >
                     ✂️ Cobrar seleccionados ({money(chargeTotal)})
                   </button>
@@ -3952,7 +3952,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
                     className="caja-charge-btn"
                     style={{
                       width: "100%", padding: 15, border: "none", borderRadius: 14, color: "#fff", fontWeight: 800, fontSize: 14.5, letterSpacing: 0.3,
-                      background: (((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())) ? "rgba(74,124,35,0.08)" : (m === "Fiado" ? "linear-gradient(135deg, #E8862E, #D1453A)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`),
+                      background: (((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())) ? "rgba(18,161,0,0.08)" : (m === "Fiado" ? "linear-gradient(135deg, #E8862E, #D1453A)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`),
                       cursor: (((m === "Tarjeta" || m === "Transferencia") && !bank[key]) || (m === "Fiado" && !fiadoPerson[key]?.trim())) ? "not-allowed" : "pointer",
                       boxShadow: "0 8px 20px rgba(193,39,45,0.3)",
                     }}
@@ -3973,7 +3973,7 @@ function CajaView({ tables, deliveries, sales, expenses, employees, cashSessions
 }
 
 function cajaInp(line, cream) {
-  return { padding: 9, borderRadius: 9, border: `1px solid ${line}`, background: "rgba(74,124,35,0.03)", color: cream, fontSize: 13, fontFamily: "inherit" };
+  return { padding: 9, borderRadius: 9, border: `1px solid ${line}`, background: "rgba(18,161,0,0.03)", color: cream, fontSize: 13, fontFamily: "inherit" };
 }
 
 function ChangePin({ current, onChange }) {
@@ -4011,7 +4011,7 @@ function DeliveryElapsed({ createdAtMs }) {
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
-      background: urgent ? "rgba(248,113,113,0.18)" : "rgba(74,124,35,0.08)", color: urgent ? "#C0392B" : "#5C7A3D",
+      background: urgent ? "rgba(248,113,113,0.18)" : "rgba(18,161,0,0.08)", color: urgent ? "#C0392B" : "#5C7A3D",
     }}>
       ⏱ {mins} min
     </span>
@@ -4041,13 +4041,13 @@ function printEncargoReceipt(e, total, balance) {
       .logo { font-size: 36px; }
       .name { font-size: 18px; font-weight: 800; color: #D1453A; margin-top: 4px; }
       .sub { text-align: center; font-size: 11px; color: #666; letter-spacing: 1px; margin-bottom: 18px; }
-      .title { text-align: center; background: #000000; color: #4A7C23; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
+      .title { text-align: center; background: #000000; color: #12A100; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
       .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #ddd; font-size: 13px; }
       .row strong { font-weight: 800; }
       .section-title { font-weight: 800; font-size: 11px; text-transform: uppercase; color: #8a7a63; margin: 18px 0 4px; letter-spacing: 0.5px; }
       .pos { color: #2E7D32; font-weight: 700; }
       .neg { color: #D1453A; font-weight: 700; }
-      .big { font-size: 20px; font-weight: 800; text-align: center; margin: 18px 0; background: #4A7C23; padding: 16px; border-radius: 10px; letter-spacing: 0.5px; }
+      .big { font-size: 20px; font-weight: 800; text-align: center; margin: 18px 0; background: #12A100; padding: 16px; border-radius: 10px; letter-spacing: 0.5px; }
       .note { margin-top: 14px; font-size: 12px; color: #5a4c3a; background: #FBF6EC; border-radius: 8px; padding: 10px 12px; }
       .sign { margin-top: 55px; display: flex; justify-content: space-between; gap: 24px; }
       .sign div { flex: 1; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; color: #5a4c3a; }
@@ -4150,15 +4150,15 @@ function EncargoMenuItemRow({ menuItem, onAdd }) {
   const [qty, setQty] = useState(1);
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(74,124,35,0.03)", border: `1px solid ${LINE}`, borderRadius: 10, padding: "7px 10px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(18,161,0,0.03)", border: `1px solid ${LINE}`, borderRadius: 10, padding: "7px 10px" }}>
       <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: CREAM }}>{menuItem.name}</span>
       <span style={{ fontSize: 11.5, color: MUTED }}>{money(menuItem.price)} c/u</span>
       <input
         type="number" min="1" value={qty}
         onChange={(ev) => setQty(ev.target.value)}
-        style={{ width: 52, padding: "5px 6px", borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, fontSize: 12, textAlign: "center" }}
+        style={{ width: 52, padding: "5px 6px", borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, fontSize: 12, textAlign: "center" }}
       />
       <button
         onClick={() => { onAdd(qty); setQty(1); }}
@@ -4174,8 +4174,8 @@ function EncargoPaymentForm({ onAdd }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("Efectivo");
   const CREAM = "#000000";
-  const LINE = "rgba(74,124,35,0.14)";
-  const fs = { padding: 7, fontSize: 12, borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, boxSizing: "border-box" };
+  const LINE = "rgba(18,161,0,0.14)";
+  const fs = { padding: 7, fontSize: 12, borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, boxSizing: "border-box" };
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
       <input placeholder="Monto" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ ...fs, maxWidth: 100 }} />
@@ -4200,8 +4200,8 @@ function EncargoSpecialItemForm({ onAdd }) {
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState(1);
   const CREAM = "#000000";
-  const LINE = "rgba(74,124,35,0.14)";
-  const fs = { padding: 7, fontSize: 12, borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, boxSizing: "border-box" };
+  const LINE = "rgba(18,161,0,0.14)";
+  const fs = { padding: 7, fontSize: 12, borderRadius: 7, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, boxSizing: "border-box" };
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
       <input placeholder="Nombre (ej: torta 3 leches x40)" value={name} onChange={(e) => setName(e.target.value)} style={{ ...fs, maxWidth: 180 }} />
@@ -4265,14 +4265,14 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
   const INK = "#F2ECD8";
   const CARD = "#FBF7EA";
   const CARD2 = "#F5EEDC";
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
   const BLUE = "#3E7FD9";
-  const fieldStyle = { padding: 9, fontSize: 13, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, boxSizing: "border-box" };
+  const fieldStyle = { padding: 9, fontSize: 13, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, boxSizing: "border-box" };
 
   const todayStr = new Date().toDateString();
   const in7days = new Date(); in7days.setDate(in7days.getDate() + 7);
@@ -4361,7 +4361,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
         borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
         boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
       }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.10), transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.10), transparent 70%)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -4372,7 +4372,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
           </div>
           <button
             onClick={() => setFormOpen((f) => !f)}
-            style={{ padding: "12px 20px", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 13.5, background: formOpen ? "rgba(74,124,35,0.06)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: formOpen ? CREAM : "#fff", boxShadow: formOpen ? "none" : "0 8px 20px rgba(193,39,45,0.3)", border: formOpen ? `1px solid ${LINE}` : "none" }}
+            style={{ padding: "12px 20px", borderRadius: 12, cursor: "pointer", fontWeight: 800, fontSize: 13.5, background: formOpen ? "rgba(18,161,0,0.06)" : `linear-gradient(135deg, ${EMBER}, ${AMBER})`, color: formOpen ? CREAM : "#fff", boxShadow: formOpen ? "none" : "0 8px 20px rgba(193,39,45,0.3)", border: formOpen ? `1px solid ${LINE}` : "none" }}
           >
             {formOpen ? "✕ Cerrar" : "➕ Nuevo encargo"}
           </button>
@@ -4385,7 +4385,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
             { label: "PRÓXIMOS 7 DÍAS", value: semanaCount, accent: BLUE },
             { label: "SALDO POR COBRAR (ACTIVOS)", value: money(pendingBalance), accent: "#27AE60" },
           ].map((s, i) => (
-            <div key={i} style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+            <div key={i} style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: CREAM }}>{s.value}</div>
             </div>
@@ -4423,8 +4423,8 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18, alignItems: "center" }}>
             <div style={{ display: "flex", gap: 6 }}>
-              <button onClick={() => setFulfillment("recoge")} style={{ padding: "9px 14px", borderRadius: 10, border: fulfillment === "recoge" ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: fulfillment === "recoge" ? "rgba(74,124,35,0.10)" : "rgba(74,124,35,0.03)", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: fulfillment === "recoge" ? GOLD : CREAM }}>🏪 Cliente recoge</button>
-              <button onClick={() => setFulfillment("entrega")} style={{ padding: "9px 14px", borderRadius: 10, border: fulfillment === "entrega" ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: fulfillment === "entrega" ? "rgba(74,124,35,0.10)" : "rgba(74,124,35,0.03)", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: fulfillment === "entrega" ? GOLD : CREAM }}>🛵 Se entrega</button>
+              <button onClick={() => setFulfillment("recoge")} style={{ padding: "9px 14px", borderRadius: 10, border: fulfillment === "recoge" ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: fulfillment === "recoge" ? "rgba(18,161,0,0.10)" : "rgba(18,161,0,0.03)", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: fulfillment === "recoge" ? GOLD : CREAM }}>🏪 Cliente recoge</button>
+              <button onClick={() => setFulfillment("entrega")} style={{ padding: "9px 14px", borderRadius: 10, border: fulfillment === "entrega" ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: fulfillment === "entrega" ? "rgba(18,161,0,0.10)" : "rgba(18,161,0,0.03)", cursor: "pointer", fontWeight: 700, fontSize: 12.5, color: fulfillment === "entrega" ? GOLD : CREAM }}>🛵 Se entrega</button>
             </div>
             {fulfillment === "entrega" && (
               <input placeholder="Dirección de entrega" value={address} onChange={(e) => setAddress(e.target.value)} style={{ ...fieldStyle, maxWidth: 240 }} />
@@ -4433,7 +4433,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
 
           <div style={{ fontSize: 11, textTransform: "uppercase", fontWeight: 800, color: GOLD, letterSpacing: 1, marginBottom: 8 }}>2. Armá el pedido con el menú</div>
           <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 14, marginBottom: 18 }}>
-            <div style={{ background: "rgba(74,124,35,0.02)", border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, maxHeight: 320, overflowY: "auto" }}>
+            <div style={{ background: "rgba(18,161,0,0.02)", border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, maxHeight: 320, overflowY: "auto" }}>
               {menuCats.map((cat) => {
                 const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
                 if (!items.length) return null;
@@ -4476,8 +4476,8 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                       <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ fontWeight: 700, color: GOLD }}>{money(it.price * it.qty)}</span>
-                        <button onClick={() => changeNewCartQty(it.menuId, -1)} style={{ background: "rgba(74,124,35,0.08)", border: "none", borderRadius: 6, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>−</button>
-                        <button onClick={() => changeNewCartQty(it.menuId, 1)} style={{ background: "rgba(74,124,35,0.08)", border: "none", borderRadius: 6, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>+</button>
+                        <button onClick={() => changeNewCartQty(it.menuId, -1)} style={{ background: "rgba(18,161,0,0.08)", border: "none", borderRadius: 6, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>−</button>
+                        <button onClick={() => changeNewCartQty(it.menuId, 1)} style={{ background: "rgba(18,161,0,0.08)", border: "none", borderRadius: 6, width: 20, height: 20, cursor: "pointer", color: "#fff", fontSize: 12, lineHeight: 1 }}>+</button>
                       </div>
                     </div>
                   ))}
@@ -4547,13 +4547,13 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                 style={{
                   display: "flex", alignItems: "center", gap: 7, padding: "6px 14px 6px 6px", borderRadius: 24, cursor: "pointer",
                   border: active ? `1px solid ${f.color}` : `1px solid ${LINE}`,
-                  background: active ? `linear-gradient(135deg, ${f.color}2E, ${f.color}14)` : "rgba(74,124,35,0.02)",
+                  background: active ? `linear-gradient(135deg, ${f.color}2E, ${f.color}14)` : "rgba(18,161,0,0.02)",
                   boxShadow: active ? `0 4px 14px ${f.color}40` : "none",
                 }}
               >
-                <span style={{ width: 22, height: 22, borderRadius: "50%", background: active ? f.color : "rgba(74,124,35,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{f.icon}</span>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", background: active ? f.color : "rgba(18,161,0,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11 }}>{f.icon}</span>
                 <span style={{ fontSize: 12.5, fontWeight: 800, color: active ? CREAM : MUTED }}>{f.label}</span>
-                <span style={{ fontSize: 10.5, fontWeight: 800, minWidth: 18, textAlign: "center", padding: "1px 6px", borderRadius: 10, background: active ? "rgba(74,124,35,0.2)" : "rgba(74,124,35,0.05)", color: active ? CREAM : MUTED }}>{filterCounts[f.id]}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 800, minWidth: 18, textAlign: "center", padding: "1px 6px", borderRadius: 10, background: active ? "rgba(18,161,0,0.2)" : "rgba(18,161,0,0.05)", color: active ? CREAM : MUTED }}>{filterCounts[f.id]}</span>
               </button>
             );
           })}
@@ -4591,7 +4591,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                         📅 {eventDateObj.toLocaleDateString("es-NI", { weekday: "long", day: "numeric", month: "long" })}{e.eventTime ? ` · ${e.eventTime}` : ""}
                         {isToday && " (HOY)"}{isPast && " — ¡ya pasó!"}
                       </span>
-                      <span style={{ fontSize: 11, background: "rgba(74,124,35,0.05)", border: `1px solid ${LINE}`, borderRadius: 8, padding: "2px 8px", fontWeight: 700, color: CREAM }}>
+                      <span style={{ fontSize: 11, background: "rgba(18,161,0,0.05)", border: `1px solid ${LINE}`, borderRadius: 8, padding: "2px 8px", fontWeight: 700, color: CREAM }}>
                         {e.fulfillment === "entrega" ? `🛵 Entrega${e.address ? `: ${e.address}` : ""}` : "🏪 Cliente recoge"}
                       </span>
                     </div>
@@ -4601,7 +4601,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                   </span>
                 </div>
 
-                {e.description && <div style={{ fontSize: 13, color: CREAM, background: "rgba(74,124,35,0.03)", border: `1px solid ${LINE}`, borderRadius: 10, padding: "9px 13px", marginBottom: 12 }}>{e.description}</div>}
+                {e.description && <div style={{ fontSize: 13, color: CREAM, background: "rgba(18,161,0,0.03)", border: `1px solid ${LINE}`, borderRadius: 10, padding: "9px 13px", marginBottom: 12 }}>{e.description}</div>}
 
                 {e.items.length > 0 && (
                   <div style={{ marginBottom: 12 }}>
@@ -4610,8 +4610,8 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                         <span>{it.special ? "⭐ " : ""}{it.qty}x {it.name}</span>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontWeight: 700, color: GOLD }}>{money(it.price * it.qty)}</span>
-                          <button onClick={() => onChangeItemQty(e.id, it.menuId, -1)} style={{ background: "rgba(74,124,35,0.06)", border: `1px solid ${LINE}`, borderRadius: 6, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1, color: CREAM }}>−</button>
-                          <button onClick={() => onChangeItemQty(e.id, it.menuId, 1)} style={{ background: "rgba(74,124,35,0.06)", border: `1px solid ${LINE}`, borderRadius: 6, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1, color: CREAM }}>+</button>
+                          <button onClick={() => onChangeItemQty(e.id, it.menuId, -1)} style={{ background: "rgba(18,161,0,0.06)", border: `1px solid ${LINE}`, borderRadius: 6, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1, color: CREAM }}>−</button>
+                          <button onClick={() => onChangeItemQty(e.id, it.menuId, 1)} style={{ background: "rgba(18,161,0,0.06)", border: `1px solid ${LINE}`, borderRadius: 6, width: 20, height: 20, cursor: "pointer", fontSize: 12, lineHeight: 1, color: CREAM }}>+</button>
                         </div>
                       </div>
                     ))}
@@ -4619,13 +4619,13 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                 )}
 
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                  <button onClick={() => setItemPickerFor(itemPickerFor === e.id ? null : e.id)} style={{ fontSize: 11.5, background: "rgba(74,124,35,0.04)", border: `1px solid ${LINE}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: CREAM, fontWeight: 700 }}>
+                  <button onClick={() => setItemPickerFor(itemPickerFor === e.id ? null : e.id)} style={{ fontSize: 11.5, background: "rgba(18,161,0,0.04)", border: `1px solid ${LINE}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: CREAM, fontWeight: 700 }}>
                     🍽️ {itemPickerFor === e.id ? "Cerrar menú" : "Agregar platillos del menú"}
                   </button>
                 </div>
 
                 {itemPickerFor === e.id && (
-                  <div style={{ background: "rgba(74,124,35,0.02)", border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, marginBottom: 14, maxHeight: 260, overflowY: "auto" }}>
+                  <div style={{ background: "rgba(18,161,0,0.02)", border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, marginBottom: 14, maxHeight: 260, overflowY: "auto" }}>
                     <div style={{ fontSize: 11, color: MUTED, marginBottom: 10 }}>Poné la cantidad que encargaron de cada platillo y tocá "Agregar" — el sistema calcula el total con el precio del menú.</div>
                     {menuCats.map((cat) => {
                       const items = menuItems.filter((m) => m.cat === cat.name && m.active !== false);
@@ -4702,7 +4702,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                         <input
                           type="number" defaultValue={e.manualTotal || ""} placeholder="0"
                           onBlur={(ev) => onUpdate(e.id, { manualTotal: Number(ev.target.value) || 0 })}
-                          style={{ width: 90, fontSize: 12, padding: 5, borderRadius: 6, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM }}
+                          style={{ width: 90, fontSize: 12, padding: 5, borderRadius: 6, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM }}
                         />
                       </div>
                     )}
@@ -4730,7 +4730,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                         </button>
                       );
                     })}
-                    <button onClick={() => printEncargoReceipt(e, total, balance)} style={{ fontSize: 11, background: "rgba(74,124,35,0.1)", border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: GOLD, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+                    <button onClick={() => printEncargoReceipt(e, total, balance)} style={{ fontSize: 11, background: "rgba(18,161,0,0.1)", border: `1px solid ${GOLD}`, borderRadius: 8, padding: "6px 11px", cursor: "pointer", color: GOLD, fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
                       <Printer size={12} /> Imprimir comprobante
                     </button>
                     {e.status !== "cancelado" && e.status !== "entregado" && (
@@ -4751,7 +4751,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                       {["Efectivo", "Tarjeta", "Transferencia"].map((m) => (
-                        <button key={m} onClick={() => setDeliverMethod(m)} style={{ padding: "6px 12px", borderRadius: 8, border: deliverMethod === m ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: deliverMethod === m ? "rgba(74,124,35,0.12)" : "transparent", color: deliverMethod === m ? GOLD : CREAM, fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>{m}</button>
+                        <button key={m} onClick={() => setDeliverMethod(m)} style={{ padding: "6px 12px", borderRadius: 8, border: deliverMethod === m ? `2px solid ${GOLD}` : `1px solid ${LINE}`, background: deliverMethod === m ? "rgba(18,161,0,0.12)" : "transparent", color: deliverMethod === m ? GOLD : CREAM, fontWeight: 700, fontSize: 11.5, cursor: "pointer" }}>{m}</button>
                       ))}
                       <button
                         onClick={() => { onCompleteDelivery(e.id, deliverMethod); setDeliverFor(null); }}
@@ -4771,7 +4771,7 @@ function EncargosView({ encargos, menuItems, menuCats, onAdd, onUpdate, onDelete
                     <input
                       placeholder="Motivo de la cancelación (opcional)"
                       value={cancelReason} onChange={(ev) => setCancelReason(ev.target.value)}
-                      style={{ width: "100%", boxSizing: "border-box", padding: 8, fontSize: 12, borderRadius: 8, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, marginBottom: 10 }}
+                      style={{ width: "100%", boxSizing: "border-box", padding: 8, fontSize: 12, borderRadius: 8, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, marginBottom: 10 }}
                     />
                     {paid > 0 && (
                       <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
@@ -4812,12 +4812,12 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
   const INK = "#F2ECD8";
   const CARD = "#FBF7EA";
   const CARD2 = "#F5EEDC";
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
   const BLUE = "#3E7FD9";
 
   const activos = deliveries.filter((d) => d.kitchenStatus !== "entregado");
@@ -4916,7 +4916,7 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
         borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
         boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
       }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.10), transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.10), transparent 70%)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -4938,7 +4938,7 @@ function DeliveryView({ deliveries, onNew, onOpen }) {
             { label: "🥡 PARA LLEVAR", value: pickup.length, accent: AMBER },
             { label: "✅ LISTOS", value: listos, accent: "#27AE60" },
           ].map((s, i) => (
-            <div key={i} style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+            <div key={i} style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: CREAM }}>{s.value}</div>
             </div>
@@ -4980,12 +4980,12 @@ function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
 
   const INK = "#F2ECD8";
   const CARD = "#FBF7EA";
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
 
   function handleCreate() {
     if (type === "pickup") {
@@ -5001,17 +5001,17 @@ function NewDeliveryModal({ onCreate, onClose, pickupCount }) {
       <div style={{ background: `linear-gradient(175deg, ${CARD}, ${INK})`, border: `1px solid ${LINE}`, borderRadius: 20, width: "100%", maxWidth: 380, padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,0.5)" }}>
         <h3 style={{ marginTop: 0, marginBottom: 16, fontFamily: "'Fraunces', serif", fontWeight: 600, fontSize: 22, color: CREAM }}>Nuevo pedido</h3>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(74,124,35,0.05)", color: type === "delivery" ? "#fff" : MUTED }}>🛵 Delivery</button>
-          <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(74,124,35,0.05)", color: type === "pickup" ? "#fff" : MUTED }}>🥡 Para llevar</button>
+          <button onClick={() => setType("delivery")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "delivery" ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(18,161,0,0.05)", color: type === "delivery" ? "#fff" : MUTED }}>🛵 Delivery</button>
+          <button onClick={() => setType("pickup")} style={{ flex: 1, padding: 12, borderRadius: 10, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 13, background: type === "pickup" ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(18,161,0,0.05)", color: type === "pickup" ? "#fff" : MUTED }}>🥡 Para llevar</button>
         </div>
         {type === "delivery" ? (
           <>
             <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: MUTED, marginBottom: 5 }}>Nombre del cliente</label>
-            <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box", marginBottom: 12 }} />
+            <input value={customer} onChange={(e) => setCustomer(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box", marginBottom: 12 }} />
             <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: MUTED, marginBottom: 5 }}>Teléfono (opcional, para WhatsApp/llamada)</label>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ej: 8888 8888" style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box", marginBottom: 12 }} />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ej: 8888 8888" style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box", marginBottom: 12 }} />
             <label style={{ display: "block", fontSize: 11.5, fontWeight: 700, color: MUTED, marginBottom: 5 }}>Dirección</label>
-            <input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(74,124,35,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box" }} />
+            <input value={address} onChange={(e) => setAddress(e.target.value)} style={{ width: "100%", padding: 10, borderRadius: 9, border: `1px solid ${LINE}`, background: "rgba(18,161,0,0.04)", color: CREAM, fontSize: 14, boxSizing: "border-box" }} />
           </>
         ) : (
           <p style={{ fontSize: 13, color: MUTED, margin: "10px 0" }}>No se necesita ningún dato — solo confirma para crear el pedido.</p>
@@ -5132,7 +5132,7 @@ function PromoView({ promotions, onAdd, onDelete }) {
 function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, onManage }) {
   const activeItems = menuItems.filter((m) => m.active !== false);
   const catsWithItems = menuCats.filter((c) => c.tvHidden !== true && activeItems.some((m) => m.cat === c.name));
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const CREAM = "#F7F0E4";
   const INK = "#0A0806";
   const EMBER = "#D1453A";
@@ -5203,7 +5203,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         @keyframes mbTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes mbPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
         @keyframes mbShine { 0% { background-position: -150% 0; } 100% { background-position: 250% 0; } }
-        @keyframes mbBadgeGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(74,124,35,0.4), 0 0 22px 2px rgba(74,124,35,0.15); } 50% { box-shadow: 0 0 0 10px rgba(74,124,35,0), 0 0 30px 6px rgba(74,124,35,0.3); } }
+        @keyframes mbBadgeGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(18,161,0,0.4), 0 0 22px 2px rgba(18,161,0,0.15); } 50% { box-shadow: 0 0 0 10px rgba(18,161,0,0), 0 0 30px 6px rgba(18,161,0,0.3); } }
         @keyframes mbTitleShimmer { 0% { background-position: -120% 0; } 100% { background-position: 220% 0; } }
         @keyframes mbScanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
         @keyframes mbCornerGlow { 0%,100% { opacity: 0.35; } 50% { opacity: 0.85; } }
@@ -5239,7 +5239,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       {/* Rejilla tecnológica de fondo */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 0, opacity: 0.05, pointerEvents: "none",
-        backgroundImage: "linear-gradient(rgba(74,124,35,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(74,124,35,0.6) 1px, transparent 1px)",
+        backgroundImage: "linear-gradient(rgba(18,161,0,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(18,161,0,0.6) 1px, transparent 1px)",
         backgroundSize: "42px 42px",
       }} />
       {/* Orbes de degradado flotantes — look moderno tipo glass 2026 */}
@@ -5269,8 +5269,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       {/* Barra superior — panel de vidrio moderno */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "clamp(14px, 2vh, 22px) clamp(24px, 3.2vw, 48px) clamp(6px, 1vh, 10px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
         <div style={{
-          display: "flex", alignItems: "center", gap: 12, background: "rgba(74,124,35,0.04)", backdropFilter: "blur(10px)",
-          border: "1px solid rgba(74,124,35,0.08)", borderRadius: 30, padding: "clamp(6px,0.9vh,10px) clamp(14px,1.8vw,20px)",
+          display: "flex", alignItems: "center", gap: 12, background: "rgba(18,161,0,0.04)", backdropFilter: "blur(10px)",
+          border: "1px solid rgba(18,161,0,0.08)", borderRadius: 30, padding: "clamp(6px,0.9vh,10px) clamp(14px,1.8vw,20px)",
           animation: "mbPillIn 0.5s ease both",
         }}>
           <span style={{ fontSize: "clamp(19px, 2vw, 27px)" }}>🍔🍗</span>
@@ -5281,8 +5281,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            display: "flex", alignItems: "center", gap: 14, background: "rgba(74,124,35,0.04)", backdropFilter: "blur(10px)",
-            border: "1px solid rgba(74,124,35,0.08)", borderRadius: 30, padding: "clamp(6px,0.9vh,10px) clamp(14px,1.8vw,20px)",
+            display: "flex", alignItems: "center", gap: 14, background: "rgba(18,161,0,0.04)", backdropFilter: "blur(10px)",
+            border: "1px solid rgba(18,161,0,0.08)", borderRadius: 30, padding: "clamp(6px,0.9vh,10px) clamp(14px,1.8vw,20px)",
             animation: "mbPillIn 0.5s ease 0.08s both",
           }}>
             <div style={{ textAlign: "right" }}>
@@ -5293,7 +5293,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
                 {clock.toLocaleDateString("es-NI", { weekday: "short", day: "numeric", month: "short" })}
               </div>
             </div>
-            <div style={{ width: 1, height: 22, background: "rgba(74,124,35,0.1)" }} />
+            <div style={{ width: 1, height: 22, background: "rgba(18,161,0,0.1)" }} />
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#27AE60", animation: "mbPulse 1.6s infinite" }} />
               <span style={{ fontSize: "clamp(8px, 0.72vw, 10px)", color: "#7FCB93", fontWeight: 700, letterSpacing: 1.5 }}>EN VIVO</span>
@@ -5305,7 +5305,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
               title="Editar qué se muestra en el Menú TV"
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", width: "clamp(28px,2.4vw,34px)", height: "clamp(28px,2.4vw,34px)",
-                borderRadius: "50%", border: `1px solid ${GOLD}55`, background: "rgba(74,124,35,0.08)", color: GOLD, cursor: "pointer", fontSize: "clamp(13px,1.2vw,16px)",
+                borderRadius: "50%", border: `1px solid ${GOLD}55`, background: "rgba(18,161,0,0.08)", color: GOLD, cursor: "pointer", fontSize: "clamp(13px,1.2vw,16px)",
               }}
             >⚙️</button>
           )}
@@ -5338,7 +5338,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
             />
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(10,8,6,0.10) 20%, rgba(10,8,6,0.5) 60%, rgba(10,8,6,0.94) 100%)", animation: "mbVignettePulse 5s ease-in-out infinite" }} />
             <div style={{ position: "absolute", inset: 0, boxShadow: "inset 0 0 clamp(40px,8vw,120px) rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, transparent 42%, rgba(74,124,35,0.08) 50%, transparent 58%)", backgroundSize: "260% 100%", animation: "mbShine 5.5s linear infinite" }} />
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(100deg, transparent 42%, rgba(18,161,0,0.08) 50%, transparent 58%)", backgroundSize: "260% 100%", animation: "mbShine 5.5s linear infinite" }} />
 
             {/* Marco de esquinas doradas estilo "toma destacada" */}
             {[["top","left"],["top","right"],["bottom","left"],["bottom","right"]].map(([v, h], i) => (
@@ -5398,7 +5398,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
                   boxShadow: `0 10px 26px rgba(0,0,0,0.4), 0 0 0 1px ${GOLD}66`,
                 }}>
                   {money(spotlightItem.price)}
-                  <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(100deg, transparent, rgba(74,124,35,0.5), transparent)", animation: "mbBadgeShine 3s ease-in-out infinite" }} />
+                  <div style={{ position: "absolute", top: 0, left: 0, width: "40%", height: "100%", background: "linear-gradient(100deg, transparent, rgba(18,161,0,0.5), transparent)", animation: "mbBadgeShine 3s ease-in-out infinite" }} />
                 </div>
               </div>
             </div>
@@ -5412,7 +5412,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
             <div style={{ textAlign: "center", marginBottom: "clamp(18px, 3vh, 36px)" }}>
               <div style={{
                 display: "inline-flex", alignItems: "center", gap: 8, fontSize: "clamp(9px, 0.85vw, 12px)", fontWeight: 800, color: GOLD, letterSpacing: 3,
-                background: "rgba(74,124,35,0.1)", border: "1px solid rgba(74,124,35,0.25)", borderRadius: 30, padding: "clamp(5px,0.7vh,7px) clamp(14px,1.6vw,18px)",
+                background: "rgba(18,161,0,0.1)", border: "1px solid rgba(18,161,0,0.25)", borderRadius: 30, padding: "clamp(5px,0.7vh,7px) clamp(14px,1.6vw,18px)",
                 animation: "mbPillIn 0.55s ease both",
               }}>🏷️ OFERTAS ESPECIALES</div>
               <div style={{
@@ -5440,11 +5440,11 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
                   border: `1px solid ${GOLD}33`, borderRadius: 18,
                   padding: "clamp(16px, 2.1vh, 22px) clamp(18px, 2.2vw, 26px)",
                   animation: `mbCardIn 0.5s ease ${0.15 + i * 0.08}s both`,
-                  boxShadow: `0 16px 34px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(74,124,35,0.04)`,
+                  boxShadow: `0 16px 34px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(18,161,0,0.04)`,
                 }}>
                   <div style={{
                     position: "absolute", top: 0, left: 0, right: 0, bottom: 0, pointerEvents: "none",
-                    background: "linear-gradient(100deg, transparent 40%, rgba(74,124,35,0.07) 50%, transparent 60%)",
+                    background: "linear-gradient(100deg, transparent 40%, rgba(18,161,0,0.07) 50%, transparent 60%)",
                     backgroundSize: "250% 100%", animation: "mbShine 5s linear infinite",
                   }} />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14, position: "relative" }}>
@@ -5499,8 +5499,8 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
                 <div key={m.id} style={{
                   position: "relative", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
                   padding: "clamp(12px, 1.7vh, 17px) clamp(14px,1.6vw,18px)",
-                  background: "rgba(74,124,35,0.035)", backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(74,124,35,0.08)", borderRadius: 14,
+                  background: "rgba(18,161,0,0.035)", backdropFilter: "blur(8px)",
+                  border: "1px solid rgba(18,161,0,0.08)", borderRadius: 14,
                   animation: `mbChipIn 0.5s cubic-bezier(0.22,1,0.36,1) ${0.18 + i * 0.05}s both`,
                 }}>
                   <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: `linear-gradient(180deg, ${accent}, transparent)` }} />
@@ -5510,7 +5510,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
                   }}>{m.name}</span>
                   <span style={{
                     fontFamily: "'Anton', sans-serif", fontSize: "clamp(13.5px, 1.45vw, 18px)", color: GOLD, whiteSpace: "nowrap", flexShrink: 0,
-                    padding: "3px 11px", borderRadius: 8, background: "rgba(74,124,35,0.08)", border: "1px solid rgba(74,124,35,0.18)",
+                    padding: "3px 11px", borderRadius: 8, background: "rgba(18,161,0,0.08)", border: "1px solid rgba(18,161,0,0.18)",
                   }}>{money(m.price)}</span>
                 </div>
               ))}
@@ -5522,11 +5522,11 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       <div style={{ padding: "clamp(9px, 1.4vh, 16px) clamp(24px, 3.2vw, 48px) clamp(5px, 0.9vh, 9px)", flexShrink: 0, position: "relative", zIndex: 2 }}>
         <div style={{
           display: "flex", gap: 7, maxWidth: 640, margin: "0 auto",
-          background: "rgba(74,124,35,0.04)", backdropFilter: "blur(8px)", border: "1px solid rgba(74,124,35,0.07)",
+          background: "rgba(18,161,0,0.04)", backdropFilter: "blur(8px)", border: "1px solid rgba(18,161,0,0.07)",
           borderRadius: 20, padding: "8px 12px",
         }}>
           {slides.map((sl, i) => (
-            <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: "rgba(74,124,35,0.10)", overflow: "hidden" }}>
+            <div key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: "rgba(18,161,0,0.10)", overflow: "hidden" }}>
               <div style={{
                 height: "100%", borderRadius: 4, background: sl.type === "promo" ? `linear-gradient(90deg, ${EMBER}, ${AMBER})` : `linear-gradient(90deg, ${GOLD}, #FFE3A0)`,
                 width: i < slide ? "100%" : i === slide ? `${tick}%` : "0%",
@@ -5539,7 +5539,7 @@ function MenuBoardView({ promotions, menuItems, menuCats, kiosk, tvShowPromos, o
       </div>
 
       {/* Ticker inferior */}
-      <div style={{ borderTop: "1px solid rgba(74,124,35,0.12)", background: "rgba(0,0,0,0.45)", padding: "clamp(6px, 1vh, 11px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
+      <div style={{ borderTop: "1px solid rgba(18,161,0,0.12)", background: "rgba(0,0,0,0.45)", padding: "clamp(6px, 1vh, 11px) 0", overflow: "hidden", flexShrink: 0, width: "100%", boxSizing: "border-box", position: "relative", zIndex: 2 }}>
         <div style={{ display: "flex", width: "max-content", animation: "mbTicker 24s linear infinite" }}>
           {[...tickerMsgs, ...tickerMsgs, ...tickerMsgs].map((msg, i) => (
             <span key={i} style={{ display: "flex", alignItems: "center", gap: "clamp(16px, 2vw, 34px)", fontSize: "clamp(9.5px, 0.9vw, 12.5px)", color: "#8A7A62", letterSpacing: 2.5, fontWeight: 700, paddingRight: "clamp(16px, 2vw, 34px)", whiteSpace: "nowrap" }}>
@@ -5633,7 +5633,7 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
           <div style={{ background: "linear-gradient(135deg, #000000, #3d2f22)", borderRadius: 12, padding: 16, color: "#fff" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 8 }}>QUINCENA 1 (día 1 al 15)</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", letterSpacing: 0.5, marginBottom: 8 }}>QUINCENA 1 (día 1 al 15)</div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q1Sold)}</span>
             </div>
@@ -5649,13 +5649,13 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
               <span style={{ opacity: 0.8 }}>Nómina</span><span style={{ fontWeight: 800, color: "#D1453A" }}>-{money(q1Payroll)}</span>
             </div>
-            <div style={{ borderTop: "1px solid rgba(74,124,35,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+            <div style={{ borderTop: "1px solid rgba(18,161,0,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: 12, fontWeight: 700 }}>Ganancia real</span>
               <span style={{ fontSize: 17, fontWeight: 800, color: q1Sold - q1Spent - q1Payroll >= 0 ? "#00E676" : "#FF5252" }}>{money(q1Sold - q1Spent - q1Payroll)}</span>
             </div>
           </div>
           <div style={{ background: "linear-gradient(135deg, #000000, #3d2f22)", borderRadius: 12, padding: 16, color: "#fff" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 8 }}>QUINCENA 2 (día 16 al {lastDay})</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", letterSpacing: 0.5, marginBottom: 8 }}>QUINCENA 2 (día 16 al {lastDay})</div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
               <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q2Sold)}</span>
             </div>
@@ -5671,20 +5671,20 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
               <span style={{ opacity: 0.8 }}>Nómina</span><span style={{ fontWeight: 800, color: "#D1453A" }}>-{money(q2Payroll)}</span>
             </div>
-            <div style={{ borderTop: "1px solid rgba(74,124,35,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+            <div style={{ borderTop: "1px solid rgba(18,161,0,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: 12, fontWeight: 700 }}>Ganancia real</span>
               <span style={{ fontSize: 17, fontWeight: 800, color: q2Sold - q2Spent - q2Payroll >= 0 ? "#00E676" : "#FF5252" }}>{money(q2Sold - q2Spent - q2Payroll)}</span>
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 12, background: "#FFF3E0", border: "1px solid #4A7C23", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13, flexWrap: "wrap", gap: 6 }}>
+        <div style={{ marginTop: 12, background: "#FFF3E0", border: "1px solid #12A100", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", fontSize: 13, flexWrap: "wrap", gap: 6 }}>
           <span style={{ color: "#5a4c3a", fontWeight: 700 }}>Total del mes ({monthLabel})</span>
           <span style={{ fontWeight: 800, color: "#000000" }}>{money(q1Sold + q2Sold)} vendido · -{money(q1Spent + q2Spent)} gastado · -{money(q1Payroll + q2Payroll)} nómina</span>
         </div>
       </div>
 
       <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 16, padding: 18, marginBottom: 20, color: "#000000" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 10 }}>💎 BALANCE DETALLADO DEL MES — {monthLabel.toUpperCase()}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", letterSpacing: 0.5, marginBottom: 10 }}>💎 BALANCE DETALLADO DEL MES — {monthLabel.toUpperCase()}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
           <div><div style={{ color: "#5C7A3D" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(monthIncomeAll)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(monthInsumosAll)}</div></div>
@@ -5693,7 +5693,7 @@ function HistorialView({ salesLog, expensesLog, payments, onDeleteSale, onDelete
           <div><div style={{ color: "#5C7A3D" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(monthOtrosAll)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(monthPayrollAll)}</div></div>
         </div>
-        <div style={{ borderTop: "1px solid rgba(74,124,35,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ borderTop: "1px solid rgba(18,161,0,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>= Ganancia real del mes</span>
           <span style={{ fontSize: 22, fontWeight: 800, color: monthRealProfitAll >= 0 ? "#00E676" : "#FF5252" }}>{money(monthRealProfitAll)}</span>
         </div>
@@ -5806,12 +5806,12 @@ function printPayStub(employee, payment) {
       .logo { font-size: 36px; }
       .name { font-size: 18px; font-weight: 800; color: #D1453A; margin-top: 4px; }
       .sub { text-align: center; font-size: 11px; color: #666; letter-spacing: 1px; margin-bottom: 18px; }
-      .title { text-align: center; background: #000000; color: #4A7C23; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
+      .title { text-align: center; background: #000000; color: #12A100; font-weight: 800; padding: 9px; border-radius: 8px; letter-spacing: 1px; margin-bottom: 18px; font-size: 13px; }
       .row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #ddd; font-size: 13px; }
       .row strong { font-weight: 800; }
       .section-title { font-weight: 800; font-size: 11px; text-transform: uppercase; color: #8a7a63; margin: 18px 0 4px; letter-spacing: 0.5px; }
       .neg { color: #D1453A; font-weight: 700; }
-      .big { font-size: 22px; font-weight: 800; text-align: center; margin: 18px 0; background: #4A7C23; padding: 16px; border-radius: 10px; letter-spacing: 0.5px; }
+      .big { font-size: 22px; font-weight: 800; text-align: center; margin: 18px 0; background: #12A100; padding: 16px; border-radius: 10px; letter-spacing: 0.5px; }
       .sign { margin-top: 55px; display: flex; justify-content: space-between; gap: 24px; }
       .sign div { flex: 1; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; color: #5a4c3a; }
       hr { border: none; border-top: 2px dashed #333; margin: 14px 0; }
@@ -5899,7 +5899,7 @@ function PaydayBanner({ employees, payments, clockRecords }) {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {pending.map((x) => (
-              <span key={x.emp.id} style={{ background: "rgba(74,124,35,0.22)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 700 }}>
+              <span key={x.emp.id} style={{ background: "rgba(18,161,0,0.22)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 700 }}>
                 {x.emp.name}: {money(x.owed)}
               </span>
             ))}
@@ -5920,7 +5920,7 @@ function PaymentForm({ employee, pendingDays, period, cutoff, onPay }) {
   const neto = bruto - (Number(deducciones) || 0);
 
   return (
-    <div style={{ background: "#FFF3E0", border: "1px solid #4A7C23", borderRadius: 12, padding: 14, marginTop: 12, marginBottom: 12 }}>
+    <div style={{ background: "#FFF3E0", border: "1px solid #12A100", borderRadius: 12, padding: 14, marginTop: 12, marginBottom: 12 }}>
       <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 10 }}>💵 Registrar pago detallado</div>
 
       {period && (
@@ -6051,7 +6051,7 @@ function printPayrollSummary(employees, payments, clockRecords) {
       table { width: 100%; border-collapse: collapse; margin-top: 10px; }
       td, th { padding: 8px 6px; border-bottom: 1px solid #eee; text-align: left; }
       th { font-size: 10px; text-transform: uppercase; color: #8a7a63; background: #FBF2E4; }
-      .total td { border: none; font-weight: 800; font-size: 14px; padding-top: 14px; background: #4A7C23; }
+      .total td { border: none; font-weight: 800; font-size: 14px; padding-top: 14px; background: #12A100; }
       hr { border: none; border-top: 2px dashed #333; margin: 14px 0; }
       @page { margin: 12mm; }
     </style></head><body>
@@ -6129,12 +6129,12 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
   const INK = "#F2ECD8";
   const CARD = "#FBF7EA";
   const CARD2 = "#F5EEDC";
-  const GOLD = "#4A7C23";
+  const GOLD = "#12A100";
   const EMBER = "#D1453A";
   const AMBER = "#E8862E";
   const CREAM = "#000000";
   const MUTED = "#5C7A3D";
-  const LINE = "rgba(74,124,35,0.14)";
+  const LINE = "rgba(18,161,0,0.14)";
 
   const monthPayroll = payments.filter((p) => p.time.slice(0, 7) === monthKey).reduce((sum, p) => sum + p.amount, 0);
 
@@ -6202,7 +6202,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
         borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
         boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: `1px solid ${LINE}`,
       }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.10), transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.10), transparent 70%)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -6213,7 +6213,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
             <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Turno: {SHIFT_START} a {SHIFT_END} · tolerancia {LATE_GRACE_MIN} min</div>
           </div>
           {employees.length > 0 && (
-            <button onClick={() => printPayrollSummary(employees, payments, clockRecords)} className="emp-chip" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: `1px solid ${LINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(74,124,35,0.04)", color: GOLD }}>
+            <button onClick={() => printPayrollSummary(employees, payments, clockRecords)} className="emp-chip" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 12, border: `1px solid ${LINE}`, cursor: "pointer", fontWeight: 700, fontSize: 12.5, background: "rgba(18,161,0,0.04)", color: GOLD }}>
               <Printer size={14} /> Imprimir nómina
             </button>
           )}
@@ -6226,7 +6226,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
             { label: "EQUIPO ACTIVO", value: activeEmployees.length, accent: "#3E7FD9" },
             { label: "PUNTUALIDAD DEL EQUIPO", value: teamPunctuality !== null ? `${teamPunctuality}%` : "—", accent: teamPunctuality !== null && teamPunctuality >= 90 ? "#27AE60" : teamPunctuality !== null && teamPunctuality >= 70 ? AMBER : "#C0392B" },
           ].map((s, i) => (
-            <div key={i} style={{ background: "rgba(74,124,35,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+            <div key={i} style={{ background: "rgba(18,161,0,0.035)", border: `1px solid ${LINE}`, borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: CREAM }}>{s.value}</div>
             </div>
@@ -6241,7 +6241,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
         <div style={{ fontWeight: 800, fontSize: 14, color: CREAM, marginBottom: 12 }}>➕ Agregar nuevo empleado</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
           {ROLES.map((r) => (
-            <button key={r} onClick={() => setRole(r)} className="emp-chip" style={{ padding: "7px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: role === r ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(74,124,35,0.05)", color: role === r ? "#fff" : MUTED }}>
+            <button key={r} onClick={() => setRole(r)} className="emp-chip" style={{ padding: "7px 14px", borderRadius: 20, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, background: role === r ? `linear-gradient(135deg, ${EMBER}, ${AMBER})` : "rgba(18,161,0,0.05)", color: role === r ? "#fff" : MUTED }}>
               {ROLE_ICONS[r]} {r}
             </button>
           ))}
@@ -6338,7 +6338,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span style={{ fontWeight: 800, fontSize: 15.5, color: CREAM, fontFamily: "'Fraunces', serif" }}>{emp.name}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(74,124,35,0.06)", color: MUTED, padding: "2px 9px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(18,161,0,0.06)", color: MUTED, padding: "2px 9px", borderRadius: 20 }}>{ROLE_ICONS[emp.role] || "👤"} {emp.role || "Personal"}</span>
                     {isInactive && <span style={{ fontSize: 10, fontWeight: 700, background: "rgba(193,39,45,0.15)", color: "#C0392B", padding: "2px 9px", borderRadius: 20 }}>Inactivo</span>}
                   </div>
                   <div style={{ fontSize: 11.5, color: MUTED, marginTop: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -6349,7 +6349,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                     <span style={{ color: punctColor, fontWeight: 700 }}>{st.punctuality}% puntual</span>
                     {emp.hireDate && <><span>·</span><span>{seniorityLabel(emp.hireDate)}</span></>}
                   </div>
-                  <div style={{ background: "rgba(74,124,35,0.08)", borderRadius: 4, height: 4, marginTop: 7, overflow: "hidden", maxWidth: 200 }}>
+                  <div style={{ background: "rgba(18,161,0,0.08)", borderRadius: 4, height: 4, marginTop: 7, overflow: "hidden", maxWidth: 200 }}>
                     <div style={{ width: `${st.punctuality}%`, height: "100%", background: punctColor, borderRadius: 4 }} />
                   </div>
                 </div>
@@ -6377,7 +6377,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                     />
                   ) : (
                     <>
-                      <div style={{ background: "rgba(74,124,35,0.07)", border: `1px solid ${GOLD}55`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+                      <div style={{ background: "rgba(18,161,0,0.07)", border: `1px solid ${GOLD}55`, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
                         <div style={{ fontSize: 10.5, fontWeight: 800, color: GOLD, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
                           📅 Control mensual — {st.monthLabel}
                         </div>
@@ -6396,7 +6396,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                         <button onClick={() => onToggleActive(emp.id)} className="emp-chip" style={{ fontSize: 12, background: isInactive ? "rgba(74,222,128,0.10)" : "rgba(193,39,45,0.10)", border: `1px solid ${isInactive ? "#27AE60" : EMBER}55`, color: isInactive ? "#27AE60" : "#C0392B", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
                           {isInactive ? "✅ Reactivar empleado" : "🚫 Marcar como inactivo"}
                         </button>
-                        <button onClick={() => { if (window.confirm(`¿Eliminar a "${emp.name}" por completo? Esto borra al empleado (no su historial de pagos ya registrado) y no se puede deshacer.`)) onDeleteEmployee(emp.id); }} className="emp-chip" style={{ fontSize: 12, background: "rgba(74,124,35,0.04)", border: `1px solid ${LINE}`, color: MUTED, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
+                        <button onClick={() => { if (window.confirm(`¿Eliminar a "${emp.name}" por completo? Esto borra al empleado (no su historial de pagos ya registrado) y no se puede deshacer.`)) onDeleteEmployee(emp.id); }} className="emp-chip" style={{ fontSize: 12, background: "rgba(18,161,0,0.04)", border: `1px solid ${LINE}`, color: MUTED, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontWeight: 700 }}>
                           🗑️ Eliminar empleado
                         </button>
                       </div>
@@ -6431,7 +6431,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
                           <div style={{ fontSize: 10, color: MUTED, marginTop: 2 }}>{new Date(p.time).toLocaleString("es-NI")}</div>
                           {(p.days || p.bono || p.deducciones) && (
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
-                              {p.days ? <span style={{ fontSize: 10, background: "rgba(74,124,35,0.06)", color: MUTED, padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>📅 {p.days} día{p.days !== 1 ? "s" : ""} × {money(emp.dailyWage)}</span> : null}
+                              {p.days ? <span style={{ fontSize: 10, background: "rgba(18,161,0,0.06)", color: MUTED, padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>📅 {p.days} día{p.days !== 1 ? "s" : ""} × {money(emp.dailyWage)}</span> : null}
                               {p.bono > 0 ? <span style={{ fontSize: 10, background: "rgba(74,222,128,0.12)", color: "#27AE60", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>🎁 Bono {money(p.bono)}</span> : null}
                               {p.deducciones > 0 ? <span style={{ fontSize: 10, background: "rgba(193,39,45,0.12)", color: "#C0392B", padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>➖ Deducción {money(p.deducciones)}</span> : null}
                             </div>
@@ -6473,7 +6473,7 @@ function EmpleadosView({ employees, clockRecords, payments, onAdd, onClockIn, on
 }
 
 function empInp(line, cream) {
-  return { padding: 9, borderRadius: 9, border: `1px solid ${line}`, background: "rgba(74,124,35,0.03)", color: cream, fontSize: 13, fontFamily: "inherit" };
+  return { padding: 9, borderRadius: 9, border: `1px solid ${line}`, background: "rgba(18,161,0,0.03)", color: cream, fontSize: 13, fontFamily: "inherit" };
 }
 function EmployeeEditForm({ employee, onSave, onCancel }) {
   const [name, setName] = useState(employee.name);
@@ -6484,7 +6484,7 @@ function EmployeeEditForm({ employee, onSave, onCancel }) {
   const [restDay, setRestDay] = useState(employee.restDay === undefined || employee.restDay === null ? "" : String(employee.restDay));
 
   return (
-    <div style={{ background: "linear-gradient(160deg, #FFF8ED, #FFF3E0)", border: "2px solid #4A7C23", borderRadius: 12, padding: 16, marginTop: 4 }}>
+    <div style={{ background: "linear-gradient(160deg, #FFF8ED, #FFF3E0)", border: "2px solid #12A100", borderRadius: 12, padding: 16, marginTop: 4 }}>
       <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 12, color: "#000000" }}>✏️ Editar datos del empleado</div>
 
       <label style={{ ...lbl, marginTop: 0 }}>Nombre completo</label>
@@ -6564,7 +6564,7 @@ function PayCustomButton({ onPay }) {
       <button
         disabled={!amt}
         onClick={() => { onPay(Number(amt)); setAmt(""); }}
-        style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#000000", color: "#4A7C23", fontWeight: 700, cursor: "pointer", opacity: amt ? 1 : 0.5 }}
+        style={{ padding: "0 16px", border: "none", borderRadius: 8, background: "#000000", color: "#12A100", fontWeight: 700, cursor: "pointer", opacity: amt ? 1 : 0.5 }}
       >
         Registrar
       </button>
@@ -6588,7 +6588,7 @@ function printDayReport(dayStr, dateLabel, sales, expenses, income, spent, insum
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
       td, th { padding: 4px 2px; border-bottom: 1px dashed #ccc; text-align: left; }
       .totals td { border: none; font-weight: bold; }
-      .big { font-size: 16px; background: #4A7C23; padding: 10px; border-radius: 8px; text-align: center; margin: 12px 0; }
+      .big { font-size: 16px; background: #12A100; padding: 10px; border-radius: 8px; text-align: center; margin: 12px 0; }
       hr { border: none; border-top: 2px dashed #333; margin: 10px 0; }
       @page { margin: 10mm; }
     </style></head><body>
@@ -6885,7 +6885,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
   }, [sales]);
   const max7 = Math.max(1, ...last7Days.map((d) => d.total));
 
-  const rCard = { background: "linear-gradient(175deg, #FBF7EA, #F5EEDC)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 14, padding: 14 };
+  const rCard = { background: "linear-gradient(175deg, #FBF7EA, #F5EEDC)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 14, padding: 14 };
   const rLabel = { fontSize: 10.5, color: "#5C7A3D", fontWeight: 700, letterSpacing: 0.5, marginBottom: 5 };
   const rValue = { fontSize: 20, fontWeight: 800, color: "#000000" };
 
@@ -6910,9 +6910,9 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       <div style={{
         background: "linear-gradient(160deg, #F2ECD8, #211710 60%, #F2ECD8)",
         borderRadius: 22, padding: "26px 28px", marginBottom: 22, position: "relative", overflow: "hidden",
-        boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: "1px solid rgba(74,124,35,0.14)",
+        boxShadow: "0 18px 40px rgba(0,0,0,0.35)", border: "1px solid rgba(18,161,0,0.14)",
       }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(74,124,35,0.10), transparent 70%)" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(18,161,0,0.10), transparent 70%)" }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14, position: "relative" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -6925,17 +6925,17 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button onClick={() => shiftDate(-1)} className="rep-chip" style={{ background: "rgba(74,124,35,0.05)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 10, color: "#4A7C23", cursor: "pointer", width: 36, height: 36, fontSize: 16 }}>‹</button>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(74,124,35,0.14)", background: "rgba(74,124,35,0.03)", color: "#000000", fontSize: 13, maxWidth: 150 }} />
-            <button onClick={() => shiftDate(1)} className="rep-chip" style={{ background: "rgba(74,124,35,0.05)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 10, color: "#4A7C23", cursor: "pointer", width: 36, height: 36, fontSize: 16 }}>›</button>
+            <button onClick={() => shiftDate(-1)} className="rep-chip" style={{ background: "rgba(18,161,0,0.05)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 10, color: "#12A100", cursor: "pointer", width: 36, height: 36, fontSize: 16 }}>‹</button>
+            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} style={{ padding: 9, borderRadius: 9, border: "1px solid rgba(18,161,0,0.14)", background: "rgba(18,161,0,0.03)", color: "#000000", fontSize: 13, maxWidth: 150 }} />
+            <button onClick={() => shiftDate(1)} className="rep-chip" style={{ background: "rgba(18,161,0,0.05)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 10, color: "#12A100", cursor: "pointer", width: 36, height: 36, fontSize: 16 }}>›</button>
             {!isToday && (
-              <button onClick={() => { const d = new Date(); const tz = d.getTimezoneOffset() * 60000; setSelectedDate(new Date(d - tz).toISOString().slice(0, 10)); }} className="rep-chip" style={{ fontSize: 11, background: "rgba(74,124,35,0.10)", border: "1px solid rgba(74,124,35,0.3)", borderRadius: 9, padding: "9px 12px", cursor: "pointer", color: "#4A7C23", fontWeight: 700 }}>Hoy</button>
+              <button onClick={() => { const d = new Date(); const tz = d.getTimezoneOffset() * 60000; setSelectedDate(new Date(d - tz).toISOString().slice(0, 10)); }} className="rep-chip" style={{ fontSize: 11, background: "rgba(18,161,0,0.10)", border: "1px solid rgba(18,161,0,0.3)", borderRadius: 9, padding: "9px 12px", cursor: "pointer", color: "#12A100", fontWeight: 700 }}>Hoy</button>
             )}
-            <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" className="rep-chip" style={{ background: "rgba(74,124,35,0.05)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 10, padding: "9px 11px", cursor: "pointer", color: "#4A7C23" }}>
+            <button onClick={() => printDayReport(dayStr, selectedDate, sales, expenses, income, spent, insumos, payroll, realProfit)} title="Imprimir reporte del día" className="rep-chip" style={{ background: "rgba(18,161,0,0.05)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 10, padding: "9px 11px", cursor: "pointer", color: "#12A100" }}>
               <Printer size={15} />
             </button>
             {todaySales.length > 0 && (
-              <button onClick={exportCSV} title="Exportar a Excel/CSV" className="rep-chip" style={{ background: "rgba(74,124,35,0.05)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 10, padding: "9px 11px", cursor: "pointer", color: "#4A7C23", fontSize: 15 }}>
+              <button onClick={exportCSV} title="Exportar a Excel/CSV" className="rep-chip" style={{ background: "rgba(18,161,0,0.05)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 10, padding: "9px 11px", cursor: "pointer", color: "#12A100", fontSize: 15 }}>
                 📥
               </button>
             )}
@@ -6947,9 +6947,9 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
             { label: "INGRESOS", value: money(income), accent: "#27AE60" },
             { label: "GASTOS TOTALES", value: money(spent), accent: "#C0392B" },
             { label: "PEDIDOS CERRADOS", value: count, accent: "#3E7FD9" },
-            { label: "TICKET PROMEDIO", value: money(avgTicket), accent: "#4A7C23" },
+            { label: "TICKET PROMEDIO", value: money(avgTicket), accent: "#12A100" },
           ].map((s, i) => (
-            <div key={i} style={{ background: "rgba(74,124,35,0.035)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
+            <div key={i} style={{ background: "rgba(18,161,0,0.035)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 14, padding: "13px 16px", borderLeft: `3px solid ${s.accent}` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#5C7A3D", letterSpacing: 1, marginBottom: 5 }}>{s.label}</div>
               <div style={{ fontSize: 20, fontWeight: 800, color: "#000000" }}>{s.value}</div>
             </div>
@@ -6958,7 +6958,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       </div>
 
       <div style={{ ...rCard, marginBottom: 18 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", marginBottom: 12, letterSpacing: 0.5 }}>📈 TENDENCIA DE VENTAS — ÚLTIMOS 7 DÍAS</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", marginBottom: 12, letterSpacing: 0.5 }}>📈 TENDENCIA DE VENTAS — ÚLTIMOS 7 DÍAS</div>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
           {last7Days.map((d, i) => (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
@@ -6971,14 +6971,14 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       </div>
 
       <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#000000" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL (hoy)</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL (hoy)</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
           <div><div style={{ color: "#5C7A3D" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(income)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(insumos)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(otrosGastos)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(payroll)}</div></div>
         </div>
-        <div style={{ borderTop: "1px solid rgba(74,124,35,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ borderTop: "1px solid rgba(18,161,0,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>= Te queda realmente</span>
           <span style={{ fontSize: 22, fontWeight: 800, color: realProfit >= 0 ? "#00E676" : "#FF5252" }}>{money(realProfit)}</span>
         </div>
@@ -6994,13 +6994,13 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
       {income > 0 && (
         <div style={{ ...rCard, marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", marginBottom: 12, letterSpacing: 0.5 }}>💳 MÉTODO DE PAGO (HOY)</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", marginBottom: 12, letterSpacing: 0.5 }}>💳 MÉTODO DE PAGO (HOY)</div>
           <div style={{ display: "flex", gap: 20 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6, color: "#000000" }}>
                 <span>💵 Efectivo</span><span style={{ fontWeight: 700 }}>{money(cashToday)}</span>
               </div>
-              <div style={{ background: "rgba(74,124,35,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+              <div style={{ background: "rgba(18,161,0,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
                 <div style={{ width: `${income > 0 ? (cashToday / income) * 100 : 0}%`, height: "100%", background: "#27AE60", borderRadius: 6 }} />
               </div>
             </div>
@@ -7008,7 +7008,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6, color: "#000000" }}>
                 <span>💳 Tarjeta</span><span style={{ fontWeight: 700 }}>{money(cardToday)}</span>
               </div>
-              <div style={{ background: "rgba(74,124,35,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+              <div style={{ background: "rgba(18,161,0,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
                 <div style={{ width: `${income > 0 ? (cardToday / income) * 100 : 0}%`, height: "100%", background: "#3E7FD9", borderRadius: 6 }} />
               </div>
             </div>
@@ -7016,7 +7016,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 6, color: "#000000" }}>
                 <span>🏦 Transferencia</span><span style={{ fontWeight: 700 }}>{money(transferToday)}</span>
               </div>
-              <div style={{ background: "rgba(74,124,35,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
+              <div style={{ background: "rgba(18,161,0,0.08)", borderRadius: 6, height: 10, overflow: "hidden" }}>
                 <div style={{ width: `${income > 0 ? (transferToday / income) * 100 : 0}%`, height: "100%", background: "#9C63D8", borderRadius: 6 }} />
               </div>
             </div>
@@ -7025,7 +7025,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       )}
 
       <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 16, padding: 18, marginBottom: 18, color: "#000000" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL DEL MES — {monthLabel.toUpperCase()}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", letterSpacing: 0.5, marginBottom: 10 }}>💎 GANANCIA NETA REAL DEL MES — {monthLabel.toUpperCase()}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 8, marginBottom: 10, fontSize: 11 }}>
           <div><div style={{ color: "#5C7A3D" }}>Ventas</div><div style={{ fontWeight: 800, fontSize: 14 }}>{money(monthIncome)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Insumos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(monthInsumos)}</div></div>
@@ -7034,7 +7034,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
           <div><div style={{ color: "#5C7A3D" }}>− Otros gastos</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(monthSpent - monthInsumos - monthLuz - monthAgua)}</div></div>
           <div><div style={{ color: "#5C7A3D" }}>− Nómina pagada</div><div style={{ fontWeight: 800, fontSize: 14, color: "#D1453A" }}>{money(monthPayroll)}</div></div>
         </div>
-        <div style={{ borderTop: "1px solid rgba(74,124,35,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ borderTop: "1px solid rgba(18,161,0,0.15)", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 13, fontWeight: 700 }}>= Te queda realmente este mes</span>
           <span style={{ fontSize: 22, fontWeight: 800, color: monthRealProfit >= 0 ? "#00E676" : "#FF5252" }}>{money(monthRealProfit)}</span>
         </div>
@@ -7055,7 +7055,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       {prevMonthIncome > 0 || prevMonthSpent > 0 ? (
         <div style={{ ...rCard, margin: "10px 0 14px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: "#4A7C23", letterSpacing: 0.3, textTransform: "capitalize" }}>📊 Comparado con {prevMonthLabel}</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#12A100", letterSpacing: 0.3, textTransform: "capitalize" }}>📊 Comparado con {prevMonthLabel}</span>
             {monthChangePct !== null && (
               <span style={{
                 fontSize: 12, fontWeight: 800, padding: "3px 10px", borderRadius: 20,
@@ -7101,11 +7101,11 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         <div style={rCard}><div style={rLabel}>DÍAS CON VENTAS</div><div style={rValue}>{new Set(monthSales.map((s) => s.time.slice(0, 10))).size}</div></div>
       </div>
 
-      <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(74,124,35,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 14 }}>📆 CONTROL QUINCENAL — {monthLabel.toUpperCase()}</div>
+      <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(18,161,0,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#12A100", letterSpacing: 0.5, marginBottom: 14 }}>📆 CONTROL QUINCENAL — {monthLabel.toUpperCase()}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
           {[{ label: `QUINCENA 1 (1 al 15)`, sold: q1Sold, spent: q1Spent, payroll: q1Payroll, luz: q1Luz, agua: q1Agua }, { label: `QUINCENA 2 (16 al ${lastDayOfMonth})`, sold: q2Sold, spent: q2Spent, payroll: q2Payroll, luz: q2Luz, agua: q2Agua }].map((q) => (
-            <div key={q.label} style={{ background: "rgba(74,124,35,0.06)", borderRadius: 12, padding: 14, border: "1px solid rgba(74,124,35,0.08)" }}>
+            <div key={q.label} style={{ background: "rgba(18,161,0,0.06)", borderRadius: 12, padding: 14, border: "1px solid rgba(18,161,0,0.08)" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#5C7A3D", letterSpacing: 0.5, marginBottom: 10 }}>{q.label}</div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 4 }}>
                 <span style={{ opacity: 0.8 }}>Vendido</span><span style={{ fontWeight: 800 }}>{money(q.sold)}</span>
@@ -7122,7 +7122,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "#fff", marginBottom: 8 }}>
                 <span style={{ opacity: 0.8 }}>Nómina pagada</span><span style={{ fontWeight: 800, color: "#D1453A" }}>-{money(q.payroll)}</span>
               </div>
-              <div style={{ borderTop: "1px solid rgba(74,124,35,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
+              <div style={{ borderTop: "1px solid rgba(18,161,0,0.15)", paddingTop: 8, display: "flex", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#5C7A3D" }}>Ganancia real</span>
                 <span style={{ fontSize: 18, fontWeight: 800, color: q.sold - q.spent - q.payroll >= 0 ? "#00E676" : "#FF5252" }}>{money(q.sold - q.spent - q.payroll)}</span>
               </div>
@@ -7131,7 +7131,7 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
         </div>
       </div>
 
-      <div style={{ background: "#FFF3E0", border: "1px solid #4A7C23", borderRadius: 12, padding: "12px 16px", marginBottom: 22, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ background: "#FFF3E0", border: "1px solid #12A100", borderRadius: 12, padding: "12px 16px", marginBottom: 22, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: 12, color: "#5a4c3a", fontWeight: 700 }}>💰 Ganancia real del mes completo (suma de ambas quincenas)</span>
         <span style={{ fontWeight: 800, fontSize: 18, color: (q1Sold + q2Sold - q1Spent - q2Spent - q1Payroll - q2Payroll) >= 0 ? "#2E7D32" : "#D1453A" }}>
           {money(q1Sold + q2Sold - q1Spent - q2Spent - q1Payroll - q2Payroll)}
@@ -7140,25 +7140,25 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
       <FiadosPendientesCard sales={sales} onMarkPaid={onMarkFiadoPaid} />
 
-      <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(74,124,35,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: "#4A7C23", letterSpacing: 0.5, marginBottom: 14 }}>📊 GASTOS POR CATEGORÍA — {isToday ? "HOY" : new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { day: "numeric", month: "short" }).toUpperCase()}</div>
+      <div style={{ background: "linear-gradient(160deg, #FFFFFF, #F2ECD8)", borderRadius: 18, padding: 20, marginBottom: 22, border: "1px solid rgba(18,161,0,0.2)", boxShadow: "0 10px 24px rgba(0,0,0,0.25)" }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: "#12A100", letterSpacing: 0.5, marginBottom: 14 }}>📊 GASTOS POR CATEGORÍA — {isToday ? "HOY" : new Date(selectedDate + "T12:00:00").toLocaleDateString("es-NI", { day: "numeric", month: "short" }).toUpperCase()}</div>
 
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 18 }}>
-          <div style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #4A7C23" }}>
+          <div style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #12A100" }}>
             <div style={{ fontSize: 10.5, color: "#5C7A3D" }}>GASTO DE HOY</div>
             <div style={{ fontWeight: 800, fontSize: 17, color: "#fff" }}>{money(todayExpensesTotal)}</div>
           </div>
-          <div style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #E8862E" }}>
+          <div style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #E8862E" }}>
             <div style={{ fontSize: 10.5, color: "#5C7A3D" }}>ACUMULADO DEL MES</div>
             <div style={{ fontWeight: 800, fontSize: 17, color: "#fff" }}>{money(monthExpensesTotal)}</div>
           </div>
-          <div style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #3E7FD9" }}>
+          <div style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: 12, borderLeft: "3px solid #3E7FD9" }}>
             <div style={{ fontSize: 10.5, color: "#5C7A3D" }}>PROMEDIO DIARIO DEL MES</div>
             <div style={{ fontWeight: 800, fontSize: 17, color: "#fff" }}>{money(avgDailyExpense)}</div>
           </div>
           {topExpenseCat && topExpenseCat.amount > 0 && (
-            <div style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: 12, borderLeft: `3px solid ${topExpenseCat.color}` }}>
+            <div style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: 12, borderLeft: `3px solid ${topExpenseCat.color}` }}>
               <div style={{ fontSize: 10.5, color: "#5C7A3D" }}>MAYOR GASTO DEL MES</div>
               <div style={{ fontWeight: 800, fontSize: 14, color: "#fff" }}>{topExpenseCat.icon} {topExpenseCat.label}</div>
             </div>
@@ -7167,19 +7167,19 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 18 }}>
           {todayExpensesByCat.map((cat) => (
-            <div key={cat.id} style={{ background: "rgba(74,124,35,0.05)", borderRadius: 12, padding: 12, borderLeft: `3px solid ${cat.color}` }}>
+            <div key={cat.id} style={{ background: "rgba(18,161,0,0.05)", borderRadius: 12, padding: 12, borderLeft: `3px solid ${cat.color}` }}>
               <div style={{ fontSize: 11, color: "#5C7A3D", marginBottom: 3 }}>{cat.icon} {cat.label}</div>
               <div style={{ fontWeight: 800, fontSize: 16, color: "#fff" }}>{money(cat.amount)}</div>
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#5C7A3D", letterSpacing: 0.5, marginBottom: 10, borderTop: "1px solid rgba(74,124,35,0.1)", paddingTop: 14 }}>ACUMULADO DEL MES ({monthLabel.toUpperCase()})</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#5C7A3D", letterSpacing: 0.5, marginBottom: 10, borderTop: "1px solid rgba(18,161,0,0.1)", paddingTop: 14 }}>ACUMULADO DEL MES ({monthLabel.toUpperCase()})</div>
         {monthExpensesByCat.map((cat) => (
           <div key={cat.id} style={{ marginBottom: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#fff", marginBottom: 3 }}>
               <span>{cat.icon} {cat.label} {cat.count > 0 ? <span style={{ color: "#8A7A62" }}>({cat.count})</span> : null}</span><span style={{ fontWeight: 700 }}>{money(cat.amount)}</span>
             </div>
-            <div style={{ background: "rgba(74,124,35,0.08)", borderRadius: 6, height: 7, overflow: "hidden" }}>
+            <div style={{ background: "rgba(18,161,0,0.08)", borderRadius: 6, height: 7, overflow: "hidden" }}>
               <div style={{ width: `${(cat.amount / maxCatAmount) * 100}%`, height: "100%", background: cat.color, borderRadius: 6 }} />
             </div>
           </div>
@@ -7256,14 +7256,14 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       )}
 
       <div style={{ ...rCard, marginBottom: 22 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#4A7C23", marginBottom: 14, letterSpacing: 0.5 }}>🏆 PRODUCTOS MÁS VENDIDOS {isToday ? "(HOY)" : ""}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#12A100", marginBottom: 14, letterSpacing: 0.5 }}>🏆 PRODUCTOS MÁS VENDIDOS {isToday ? "(HOY)" : ""}</div>
         {byItem.length === 0 && <p style={{ color: "#5C7A3D", fontSize: 13 }}>Aún no hay ventas registradas ese día.</p>}
         {byItem.map(([name, qty], i) => (
           <div key={name} style={{ marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4, color: "#000000" }}>
               <span>{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "▫️"} {name}</span><span style={{ fontWeight: 700 }}>{qty}</span>
             </div>
-            <div style={{ background: "rgba(74,124,35,0.08)", borderRadius: 6, height: 8, overflow: "hidden" }}>
+            <div style={{ background: "rgba(18,161,0,0.08)", borderRadius: 6, height: 8, overflow: "hidden" }}>
               <div style={{ width: `${(qty / maxItemQty) * 100}%`, height: "100%", background: "linear-gradient(90deg, #E8862E, #D1453A)", borderRadius: 6 }} />
             </div>
           </div>
@@ -7277,14 +7277,14 @@ function ReportesView({ sales, expenses, payments, salesLog, expensesLog, onAddE
       {dayPermanentSales.length === 0 && <p style={{ color: "#5C7A3D" }}>Sin cobros ese día.</p>}
       <div style={{ display: "grid", gap: 12 }}>
         {dayPermanentSales.slice().reverse().map((s) => (
-          <div key={s.id} style={{ background: "linear-gradient(175deg, #FBF7EA, #F5EEDC)", border: "1px solid rgba(74,124,35,0.14)", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ background: "rgba(74,124,35,0.03)", padding: "11px 15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, borderBottom: "1px solid rgba(74,124,35,0.1)" }}>
+          <div key={s.id} style={{ background: "linear-gradient(175deg, #FBF7EA, #F5EEDC)", border: "1px solid rgba(18,161,0,0.14)", borderRadius: 14, overflow: "hidden" }}>
+            <div style={{ background: "rgba(18,161,0,0.03)", padding: "11px 15px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6, borderBottom: "1px solid rgba(18,161,0,0.1)" }}>
               <div>
                 <span style={{ fontWeight: 800, fontSize: 13.5, color: "#000000" }}>{s.kind === "delivery" ? "🛵" : "🍽️"} {s.ref}</span>
                 <span style={{ fontSize: 11, color: "#5C7A3D", marginLeft: 8 }}>{new Date(s.time).toLocaleTimeString("es-NI", { hour: "2-digit", minute: "2-digit" })} · {methodLabel(s)}{s.discountAmount > 0 ? ` · 🏷️ -${money(s.discountAmount)}` : ""}</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontWeight: 800, fontSize: 15, color: "#4A7C23" }}>{money(s.total)}</span>
+                <span style={{ fontWeight: 800, fontSize: 15, color: "#12A100" }}>{money(s.total)}</span>
               </div>
             </div>
             <div style={{ padding: "9px 15px" }}>
@@ -7380,10 +7380,10 @@ function ReceiptModal({ sale, onClose }) {
               </div>
             )}
             <div style={{ background: "#000000", borderRadius: 8, padding: "10px 14px", margin: "8px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "#4A7C23", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>TOTAL</span>
+              <span style={{ color: "#12A100", fontWeight: 700, fontSize: 12, letterSpacing: 1 }}>TOTAL</span>
               <span style={{ color: "#fff", fontWeight: 800, fontSize: 20 }}>{money(sale.total)}</span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, background: "#FFF3E0", padding: "6px 10px", borderRadius: 6, border: "1px solid #4A7C23" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, background: "#FFF3E0", padding: "6px 10px", borderRadius: 6, border: "1px solid #12A100" }}>
               <span>💳 Forma de pago</span><span style={{ fontWeight: 800 }}>{methodLabel(sale)}</span>
             </div>
             {sale.tip > 0 && (
